@@ -1,0 +1,14 @@
+{
+  "name": "phasewright",
+  "owner": { "name": "trbbmnglg" },
+  "metadata": {
+    "description": "Reusable skills, agents and plugins for AI coding assistants"
+  },
+  "plugins": [
+    {
+      "name": "phasewright",
+      "source": ".",
+      "description": "8 skills for planning, requirements, commits, refactoring, error handling, performance, docs and prompt engineering."
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "phasewright",
+  "description": "Reusable skills, agents and plugins for AI coding assistants",
+  "owner": { "name": "trbbmnglg" },
+  "plugins": [
+    {
+      "name": "phasewright",
+      "source": "./",
+      "description": "8 skills and 3 agents: planning, requirements, commits, refactoring, error handling, performance, docs, prompt engineering, debugging."
+    },
+    {
+      "name": "phased-shipping",
+      "source": "./plugins/phased-shipping",
+      "description": "Ship in small phases, one deploy each, with the right model and effort for every task type."
+    }
+  ]
+}

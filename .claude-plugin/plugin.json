@@ -1,0 +1,15 @@
+{
+  "name": "phasewright",
+  "description": "Reusable skills and agents for shipping software with AI assistants: planning, debugging, prompts, docs and more.",
+  "version": "1.0.0",
+  "author": { "name": "trbbmnglg", "url": "https://github.com/trbbmnglg" },
+  "homepage": "https://github.com/trbbmnglg/phasewright",
+  "repository": "https://github.com/trbbmnglg/phasewright",
+  "license": "MIT",
+  "keywords": ["skills", "agents", "planning", "debugging", "prompts", "docs"],
+  "agents": [
+    "./agents/claude/debugger.md",
+    "./agents/claude/docs-writer.md",
+    "./agents/claude/prompt-engineer.md"
+  ]
+}

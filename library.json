@@ -1,0 +1,646 @@
+{
+  "schema_version": 1,
+  "repo": "trbbmnglg/phasewright",
+  "license": "MIT",
+  "items": [
+    {
+      "slug": "prompt-engineer",
+      "type": "agent",
+      "title": "Prompt Engineer",
+      "summary": "Prompt engineering specialist for designing and improving LLM prompts.",
+      "description": "Prompt engineering specialist for designing and improving LLM prompts. Use PROACTIVELY when designing a new system prompt or LLM call, when adding an AI feature, when writing few-shot examples, or when auditing/improving the prompts already in an app. MUST BE USED before shipping a production system prompt or autonomous-agent instruction. Rewrites prompt strings in place and reports before/after robustness. Do NOT use for non-prompt code review → a code reviewer. Do NOT use for runtime injection pen-testing → a security reviewer.",
+      "tags": [
+        "prompts",
+        "llm",
+        "ai"
+      ],
+      "featured": true,
+      "order": 1,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "agents/claude/prompt-engineer.md",
+      "files": [
+        "agents/claude/prompt-engineer.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/prompt-engineer.md",
+      "zip": "agent-prompt-engineer.zip",
+      "model": "opus",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "Copy agents/claude/prompt-engineer.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code also reads Claude-format agents from .claude/agents",
+          "install": [
+            "Copy agents/claude/prompt-engineer.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "none",
+          "note": "No documented custom-agent file format; use the matching skill instead",
+          "install": []
+        },
+        "agent-skills": {
+          "support": "none",
+          "note": "Agents are tool-specific",
+          "install": []
+        }
+      }
+    },
+    {
+      "slug": "debugger",
+      "type": "agent",
+      "title": "Root-Cause Debugger",
+      "summary": "Root-cause debugger for failures, stack traces, and wrong behavior.",
+      "description": "Root-cause debugger for failures, stack traces, and wrong behavior. Use PROACTIVELY when a test fails, a stack trace or unhandled error appears, an API returns an unexpected status, or the UI behaves incorrectly. MUST BE USED before applying a fix to any non-obvious bug — do not guess at a cause without evidence. Reproduces the bug, isolates the root cause, applies a minimal fix, and hands regression guard to a QA agent.",
+      "tags": [
+        "debugging",
+        "root-cause"
+      ],
+      "featured": true,
+      "order": 2,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "agents/claude/debugger.md",
+      "files": [
+        "agents/claude/debugger.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/debugger.md",
+      "zip": "agent-debugger.zip",
+      "model": "opus",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "Copy agents/claude/debugger.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code also reads Claude-format agents from .claude/agents",
+          "install": [
+            "Copy agents/claude/debugger.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "none",
+          "note": "No documented custom-agent file format; use the matching skill instead",
+          "install": []
+        },
+        "agent-skills": {
+          "support": "none",
+          "note": "Agents are tool-specific",
+          "install": []
+        }
+      }
+    },
+    {
+      "slug": "docs-writer",
+      "type": "agent",
+      "title": "Docs Writer",
+      "summary": "Technical writer for project documentation.",
+      "description": "Technical writer for project documentation. Use when a feature has shipped and its docs need to be written or updated, when diagrams (flowcharts, ERDs, sequence diagrams) are requested, when a changelog or release note is needed, or when any docs/folder artifact is missing. Reads actual code first — never documents APIs, schemas, or flows that don't exist. Do NOT use for ADRs of undecided architectural decisions → an architect. Do NOT use for test plans → a QA agent.",
+      "tags": [
+        "docs",
+        "diagrams",
+        "changelog"
+      ],
+      "featured": false,
+      "order": 3,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "agents/claude/docs-writer.md",
+      "files": [
+        "agents/claude/docs-writer.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/docs-writer.md",
+      "zip": "agent-docs-writer.zip",
+      "model": "sonnet",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "Copy agents/claude/docs-writer.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code also reads Claude-format agents from .claude/agents",
+          "install": [
+            "Copy agents/claude/docs-writer.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "none",
+          "note": "No documented custom-agent file format; use the matching skill instead",
+          "install": []
+        },
+        "agent-skills": {
+          "support": "none",
+          "note": "Agents are tool-specific",
+          "install": []
+        }
+      }
+    },
+    {
+      "slug": "phased-shipping",
+      "type": "plugin",
+      "title": "Phased Shipping",
+      "summary": "Ship in small phases, one deploy each, with priority, urgency, estimates, and the right model and effort for every task type.",
+      "description": "Ship in small phases, one deploy each, with priority, urgency, estimates, and the right model and effort for every task type.",
+      "tags": [
+        "planning",
+        "deployment",
+        "phases",
+        "model-routing",
+        "cost"
+      ],
+      "featured": true,
+      "order": 1,
+      "version": "0.2.0",
+      "license": "MIT",
+      "path": "plugins/phased-shipping",
+      "files": [
+        "plugins/phased-shipping/.claude-plugin/plugin.json",
+        "plugins/phased-shipping/.gitignore",
+        "plugins/phased-shipping/README.md",
+        "plugins/phased-shipping/agents/builder.md",
+        "plugins/phased-shipping/agents/checker.md",
+        "plugins/phased-shipping/agents/model-scout.md",
+        "plugins/phased-shipping/agents/shipper.md",
+        "plugins/phased-shipping/evals/plans-multi-part-release/graders/roadmap.md",
+        "plugins/phased-shipping/evals/plans-multi-part-release/graders/skill-fired.md",
+        "plugins/phased-shipping/evals/plans-multi-part-release/prompt.md",
+        "plugins/phased-shipping/evals/routes-every-task-type/graders/routing.md",
+        "plugins/phased-shipping/evals/routes-every-task-type/graders/skill-fired.md",
+        "plugins/phased-shipping/evals/routes-every-task-type/prompt.md",
+        "plugins/phased-shipping/evals/skips-trivial-change/graders/direct-answer.md",
+        "plugins/phased-shipping/evals/skips-trivial-change/graders/no-plan.md",
+        "plugins/phased-shipping/evals/skips-trivial-change/prompt.md",
+        "plugins/phased-shipping/evals/small-change-single-phase/graders/single-phase.md",
+        "plugins/phased-shipping/evals/small-change-single-phase/graders/skill-fired.md",
+        "plugins/phased-shipping/evals/small-change-single-phase/prompt.md",
+        "plugins/phased-shipping/skills/plan/SKILL.md",
+        "plugins/phased-shipping/skills/plan/references/templates.md",
+        "plugins/phased-shipping/skills/plan/scripts/history.mjs",
+        "plugins/phased-shipping/skills/run/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/plugins/phased-shipping",
+      "zip": "plugin-phased-shipping.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phased-shipping@phasewright"
+          ]
+        },
+        "copilot": {
+          "support": "partial",
+          "note": "Skills load; model pinning and agents are Claude Code features",
+          "install": [
+            "Copy plugins/phased-shipping/skills/* into .github/skills/"
+          ]
+        },
+        "cursor": {
+          "support": "partial",
+          "note": "Skills load; model pinning and agents are Claude Code features",
+          "install": [
+            "Copy plugins/phased-shipping/skills/* into .cursor/skills/"
+          ]
+        },
+        "agent-skills": {
+          "support": "none",
+          "install": []
+        }
+      }
+    },
+    {
+      "slug": "prompt-engineering",
+      "type": "skill",
+      "title": "Prompt Engineering Playbook",
+      "summary": "Prompt engineering playbook — 24 techniques across 6 categories, the 8-part prompt anatomy, the mental model of how models read prompts, do's/avoids, a 0–9 robu",
+      "description": "Prompt engineering playbook — 24 techniques across 6 categories, the 8-part prompt anatomy, the mental model of how models read prompts, do's/avoids, a 0–9 robustness checklist, and a prompt-maturity rubric. TRIGGER when writing or reviewing any system prompt, LLM API call, prompt template, AI feature, few-shot example set, or autonomous-agent instruction — in new or existing apps.",
+      "tags": [
+        "prompts",
+        "llm",
+        "ai"
+      ],
+      "featured": true,
+      "order": 1,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/prompt-engineering",
+      "files": [
+        "skills/prompt-engineering/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/prompt-engineering",
+      "zip": "skill-prompt-engineering.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/prompt-engineering into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/prompt-engineering into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/prompt-engineering into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/prompt-engineering into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "planner",
+      "type": "skill",
+      "title": "Implementation Planner",
+      "summary": "Multi-perspective implementation planner.",
+      "description": "Multi-perspective implementation planner. MANDATORY for every enhancement or new feature that touches a schema, API route, or UI page — regardless of size. Produces a full §1–16 plan covering overview, data model, backend, frontend, reuse checklist, out-of-scope, Tech Architecture (§8), QA (§9), Security (§10), execution plan (§11), E2E spec (§12), Definition of Done (§13), evidence report template (§14), and UX/UI/responsive/a11y checklist (§15). TRIGGER on: any new feature, enhancement, \"plan this\", \"go\", \"let's start\", \"build\", or any user story that will ship to production. Do NOT fire for typo fixes, copy tweaks, or single-file bug fixes touching < 3 files.",
+      "tags": [
+        "planning",
+        "architecture",
+        "qa",
+        "security"
+      ],
+      "featured": true,
+      "order": 2,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/planner",
+      "files": [
+        "skills/planner/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/planner",
+      "zip": "skill-planner.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/planner into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/planner into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/planner into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/planner into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "docs-generator",
+      "type": "skill",
+      "title": "Docs Generator",
+      "summary": "Create and update project documentation — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelogs, and release notes.",
+      "description": "Create and update project documentation — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelogs, and release notes. TRIGGER when the user asks to create, update, or generate any documentation.",
+      "tags": [
+        "docs",
+        "diagrams",
+        "changelog"
+      ],
+      "featured": false,
+      "order": 3,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/docs-generator",
+      "files": [
+        "skills/docs-generator/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/docs-generator",
+      "zip": "skill-docs-generator.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/docs-generator into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/docs-generator into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/docs-generator into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/docs-generator into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "business-analyst",
+      "type": "skill",
+      "title": "Business Analyst",
+      "summary": "Business analyst requirements interviewer.",
+      "description": "Business analyst requirements interviewer. Conducts a structured requirements interview, then produces a formal feature spec (strategy analysis, personas, user stories with Given/When/Then acceptance scenarios, process flows, data model impact, prioritization, success metrics) before any code is written. TRIGGER when the user mentions a new feature, enhancement, or idea that is vague or hasn't been fully defined yet.",
+      "tags": [
+        "requirements",
+        "specs",
+        "user-stories"
+      ],
+      "featured": false,
+      "order": 4,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/business-analyst",
+      "files": [
+        "skills/business-analyst/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/business-analyst",
+      "zip": "skill-business-analyst.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/business-analyst into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/business-analyst into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/business-analyst into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/business-analyst into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "refactoring",
+      "type": "skill",
+      "title": "Refactoring Guide",
+      "summary": "Code refactoring guide — 300-line hard limit, hook extraction, modal extraction, tab extraction, constants extraction, and API route splitting.",
+      "description": "Code refactoring guide — 300-line hard limit, hook extraction, modal extraction, tab extraction, constants extraction, and API route splitting. TRIGGER when a file approaches or exceeds 300 lines, or when extracting hooks/modals/tabs/constants.",
+      "tags": [
+        "refactoring",
+        "code-quality"
+      ],
+      "featured": false,
+      "order": 5,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/refactoring",
+      "files": [
+        "skills/refactoring/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/refactoring",
+      "zip": "skill-refactoring.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/refactoring into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/refactoring into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/refactoring into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/refactoring into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "error-handling",
+      "type": "skill",
+      "title": "Error Handling",
+      "summary": "API response shapes, Zod validation patterns, database error handling, frontend fetch wrappers, AbortController, loading/empty states, and silent failure rules.",
+      "description": "API response shapes, Zod validation patterns, database error handling, frontend fetch wrappers, AbortController, loading/empty states, and silent failure rules. TRIGGER when writing API routes, handling errors, or displaying loading/empty states.",
+      "tags": [
+        "errors",
+        "api",
+        "resilience"
+      ],
+      "featured": false,
+      "order": 6,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/error-handling",
+      "files": [
+        "skills/error-handling/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/error-handling",
+      "zip": "skill-error-handling.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/error-handling into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/error-handling into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/error-handling into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/error-handling into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "performance",
+      "type": "skill",
+      "title": "Performance Patterns",
+      "summary": "Frontend and API performance patterns — AbortController, useCallback, useMemo, Promise.all, pagination, batch inserts.",
+      "description": "Frontend and API performance patterns — AbortController, useCallback, useMemo, Promise.all, pagination, batch inserts. TRIGGER when optimizing renders, parallel fetches, waterfall queries, or slow pages.",
+      "tags": [
+        "performance",
+        "react",
+        "api"
+      ],
+      "featured": false,
+      "order": 7,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/performance",
+      "files": [
+        "skills/performance/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/performance",
+      "zip": "skill-performance.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/performance into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/performance into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/performance into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/performance into .agents/skills/ (project)"
+          ]
+        }
+      }
+    },
+    {
+      "slug": "commits",
+      "type": "skill",
+      "title": "Conventional Commits",
+      "summary": "Conventional Commits format, types, scopes, and splitting rules.",
+      "description": "Conventional Commits format, types, scopes, and splitting rules. TRIGGER when writing a git commit message or deciding how to split commits.",
+      "tags": [
+        "git",
+        "commits"
+      ],
+      "featured": false,
+      "order": 8,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/commits",
+      "files": [
+        "skills/commits/SKILL.md"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/commits",
+      "zip": "skill-commits.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/commits into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/commits into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/commits into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "agent-skills": {
+          "support": "partial",
+          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "install": [
+            "Copy skills/commits into .agents/skills/ (project)"
+          ]
+        }
+      }
+    }
+  ]
+}

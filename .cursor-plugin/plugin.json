@@ -1,0 +1,6 @@
+{
+  "name": "phasewright",
+  "description": "Reusable skills for shipping software with AI assistants: planning, requirements, commits, refactoring, error handling, performance, docs, prompt engineering.",
+  "version": "1.0.0",
+  "author": { "name": "trbbmnglg" }
+}

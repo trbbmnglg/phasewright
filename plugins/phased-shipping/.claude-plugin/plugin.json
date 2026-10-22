@@ -1,0 +1,9 @@
+{
+  "name": "phased-shipping",
+  "description": "Ship in small phases, one deploy each, with priority, urgency, estimates, and the right model and effort for every task type.",
+  "version": "0.2.0",
+  "author": {
+    "name": "trbbmnglg"
+  },
+  "keywords": ["planning", "deployment", "phases", "model-routing", "cost"]
+}
