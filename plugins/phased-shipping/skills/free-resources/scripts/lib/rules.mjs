@@ -18,6 +18,24 @@ export const DEFAULT_SAMPLE_MS = 3000;
 export const MIN_SAMPLE_MS = 500;
 export const MAX_SAMPLE_MS = 30000;
 
+// ---- Measuring a task and checking headroom (phase 2; starting values, not tuned) ----
+// Machine counters tick every second: typeperf's own smallest step, cheap because it is one streaming process.
+export const MACHINE_INTERVAL_MS = 1000;
+// The process-tree query is the costly one (a full process-list query), so it runs every 2 s.
+export const TREE_INTERVAL_MS = 2000;
+// Never sample the tree faster than this: below it the sampler itself becomes the load.
+export const MIN_TREE_INTERVAL_MS = 500;
+// If the sampler's own steady-state cost is above this share of one core, the tree interval is widened.
+export const MAX_SAMPLER_OVERHEAD_PCT = 5;
+// A task's need is its largest recent peak plus 15%, because the next run can be a little heavier.
+export const NEED_MARGIN = 1.15;
+// Only the last 5 runs of a task count: older runs describe an older version of the task.
+export const PEAKS_WINDOW = 5;
+// Keep 10% of total memory free as a cushion for the operating system, so "fits" never means "uses every last MB".
+export const RESERVE_PCT_OF_TOTAL = 10;
+// Fewer tree samples than this and the tree peak is too thin to trust; the machine-level drop is used and the report says so.
+export const MIN_TREE_SAMPLES = 3;
+
 // ---- Classifier thresholds ----
 // Under 0.5% of one core over the sample is idle: a sleeping watcher shows 0.0, a working one does not.
 export const IDLE_CORE_PCT = 0.5;

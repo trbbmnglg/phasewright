@@ -7,7 +7,7 @@
 //   cpu_pct   % of the whole machine over the sample, or null when it was not sampled
 import { execFile } from "node:child_process";
 import { homedir, cpus } from "node:os";
-import { basename } from "node:path";
+import { runPowerShell } from "./powershell.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -67,123 +67,9 @@ export function summarizeCmd(cmd, { name = "", exe = "", home = homedir(), max =
 
 // ---------- Windows ----------
 
-// One fixed PowerShell script. It takes no user input: the mode comes from a fixed list set by this
-// file, and it receives no data at all. Read-only queries only:
-//   procs     Win32_Process rows (what Task Manager shows), as JSON. If FR_AT (a clock time in ms, set by
-//             this file) is given it then waits for that moment and takes a quick CPU sample too.
-//   baseline  CPU time and start time per process, plus the account that owns each (a read-only process
-//             token query through P/Invoke built in memory: nothing is compiled or written to disk)
-//   sample    the quick CPU sample alone, used only to retry when the first one landed too early
-export const POWERSHELL_SCRIPT = `
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$mode = $env:FR_MODE
-$script:FrNative = $null
-$script:SidNames = @{}
-function Initialize-FrNative {
-  $ab = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object System.Reflection.AssemblyName('FrDyn')), [System.Reflection.Emit.AssemblyBuilderAccess]::Run)
-  $tb = $ab.DefineDynamicModule('FrDyn').DefineType('FrNative', 'Public,Class')
-  $defs = @(
-    @('kernel32.dll', 'OpenProcess', [IntPtr], @([uint32], [bool], [int])),
-    @('kernel32.dll', 'CloseHandle', [bool], @([IntPtr])),
-    @('advapi32.dll', 'OpenProcessToken', [bool], @([IntPtr], [uint32], [IntPtr].MakeByRefType())),
-    @('advapi32.dll', 'GetTokenInformation', [bool], @([IntPtr], [int], [IntPtr], [int], [int].MakeByRefType()))
-  )
-  foreach ($d in $defs) {
-    $m = $tb.DefinePInvokeMethod($d[1], $d[0], 'Public,Static,PinvokeImpl', [System.Reflection.CallingConventions]::Standard, $d[2], $d[3], [System.Runtime.InteropServices.CallingConvention]::Winapi, [System.Runtime.InteropServices.CharSet]::Auto)
-    $m.SetImplementationFlags($m.GetMethodImplementationFlags() -bor [System.Reflection.MethodImplAttributes]::PreserveSig)
-  }
-  $script:FrNative = $tb.CreateType()
-}
-function Get-FrOwner([int]$id) {
-  $api = $script:FrNative
-  $h = $api::OpenProcess(0x1000, $false, $id)
-  if ($h -eq [IntPtr]::Zero) { return $null }
-  try {
-    $t = [IntPtr]::Zero
-    if (-not $api::OpenProcessToken($h, 8, [ref]$t)) { return $null }
-    try {
-      $len = 0
-      [void]$api::GetTokenInformation($t, 1, [IntPtr]::Zero, 0, [ref]$len)
-      $buf = [System.Runtime.InteropServices.Marshal]::AllocHGlobal($len)
-      try {
-        if (-not $api::GetTokenInformation($t, 1, $buf, $len, [ref]$len)) { return $null }
-        $sid = New-Object System.Security.Principal.SecurityIdentifier([System.Runtime.InteropServices.Marshal]::ReadIntPtr($buf))
-        $key = $sid.Value
-        if (-not $script:SidNames.ContainsKey($key)) {
-          $name = $null
-          try { $name = $sid.Translate([System.Security.Principal.NTAccount]).Value } catch { }
-          $script:SidNames[$key] = $name
-        }
-        return $script:SidNames[$key]
-      } finally { [System.Runtime.InteropServices.Marshal]::FreeHGlobal($buf) }
-    } finally { [void]$api::CloseHandle($t) }
-  } finally { [void]$api::CloseHandle($h) }
-}
-function Wait-FrUntil {
-  if ($env:FR_AT) {
-    $wait = [int64]$env:FR_AT - [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-    if ($wait -gt 0) { Start-Sleep -Milliseconds $wait }
-  }
-}
-function Get-FrSample([bool]$owners) {
-  $all = [System.Diagnostics.Process]::GetProcesses()
-  $cpus = @{}
-  foreach ($p in $all) {
-    $cpu = $null
-    try { $cpu = $p.TotalProcessorTime.TotalSeconds } catch { }
-    $cpus[$p.Id] = $cpu
-  }
-  $taken = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-  if ($owners) { Initialize-FrNative }
-  $rows = foreach ($p in $all) {
-    $start = $null; $owner = $null
-    try { $start = $p.StartTime.ToUniversalTime().ToString('o') } catch { }
-    if ($owners) { $owner = Get-FrOwner ([int]$p.Id) }
-    [pscustomobject]@{ id = $p.Id; name = $p.ProcessName; cpu_s = $cpus[$p.Id]; start = $start; owner = $owner }
-  }
-  return [pscustomobject]@{ taken_ms = $taken; processes = @($rows) }
-}
-if ($mode -eq 'procs') {
-  $rows = Get-CimInstance -ClassName Win32_Process -Property ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,CreationDate,WorkingSetSize,KernelModeTime,UserModeTime
-  $taken = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
-  $list = $rows | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine,CreationDate,WorkingSetSize,KernelModeTime,UserModeTime
-  $second = $null
-  if ($env:FR_AT) { Wait-FrUntil; $second = Get-FrSample $false }
-  [pscustomobject]@{ taken_ms = $taken; processes = @($list); second = $second } | ConvertTo-Json -Compress -Depth 5
-}
-elseif ($mode -eq 'sample') {
-  Wait-FrUntil
-  Get-FrSample $false | ConvertTo-Json -Compress -Depth 4
-}
-elseif ($mode -eq 'baseline') {
-  Get-FrSample $true | ConvertTo-Json -Compress -Depth 4
-}
-`;
-
-const MODES = new Set(["procs", "sample", "baseline"]);
-
-// Runs the fixed script as the -Command argument (no -EncodedCommand, no temp file and no
-// execution-policy change, which endpoint tools tend to flag). Resolves to the parsed JSON.
-export function runPowerShell(mode, env = {}, { timeoutMs = 60000, exec = execFile } = {}) {
-  if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}`);
-  return new Promise((resolve, reject) => {
-    exec(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", POWERSHELL_SCRIPT],
-      { env: { ...process.env, ...env, FR_MODE: mode }, maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs, windowsHide: true, encoding: "utf8" },
-      (err, stdout, stderr) => {
-        if (err) return reject(new Error(`PowerShell ${mode} failed: ${String(stderr || err.message).split(/\r?\n/)[0]}`));
-        try {
-          resolve(JSON.parse(stdout.trim()));
-        } catch {
-          reject(new Error(`PowerShell ${mode} returned something that is not JSON`));
-        }
-      },
-    );
-  });
-}
+// The fixed PowerShell script and its runner live in powershell.mjs (the measure sampler uses a second
+// mode of the same script). They are re-exported here so older imports keep working.
+export { POWERSHELL_SCRIPT, runPowerShell } from "./powershell.mjs";
 
 const FILETIME_100NS = 1e7;
 
