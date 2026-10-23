@@ -13,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
-const FR = join(REPO, "plugins", "phased-shipping", "skills", "free-resources");
+const FR = join(REPO, "plugins", "free-resources", "skills", "free-resources");
 const FIX = join(HERE, "fixtures");
 const fix = (name) => readFileSync(join(FIX, name), "utf8");
 const load = (mod) => import(pathToFileURL(join(FR, "scripts", "lib", `${mod}.mjs`)).href);

@@ -12,6 +12,11 @@
       "name": "phased-shipping",
       "source": "./plugins/phased-shipping",
       "description": "Ship in small phases, one deploy each, with the right model and effort for every task type."
+    },
+    {
+      "name": "free-resources",
+      "source": "./plugins/free-resources",
+      "description": "Report-only check of machine pressure, top processes, and what a task really needs. It never closes anything."
     }
   ]
 }

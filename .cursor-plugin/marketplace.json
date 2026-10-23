@@ -9,6 +9,11 @@
       "name": "phasewright",
       "source": ".",
       "description": "8 skills for planning, requirements, commits, refactoring, error handling, performance, docs and prompt engineering."
+    },
+    {
+      "name": "free-resources",
+      "source": "./plugins/free-resources",
+      "description": "Report-only check of machine pressure, top processes, and what a task really needs. It never closes anything."
     }
   ]
 }

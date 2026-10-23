@@ -13,6 +13,7 @@
 import { resolve } from "node:path";
 import { scan, UsageError } from "./lib/scan.mjs";
 import { renderHuman } from "./lib/report.mjs";
+import { warnIfInsideSkillDir } from "./lib/skilldir.mjs";
 import { DEFAULT_SAMPLE_MS, MIN_SAMPLE_MS, MAX_SAMPLE_MS } from "./lib/rules.mjs";
 
 function usage(msg) {
@@ -41,6 +42,7 @@ function parseArgs(argv) {
 }
 
 async function main() {
+  warnIfInsideSkillDir();
   const opts = parseArgs(process.argv.slice(2));
   let report;
   try {

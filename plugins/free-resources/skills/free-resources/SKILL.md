@@ -9,12 +9,16 @@ disable-model-invocation: true
 
 This skill measures the machine and reports. It never closes, kills or signals a process, and you must not close anything either, even if the report suggests it. Closing is the user's decision, made outside this skill.
 
+## Where to run the scripts
+
+Run every script from the user's project folder (the current folder), calling it by its full path. The scripts treat the current folder as the project, and `measure.mjs` runs the user's command there, so running them from inside this skill's folder would scan and measure the wrong place. In Claude Code the full path is `${CLAUDE_SKILL_DIR}/scripts/<script>.mjs`; in other tools use the full path to the `scripts/` folder next to this file. If a script prints a warning that the current folder is inside the skill's folder, stop, change to the project folder and run it again.
+
 ## Run the scan
 
-From this skill's folder, run:
+From the project folder, run:
 
 ```
-node scripts/processes.mjs
+node "${CLAUDE_SKILL_DIR}/scripts/processes.mjs"
 ```
 
 It takes about 10 to 35 seconds, depending on how busy the machine is. Useful options:
@@ -35,7 +39,7 @@ It takes about 10 to 35 seconds, depending on how busy the machine is. Useful op
 Run the user's own command through the measurer. It runs the command exactly as given, watches the command and everything it starts, and records the peak memory and the CPU cores used:
 
 ```
-node scripts/measure.mjs [--task <name>] [--interval-ms N] [--json] -- <command...>
+node "${CLAUDE_SKILL_DIR}/scripts/measure.mjs" [--task <name>] [--interval-ms N] [--json] -- <command...>
 ```
 
 - The command keeps the terminal, and its exit code becomes the script's. A failed command is still recorded, marked with its `exit_code`.
@@ -50,7 +54,7 @@ node scripts/measure.mjs [--task <name>] [--interval-ms N] [--json] -- <command.
 Compare what the task needs with what is free now:
 
 ```
-node scripts/headroom.mjs --task <name> [--json] [--project <dir>]
+node "${CLAUDE_SKILL_DIR}/scripts/headroom.mjs" --task <name> [--json] [--project <dir>]
 ```
 
 (or give the same command after `--` and the name is worked out the way `measure.mjs` does it). It runs the scan, then prints memory and CPU separately, each with the need, the available amount, the verdict (`fits` or `short by X`) and the source of every number. Exit code 0 whether it fits or not; 3 when there is no data yet.

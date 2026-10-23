@@ -3,9 +3,9 @@
 //   node scripts/build-manifest.mjs           write library.json
 //   node scripts/build-manifest.mjs --check   exit 1 if library.json is out of date
 // Deterministic: no timestamps, stable ordering.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { REPO, ROOT, loadItems, rel } from "./lib.mjs";
+import { REPO, ROOT, loadItems, parseFrontmatter, rel } from "./lib.mjs";
 
 const SCHEMA_VERSION = 1;
 const BLOB = `https://github.com/${REPO}/tree/main`;
@@ -88,14 +88,29 @@ function agentTools(slug) {
   };
 }
 
-function pluginTools(slug) {
+// A plugin loses something outside Claude Code only if it has agents or pins a model in a skill.
+// Without either, its skills are plain SKILL.md files that Copilot and Cursor read in full.
+export function pluginNeedsClaudeCode(dir) {
+  if (existsSync(join(dir, "agents"))) return true;
+  const skillsDir = join(dir, "skills");
+  if (!existsSync(skillsDir)) return false;
+  return readdirSync(skillsDir).some((slug) => {
+    const file = join(skillsDir, slug, "SKILL.md");
+    if (!existsSync(file)) return false;
+    const { data } = parseFrontmatter(readFileSync(file, "utf8"));
+    return Boolean(data && data.model);
+  });
+}
+
+function pluginTools(slug, needsClaudeCode) {
+  const other = needsClaudeCode ? support("partial", "Skills load; model pinning and agents are Claude Code features") : support("full");
   return {
     "claude-code": {
       ...support("full"),
       install: [`claude plugin marketplace add ${REPO}`, `claude plugin install ${slug}@phasewright`],
     },
-    copilot: { ...support("partial", "Skills load; model pinning and agents are Claude Code features"), install: [`Copy plugins/${slug}/skills/* into .github/skills/`] },
-    cursor: { ...support("partial", "Skills load; model pinning and agents are Claude Code features"), install: [`Copy plugins/${slug}/skills/* into .cursor/skills/`] },
+    copilot: { ...other, install: [`Copy plugins/${slug}/skills/* into .github/skills/`] },
+    cursor: { ...other, install: [`Copy plugins/${slug}/skills/* into .cursor/skills/`] },
     "agent-skills": { ...support("none"), install: [] },
   };
 }
@@ -109,7 +124,7 @@ export function build() {
     })),
     ...plugins.map((p) => {
       const metadata = { title: p.slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "), tags: (p.manifest.keywords ?? []).join(","), featured: "true", order: "1", version: p.manifest.version };
-      return common(p, { description: p.manifest.description, license: "MIT" }, metadata, { zip: `plugin-${p.slug}.zip`, tools: pluginTools(p.slug) });
+      return common(p, { description: p.manifest.description, license: "MIT" }, metadata, { zip: `plugin-${p.slug}.zip`, tools: pluginTools(p.slug, pluginNeedsClaudeCode(p.dir)) });
     }),
   ];
   items.sort((a, b) => a.type.localeCompare(b.type) || a.order - b.order || a.slug.localeCompare(b.slug));

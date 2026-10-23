@@ -20,6 +20,7 @@ import { readLast, taskKey } from "./lib/peaks.mjs";
 import { computeHeadroom, renderHeadroom } from "./lib/headroom.mjs";
 import { DEFAULT_SAMPLE_MS, MIN_SAMPLE_MS, MAX_SAMPLE_MS, PEAKS_WINDOW } from "./lib/rules.mjs";
 import { READ_ONLY_LINE } from "./lib/report.mjs";
+import { warnIfInsideSkillDir } from "./lib/skilldir.mjs";
 
 const USAGE = "usage: node headroom.mjs --task <name> [--json] [--project <dir>] [--sample-ms N] [--fixture <file>]";
 
@@ -52,6 +53,7 @@ function parseArgs(argv) {
 }
 
 async function main() {
+  warnIfInsideSkillDir();
   const opts = parseArgs(process.argv.slice(2));
   const home = homedir();
   const key = taskKey({ task: opts.task, argv: opts.command, project: opts.project, home });

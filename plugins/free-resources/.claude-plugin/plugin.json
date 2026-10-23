@@ -1,0 +1,12 @@
+{
+  "name": "free-resources",
+  "description": "Report-only check of how pressured your machine is, which processes use the most, and what a task really needs (peak memory and CPU cores). It never closes anything.",
+  "version": "0.1.0",
+  "author": {
+    "name": "trbbmnglg"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/trbbmnglg/phasewright/tree/main/plugins/free-resources",
+  "repository": "https://github.com/trbbmnglg/phasewright",
+  "keywords": ["performance", "memory", "cpu", "processes", "report-only"]
+}

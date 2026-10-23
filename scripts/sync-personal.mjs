@@ -1,43 +1,55 @@
 #!/usr/bin/env node
-// Installs the plugin as personal skills and agents (~/.claude/skills, ~/.claude/agents),
-// for setups that don't use plugin marketplaces. Names get a "ps-" prefix because
-// personal skills and agents aren't namespaced like plugin ones.
+// Installs the plugins as personal skills and agents (~/.claude/skills, ~/.claude/agents),
+// for setups that don't use plugin marketplaces. phased-shipping names get a "ps-" prefix because
+// personal skills and agents aren't namespaced like plugin ones; free-resources has no prefix.
 //
-//   node scripts/sync-personal.mjs           install or update
+//   node scripts/sync-personal.mjs           install or update (and prune copies whose source is gone)
 //   node scripts/sync-personal.mjs --remove  remove the generated copies
-//   node scripts/sync-personal.mjs --check   exit 1 if the copies are missing or out of date
+//   node scripts/sync-personal.mjs --check   exit 1 if the copies are missing, out of date or stale
 //
-// Only files carrying the generated marker are ever overwritten or removed.
+// Only files carrying a generated marker are ever overwritten or removed, and each plugin has its own
+// marker. A file or skill without the right marker is refused, never overwritten.
+//
+// SYNC_PERSONAL_CLAUDE_HOME points the script at another folder instead of ~/.claude (the tests use it).
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, rmSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 
-const PLUGIN = join(dirname(fileURLToPath(import.meta.url)), "..", "plugins", "phased-shipping");
-const CLAUDE = join(homedir(), ".claude");
-const PREFIX = "ps-";
-const MARKER = "<!-- Generated from the phased-shipping plugin by scripts/sync-personal.mjs. Edit the plugin, then re-run the script. -->";
-const COMPONENTS = /phased-shipping:(plan|run|model-scout|builder|checker|shipper)\b/g;
-// ${CLAUDE_PLUGIN_DATA} only exists for installed plugins; personal copies keep their history here.
-const DATA = join(CLAUDE, "phased-shipping").split("\\").join("/");
+const PLUGINS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "plugins");
+const CLAUDE = process.env.SYNC_PERSONAL_CLAUDE_HOME || join(homedir(), ".claude");
+
+const markerFor = (name) => `<!-- Generated from the ${name} plugin by scripts/sync-personal.mjs. Edit the plugin, then re-run the script. -->`;
+
+const PLUGINS = [
+  {
+    name: "phased-shipping",
+    prefix: "ps-",
+    components: /phased-shipping:(plan|run|model-scout|builder|checker|shipper)\b/g,
+    // ${CLAUDE_PLUGIN_DATA} only exists for installed plugins; personal copies keep their history here.
+    data: join(CLAUDE, "phased-shipping").split("\\").join("/"),
+    siblings: /\.\.\/(plan|run)\//g,
+  },
+  { name: "free-resources", prefix: "", components: null, data: null, siblings: null },
+].map((p) => ({ ...p, dir: join(PLUGINS_DIR, p.name), marker: markerFor(p.name) }));
 
 const remove = process.argv.includes("--remove");
 const check = process.argv.includes("--check");
 let stale = 0;
 
-function transform(text) {
-  let out = text
-    .replace(COMPONENTS, `${PREFIX}$1`)
-    .split("${CLAUDE_PLUGIN_DATA}").join(DATA)
-    .replace(/\.\.\/(plan|run)\//g, `../${PREFIX}$1/`);
-  out = out.replace(/^(---\r?\n[\s\S]*?^)name: (\S+)/m, `$1name: ${PREFIX}$2`);
+function transform(plugin, text) {
+  let out = text;
+  if (plugin.components) out = out.replace(plugin.components, `${plugin.prefix}$1`);
+  if (plugin.data) out = out.split("${CLAUDE_PLUGIN_DATA}").join(plugin.data);
+  if (plugin.siblings) out = out.replace(plugin.siblings, `../${plugin.prefix}$1/`);
+  if (plugin.prefix) out = out.replace(/^(---\r?\n[\s\S]*?^)name: (\S+)/m, `$1name: ${plugin.prefix}$2`);
   // Put the marker right after the closing frontmatter fence.
-  return out.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${MARKER}\n`);
+  return out.replace(/^(---\r?\n[\s\S]*?\r?\n---\r?\n)/, `$1\n${plugin.marker}\n`);
 }
 
-function render(path) {
-  return path.endsWith(".md") ? Buffer.from(transform(readFileSync(path, "utf8"))) : readFileSync(path);
+function render(plugin, path) {
+  return path.endsWith(".md") ? Buffer.from(transform(plugin, readFileSync(path, "utf8"))) : readFileSync(path);
 }
 
 function put(to, content) {
@@ -52,50 +64,88 @@ function put(to, content) {
   writeFileSync(to, content);
 }
 
-function isOurs(path) {
-  return existsSync(path) && readFileSync(path, "utf8").includes(MARKER);
-}
+const isOurs = (plugin, path) => existsSync(path) && readFileSync(path, "utf8").includes(plugin.marker);
 
-function guard(path) {
-  if (existsSync(path) && !isOurs(path)) {
+// The plugin whose marker a file carries, or null for any file this script didn't generate.
+const ownerOf = (path) => (existsSync(path) ? PLUGINS.find((p) => readFileSync(path, "utf8").includes(p.marker)) ?? null : null);
+
+function guard(plugin, path) {
+  if (existsSync(path) && !isOurs(plugin, path)) {
     console.error(`Refusing to overwrite ${path}: it wasn't generated by this script.`);
     process.exit(1);
   }
 }
 
-function copyTree(src, dest) {
+function copyTree(plugin, src, dest) {
   for (const entry of readdirSync(src)) {
     const from = join(src, entry);
     const to = join(dest, entry);
-    if (statSync(from).isDirectory()) copyTree(from, to);
-    else put(to, render(from));
+    if (statSync(from).isDirectory()) copyTree(plugin, from, to);
+    else put(to, render(plugin, from));
   }
 }
 
-const skills = readdirSync(join(PLUGIN, "skills"));
-const agents = readdirSync(join(PLUGIN, "agents")).filter((f) => f.endsWith(".md"));
+const mdFiles = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")) : []);
+const dirs = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => statSync(join(dir, f)).isDirectory()) : []);
 
-for (const skill of skills) {
-  const dest = join(CLAUDE, "skills", PREFIX + skill);
-  const main = join(dest, "SKILL.md");
-  if (remove) {
-    if (isOurs(main)) { rmSync(dest, { recursive: true }); console.log(`removed skill ${PREFIX}${skill}`); }
-    continue;
+// What each plugin installs: [{ plugin, skills: [name], agents: [file] }]
+const plan = PLUGINS.map((plugin) => ({
+  plugin,
+  skills: dirs(join(plugin.dir, "skills")),
+  agents: mdFiles(join(plugin.dir, "agents")),
+}));
+
+// Refuse before writing anything if a target exists but isn't ours.
+if (!remove) {
+  for (const { plugin, skills, agents } of plan) {
+    for (const skill of skills) guard(plugin, join(CLAUDE, "skills", plugin.prefix + skill, "SKILL.md"));
+    for (const file of agents) guard(plugin, join(CLAUDE, "agents", plugin.prefix + file));
   }
-  guard(main);
-  copyTree(join(PLUGIN, "skills", skill), dest);
-  if (!check) console.log(`skill  /${PREFIX}${skill}  -> ${dest}`);
 }
 
-for (const file of agents) {
-  const dest = join(CLAUDE, "agents", PREFIX + file);
-  if (remove) {
-    if (isOurs(dest)) { rmSync(dest); console.log(`removed agent ${PREFIX}${file.replace(/\.md$/, "")}`); }
-    continue;
+for (const { plugin, skills, agents } of plan) {
+  for (const skill of skills) {
+    const dest = join(CLAUDE, "skills", plugin.prefix + skill);
+    const main = join(dest, "SKILL.md");
+    if (remove) {
+      if (isOurs(plugin, main)) { rmSync(dest, { recursive: true }); console.log(`removed skill ${plugin.prefix}${skill}`); }
+      continue;
+    }
+    copyTree(plugin, join(plugin.dir, "skills", skill), dest);
+    if (!check) console.log(`skill  /${plugin.prefix}${skill}  -> ${dest}`);
   }
-  guard(dest);
-  put(dest, render(join(PLUGIN, "agents", file)));
-  if (!check) console.log(`agent  ${PREFIX}${file.replace(/\.md$/, "")}  -> ${dest}`);
+
+  for (const file of agents) {
+    const dest = join(CLAUDE, "agents", plugin.prefix + file);
+    if (remove) {
+      if (isOurs(plugin, dest)) { rmSync(dest); console.log(`removed agent ${plugin.prefix}${file.replace(/\.md$/, "")}`); }
+      continue;
+    }
+    put(dest, render(plugin, join(plugin.dir, "agents", file)));
+    if (!check) console.log(`agent  ${plugin.prefix}${file.replace(/\.md$/, "")}  -> ${dest}`);
+  }
+}
+
+// Prune: a generated copy (it carries one of our markers) whose source no longer exists. Anything
+// without a marker is never touched.
+const wantedSkills = new Set(plan.flatMap(({ plugin, skills }) => skills.map((s) => plugin.prefix + s)));
+const wantedAgents = new Set(plan.flatMap(({ plugin, agents }) => agents.map((a) => plugin.prefix + a)));
+
+for (const name of dirs(join(CLAUDE, "skills"))) {
+  if (wantedSkills.has(name)) continue;
+  const dir = join(CLAUDE, "skills", name);
+  if (!ownerOf(join(dir, "SKILL.md"))) continue;
+  if (check) { stale++; console.log(`stale copy (source is gone): ${dir}`); continue; }
+  rmSync(dir, { recursive: true });
+  console.log(`pruned skill ${name}`);
+}
+for (const file of mdFiles(join(CLAUDE, "agents"))) {
+  if (wantedAgents.has(file)) continue;
+  const path = join(CLAUDE, "agents", file);
+  if (!ownerOf(path)) continue;
+  if (check) { stale++; console.log(`stale copy (source is gone): ${path}`); continue; }
+  rmSync(path);
+  console.log(`pruned agent ${file.replace(/\.md$/, "")}`);
 }
 
 if (check) {

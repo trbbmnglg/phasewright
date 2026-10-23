@@ -147,6 +147,75 @@
       }
     },
     {
+      "slug": "free-resources",
+      "type": "plugin",
+      "title": "Free Resources",
+      "summary": "Report-only check of how pressured your machine is, which processes use the most, and what a task really needs (peak memory and CPU cores).",
+      "description": "Report-only check of how pressured your machine is, which processes use the most, and what a task really needs (peak memory and CPU cores). It never closes anything.",
+      "tags": [
+        "performance",
+        "memory",
+        "cpu",
+        "processes",
+        "report-only"
+      ],
+      "featured": true,
+      "order": 1,
+      "version": "0.1.0",
+      "license": "MIT",
+      "path": "plugins/free-resources",
+      "files": [
+        "plugins/free-resources/.claude-plugin/plugin.json",
+        "plugins/free-resources/.gitignore",
+        "plugins/free-resources/README.md",
+        "plugins/free-resources/evals/never-offers-close/graders/no-close-command-run.md",
+        "plugins/free-resources/evals/never-offers-close/graders/refuses-and-redirects.md",
+        "plugins/free-resources/evals/never-offers-close/prompt.md",
+        "plugins/free-resources/skills/free-resources/SKILL.md",
+        "plugins/free-resources/skills/free-resources/scripts/headroom.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/classify.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/headroom.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/peaks.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/powershell.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/pressure.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/report.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/rules.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/sampler.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/scan.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/skilldir.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/snapshot.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/measure.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/processes.mjs"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/plugins/free-resources",
+      "zip": "plugin-free-resources.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install free-resources@phasewright"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "install": [
+            "Copy plugins/free-resources/skills/* into .github/skills/"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "install": [
+            "Copy plugins/free-resources/skills/* into .cursor/skills/"
+          ]
+        },
+        "agent-skills": {
+          "support": "none",
+          "install": []
+        }
+      }
+    },
+    {
       "slug": "phased-shipping",
       "type": "plugin",
       "title": "Phased Shipping",
@@ -184,20 +253,6 @@
         "plugins/phased-shipping/evals/small-change-single-phase/graders/single-phase.md",
         "plugins/phased-shipping/evals/small-change-single-phase/graders/skill-fired.md",
         "plugins/phased-shipping/evals/small-change-single-phase/prompt.md",
-        "plugins/phased-shipping/skills/free-resources/SKILL.md",
-        "plugins/phased-shipping/skills/free-resources/scripts/headroom.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/classify.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/headroom.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/peaks.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/powershell.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/pressure.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/report.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/rules.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/sampler.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/scan.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/lib/snapshot.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/measure.mjs",
-        "plugins/phased-shipping/skills/free-resources/scripts/processes.mjs",
         "plugins/phased-shipping/skills/plan/SKILL.md",
         "plugins/phased-shipping/skills/plan/references/templates.md",
         "plugins/phased-shipping/skills/plan/scripts/history.mjs",

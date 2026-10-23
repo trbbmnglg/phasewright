@@ -20,6 +20,7 @@ import { pathToFileURL } from "node:url";
 import { createSampler } from "./lib/sampler.mjs";
 import { appendPeak, summarizeCommand, taskKey, PEAK_SCHEMA_VERSION } from "./lib/peaks.mjs";
 import { relativizePaths } from "./lib/snapshot.mjs";
+import { warnIfInsideSkillDir } from "./lib/skilldir.mjs";
 import { TREE_INTERVAL_MS, MACHINE_INTERVAL_MS, MIN_TREE_INTERVAL_MS } from "./lib/rules.mjs";
 
 const USAGE = "usage: node measure.mjs [--task <name>] [--interval-ms N] [--json] -- <command...>";
@@ -58,6 +59,7 @@ export function windowsCommandLine(argv) {
 const fmt = (v, unit = "") => (v == null ? "n/a" : `${v}${unit}`);
 
 async function main() {
+  warnIfInsideSkillDir();
   const opts = parseArgs(process.argv.slice(2));
   if (process.platform !== "win32" && process.platform !== "darwin") usage(`Platform ${process.platform} is not supported. Windows and macOS only.`);
   const home = homedir();
