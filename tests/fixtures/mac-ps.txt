@@ -1,0 +1,4 @@
+    1     0 root          10240   0:12.34 Mon Oct 20 08:00:00 2026 /sbin/launchd
+  501     1 tester       204800   1:02:03.50 Tue Oct 21 09:15:30 2026 /Applications/Fake App.app/Contents/MacOS/Fake App --token=abc123 --flag
+  777   501 tester        51200      0:00.50 Wed Oct 22 10:00:00 2026 /usr/local/bin/node /Volumes/Data/tester/dev/demo/node_modules/.bin/vite --port 5173
+this line is not a process row

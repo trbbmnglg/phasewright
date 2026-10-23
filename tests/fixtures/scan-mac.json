@@ -1,0 +1,13 @@
+{
+  "platform": "darwin",
+  "me": { "user": "tester", "pid": 900 },
+  "home": "/Volumes/Data/tester",
+  "logical_cpus": 8,
+  "now_iso": "2026-10-23T12:00:00Z",
+  "pressure": { "total_mb": 16384, "avail_mb": 9000, "paging_per_s": 0, "cpu_pct": 20, "samples": 1 },
+  "records": [
+    { "pid": 1, "ppid": 0, "name": "launchd", "exe": "/sbin/launchd", "owner": "root", "rss_mb": 10, "start_iso": "2026-10-20T08:00:00Z" },
+    { "pid": 900, "ppid": 1, "name": "node", "exe": "/usr/local/bin/node", "owner": "tester", "rss_mb": 60, "cpu_pct": 1, "start_iso": "2026-10-23T11:59:00Z" },
+    { "pid": 777, "ppid": 99999, "name": "esbuild", "exe": "/Volumes/Data/tester/dev/demo/node_modules/.bin/esbuild", "owner": "tester", "rss_mb": 40, "cpu_pct": 0, "start_iso": "2026-10-22T10:00:00Z", "cmd_full": "/Volumes/Data/tester/dev/demo/node_modules/.bin/esbuild --service" }
+  ]
+}

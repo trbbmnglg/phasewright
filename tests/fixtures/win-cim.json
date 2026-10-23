@@ -1,0 +1,28 @@
+{
+  "taken_ms": 1790000000000,
+  "processes": [
+    { "ProcessId": 4, "ParentProcessId": 0, "Name": "System", "ExecutablePath": null, "CommandLine": null, "CreationDate": null, "WorkingSetSize": 0, "KernelModeTime": 5000000, "UserModeTime": 0 },
+    {
+      "ProcessId": 100, "ParentProcessId": 4, "Name": "node.exe",
+      "ExecutablePath": "D:\\Tools\\node\\node.exe",
+      "CommandLine": "\"D:\\Tools\\node\\node.exe\" D:\\Profiles\\tester\\work\\demo\\node_modules\\vite\\bin\\vite.js --token abc123 api_key=XYZ --port 5173",
+      "CreationDate": "2026-10-23T02:30:00.0000000Z",
+      "WorkingSetSize": 104857600, "KernelModeTime": 20000000, "UserModeTime": 10000000
+    },
+    {
+      "ProcessId": 200, "ParentProcessId": 100, "Name": "helper.exe",
+      "ExecutablePath": "D:\\Profiles\\tester\\AppData\\Local\\helper\\helper.exe",
+      "CommandLine": "D:\\Profiles\\tester\\AppData\\Local\\helper\\helper.exe --password=p --verbose",
+      "CreationDate": "\/Date(1789000000000)\/",
+      "WorkingSetSize": 52428800, "KernelModeTime": 0, "UserModeTime": 5000000
+    },
+    {
+      "ProcessId": 300, "ParentProcessId": 4, "Name": "legacy.exe",
+      "ExecutablePath": "D:\\Apps\\legacy.exe",
+      "CommandLine": "D:\\Apps\\legacy.exe",
+      "CreationDate": "20261023103000.000000+480",
+      "WorkingSetSize": 1048576, "KernelModeTime": 0, "UserModeTime": 0
+    },
+    { "ProcessId": 400, "ParentProcessId": 4, "Name": "nocmd.exe", "WorkingSetSize": 2097152 }
+  ]
+}

@@ -45,9 +45,14 @@ export function parseFrontmatter(text) {
 
 export const read = (path) => readFileSync(path, "utf8");
 
+// Files named *.local.* hold machine-specific data (for example a protected-process list). They never
+// belong in library.json or a release zip, so listing skips them.
+const LOCAL_FILE = /\.local\./;
+
 export function listFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir).sort()) {
+    if (LOCAL_FILE.test(entry)) continue;
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...listFiles(full));
     else out.push(full);

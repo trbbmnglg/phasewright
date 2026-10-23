@@ -114,7 +114,7 @@ if (existsSync(denyFile)) {
 }
 // Whole-word, case-insensitive: a term must not sit inside a longer word.
 const denyRes = deny.map((t) => [t, new RegExp(`(?<![A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&")}(?![A-Za-z0-9])`, "i")]);
-const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip)$|(^|\/)scripts\/denylist\.local\.txt$/;
+const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip)$|(^|\/)scripts\/denylist\.local\.txt$|\.local\.[^/]+$/;
 for (const file of lib.listFiles(ROOT)) {
   const path = lib.rel(file);
   if (SKIP.test(path)) continue;
