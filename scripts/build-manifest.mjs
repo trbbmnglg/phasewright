@@ -11,10 +11,18 @@ const SCHEMA_VERSION = 1;
 const BLOB = `https://github.com/${REPO}/tree/main`;
 const BLOB_FILE = `https://github.com/${REPO}/blob/main`; // agents are single files
 
-const firstSentence = (text) => {
+const SUMMARY_FALLBACK_AT = 160; // no sentence end within 200: text up to this length is used whole
+const SUMMARY_CUT = 157; // longer text is cut at a word boundary at or before this, plus an ellipsis
+
+export const firstSentence = (text) => {
   const clean = text.replace(/\s+/g, " ").trim();
   const m = clean.match(/^(.{20,200}?[.!?])(\s|$)/);
-  return (m ? m[1] : clean.slice(0, 160)).trim();
+  if (m) return m[1].trim();
+  if (clean.length <= SUMMARY_FALLBACK_AT) return clean;
+  // A single word longer than the limit has no boundary to cut at, so it is cut hard.
+  const space = clean.lastIndexOf(" ", SUMMARY_CUT);
+  const cut = clean.slice(0, space > 0 ? space : SUMMARY_CUT);
+  return cut.replace(/[\s.,;:!?\-\u2013\u2014([]+$/, "") + "\u2026";
 };
 
 const tags = (s) => s.split(",").map((t) => t.trim()).filter(Boolean);

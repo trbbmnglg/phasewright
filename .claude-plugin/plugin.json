@@ -1,7 +1,7 @@
 {
   "name": "phasewright",
   "description": "Reusable skills and agents for shipping software with AI assistants: planning, debugging, prompts, docs and more.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": { "name": "trbbmnglg", "url": "https://github.com/trbbmnglg" },
   "homepage": "https://github.com/trbbmnglg/phasewright",
   "repository": "https://github.com/trbbmnglg/phasewright",

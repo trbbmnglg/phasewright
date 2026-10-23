@@ -223,7 +223,7 @@
       "slug": "prompt-engineering",
       "type": "skill",
       "title": "Prompt Engineering Playbook",
-      "summary": "Prompt engineering playbook — 24 techniques across 6 categories, the 8-part prompt anatomy, the mental model of how models read prompts, do's/avoids, a 0–9 robu",
+      "summary": "Prompt engineering playbook — 24 techniques across 6 categories, the 8-part prompt anatomy, the mental model of how models read prompts, do's/avoids, a 0–9…",
       "description": "Prompt engineering playbook — 24 techniques across 6 categories, the 8-part prompt anatomy, the mental model of how models read prompts, do's/avoids, a 0–9 robustness checklist, and a prompt-maturity rubric. TRIGGER when writing or reviewing any system prompt, LLM API call, prompt template, AI feature, few-shot example set, or autonomous-agent instruction — in new or existing apps.",
       "tags": [
         "prompts",
