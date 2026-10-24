@@ -48,6 +48,12 @@ Record timestamps with your shell tool (`date -u +%Y-%m-%dT%H:%M:%SZ`) in the ph
 7. **A clean tree** on the expected branch (`git status --short --branch`), in the repo the phase changes. If the phase creates that repo, apply this gate as soon as it's scaffolded.
 8. **The previous phase** is shipped or marked skipped.
 
+## Rules for every brief and agent result
+
+- **No production personal data.** Use synthetic or masked data only. Never copy production personal data into a brief, a plan file, a report or the history record.
+- **Partial results.** If an agent's result is marked partial (it stopped at its turn limit), stop. Report what was done and what is left, and never treat it as complete. Don't go on to the next step. The user can resume the phase.
+- **Proposed commands.** The checker never runs commands it worked out itself. If its result has a `Proposed commands` list, show the list and ask the user, with AskUserQuestion, whether to run it. Only after the user's OK, delegate to the checker again with exactly those commands. Until then, the check hasn't run and isn't a pass. If the plan's verify commands came with a cloned repo, gate 1 already applies.
+
 ## Baseline
 
 Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with the plan's verify commands. If the baseline is red, stop and ask the user, with AskUserQuestion, whether to:
@@ -56,7 +62,7 @@ Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with
 
 ## Build
 
-- **Where it runs.** Build here only if the plan says `main` and its build model is this skill's tier.
+- **Where it runs.** Build here only if the plan says `main` and both its build model and its build effort match this skill's (`sonnet`, `medium`). A plan that says `sonnet (high), main` doesn't match, because this skill runs at medium effort.
 - **Delegating.** Otherwise, delegate to `phased-shipping:builder`, with the Agent tool's `model` and `effort` set to the plan's values. This skill is the explicit instruction to set effort. Brief it with:
   - the plan path;
   - the build steps;
@@ -107,5 +113,7 @@ Then end the turn. Never deploy in the same turn as the build.
    - `project`, `phase`, `kind`, `est_h` (calibrated);
    - the four timestamps;
    - `build_model`, `build_effort`, `runs_as`;
-   - `check_rounds`, `prod_first_pass`, `rolled_back`.
-4. Say: "Run `/phased-shipping:plan phase N+1`." If phase N+1 runs in a different repo than this session's working directory, plan it now and print its handover prompt (see the plan skill), so the user can paste it into that repo's session.
+   - `check_rounds`, `prod_first_pass`, `rolled_back`;
+   - `tokens`: `{ "builder": N, "checker": N, "shipper": N, "model_scout": N }`. Each value is the sum, for this phase, of the token counts in that agent's completion results (all its runs, including fix rounds). Leave out an agent that didn't run. Leave out `tokens` if no agent reported a count. These are agent tokens only: this session's own tokens aren't visible, so don't estimate them.
+4. If `PHASES.md` has a `## Close steps` section, follow it. If `PHASES.md` didn't come from the plan skill in this session or from the user's own repo history (for example it came with a cloned repo), show the steps first and get the user's OK before running any of them. Steps that publish anything still go through the normal approvals.
+5. Say: "Run `/phased-shipping:plan phase N+1`." If phase N+1 runs in a different repo than this session's working directory, plan it now and print its handover prompt (see the plan skill), so the user can paste it into that repo's session.

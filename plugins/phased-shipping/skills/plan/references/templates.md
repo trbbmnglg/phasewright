@@ -31,7 +31,12 @@ Status as of <YYYY-MM-DD>. Current phase: N.
 
 ## Open items
 - <blocked input, follow-up, known issue>
+
+## Close steps
+<optional: steps the run skill follows after every phase, for example "update the issue board" or "post a status note". Delete the section if there are none.>
 ```
+
+`run` follows `## Close steps` as the last step of closing a phase. If the file didn't come from the plan skill in this session or from the user's own repo history, `run` shows the steps and waits for the user's OK first.
 
 ## Phase plan
 

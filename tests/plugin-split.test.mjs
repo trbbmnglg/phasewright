@@ -87,6 +87,15 @@ test("the marketplace files list free-resources", () => {
   }
 });
 
+test("both marketplace files list phased-shipping, and the Cursor entry says what is Claude Code only", () => {
+  for (const file of [".claude-plugin/marketplace.json", ".cursor-plugin/marketplace.json"]) {
+    const entry = JSON.parse(readFileSync(join(REPO, file), "utf8")).plugins.find((p) => p.name === "phased-shipping");
+    assert.ok(entry, `${file} has a phased-shipping entry`);
+    assert.equal(entry.source, "./plugins/phased-shipping");
+    if (file.startsWith(".cursor")) assert.match(entry.description, /Claude Code/);
+  }
+});
+
 // ---------- personal sync, against a temp home ----------
 
 const SYNC = join(REPO, "scripts", "sync-personal.mjs");

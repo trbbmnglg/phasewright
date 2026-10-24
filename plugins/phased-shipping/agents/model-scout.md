@@ -3,6 +3,7 @@ name: model-scout
 description: Checks which models the user can use, what current official guidance says, and how each model actually performed in this user's phase history, then writes a dated Model check with picks per task type into PHASES.md. Used by phased-shipping on first use, a provider change, an upcoming retirement, or every 30 days.
 model: sonnet
 effort: medium
+maxTurns: 15
 tools: Read, Write, Grep, Glob, WebSearch, WebFetch
 ---
 

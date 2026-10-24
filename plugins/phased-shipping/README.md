@@ -15,7 +15,7 @@ A Claude Code plugin for shipping work in small phases, with one deploy per phas
 
 State lives in two places:
 - **`PHASES.md`** at your repo root: the roadmap, the Model check, status and ids. A new session picks up from it instead of exploring the code again.
-- **The phase history** (`history.jsonl` in the plugin's data directory, shared by all your projects). Every shipped phase records estimate against actual agent time (approval waits excluded), the build model and effort, fix rounds, prod first-pass and rollbacks. `plan` turns this into an estimate multiplier per kind of work, and into model picks backed by your own results.
+- **The phase history** (`history.jsonl` in the plugin's data directory, shared by all your projects). Every shipped phase records estimate against actual agent time (approval waits excluded), the build model and effort, fix rounds, prod first-pass, rollbacks and the agent tokens used. `plan` turns this into an estimate multiplier per kind of work, and into model picks backed by your own results.
 
 ## How the model is enforced
 
@@ -34,6 +34,63 @@ A hook can't do this gate, because tool-call hooks never see the model name.
 ## Requirements
 
 - Claude Code v2.1.292 or later (per-call effort; older versions run subagents at their file's effort).
+
+## What it touches
+
+This is everything the plugin reads, writes and runs, taken from its skills, agents and script.
+
+**Files it reads**
+- Your project: the files named in the phase plan, plus the manifest, README and source files the planner needs to size the work.
+- Settings and environment: the `model`, `availableModels` and `effortLevel` keys of your Claude Code settings files, any model convention in `CLAUDE.md`, and the values of only these environment variables: `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL*`, `CLAUDE_CODE_EFFORT_LEVEL` and `CLAUDE_CODE_USE_*`. It never prints the rest of the environment or of those files.
+- The phase history file.
+
+**Files it writes**
+- `PHASES.md` at your repo root (roadmap, Model check, status).
+- The plan folder, one file per phase (default `docs/phases/`): the plan, its timestamps and its phase report.
+- The checker's baseline file and its logs or screenshots, at the paths the brief names.
+- The phase history, `history.jsonl`: `${CLAUDE_PLUGIN_DATA}/history.jsonl` for a plugin install, `~/.claude/phased-shipping/history.jsonl` for personal copies. A phase record is one line with the estimate, agent time, build model and effort, fix rounds, prod outcome and, from 0.3.0, the agent tokens per phase. It holds no code and no project text beyond the project name.
+- A temporary JSON file that holds the record while the history script appends it.
+- Your source files, but only through the builder, and only to implement the approved plan.
+
+**Commands it runs**
+- Read-only status commands: `git status`, `git diff --stat`, `env` filtered to the variable names above, and `claude --version`.
+- The plan's baseline and verify commands, through the checker. The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
+- The plan's commit, deploy, prod-check and rollback commands, through the shipper, and only after `/phased-shipping:run approve`. A push needs `/phased-shipping:run push` or a plan whose deploy step is the push, and your approval.
+- The history script (`history.mjs`), with `stats` and `record`.
+
+**Network**
+- `model-scout` runs a web search and fetches up to 3 pages when the Model check refreshes. It treats page content as data.
+- Nothing else in the plugin makes network calls itself. Your own verify, deploy and prod-check commands reach whatever they reach.
+
+**Agents**
+
+| Agent | Tools | Turn limit |
+|---|---|---|
+| `builder` | Read, Edit, Write, Grep, Glob, Bash | 200 |
+| `checker` | Read, Grep, Glob, Bash | 25 |
+| `shipper` | Read, Grep, Glob, Bash | 20 |
+| `model-scout` | Read, Write, Grep, Glob, WebSearch, WebFetch | 15 |
+
+For a `security` review, `run` also delegates a read-only review to Claude Code's built-in `general-purpose` agent.
+
+**What it never does**
+- Force-push, skip hooks or bypass signing, amend a pushed commit, or delete a branch.
+- Commit, deploy or push without your `approve`, or deploy in the same turn as the build.
+- Run the commands of a plan or `PHASES.md` that came with a cloned repo, or run a close step from it, without showing them to you and getting your OK.
+- Print credentials, or copy production personal data into prompts, briefs, plan files or reports. Tests and fixtures use synthetic or masked data.
+
+## Limits
+
+Each agent has a turn limit (`maxTurns` in its file), so a runaway agent stops. The values are about 1.5 to 2 times the most each agent needed across this plugin's own history (a builder phase took up to 148 tool calls, a checker run 12, a shipper run 9):
+
+| Agent | `maxTurns` | Why |
+|---|---|---|
+| `builder` | 200 | A large phase is many reads, edits and test runs. |
+| `checker` | 25 | A few commands and a short report. |
+| `shipper` | 20 | A fixed runbook of commit, deploy, check and rollback. |
+| `model-scout` | 15 | One search, up to 3 fetches and one write. |
+
+When an agent stops at its limit, `run` stops too. It reports what was done and what is left, and never treats the partial result as complete. You can resume the phase. Partial output at the limit needs Claude Code v2.1.246 or later, which the stated minimum already covers. Treat the values as starting points and tune them from your own history.
 
 ## Install
 
@@ -86,11 +143,17 @@ claude plugin validate . --strict
 claude plugin eval . --allow-tools WebSearch,WebFetch,Bash
 ```
 
-The four cases check that:
+The eight cases check that:
 1. a multi-part request produces a phased roadmap with model and effort for each phase;
 2. a typo fix doesn't trigger the plan skill;
 3. tests, browser checks, commit and deploy are routed to the cheap tier;
-4. a small feature becomes one phase with no roadmap round-trip.
+4. a small feature becomes one phase with no roadmap round-trip;
+5. `run` refuses to build when there is no plan;
+6. `run` doesn't deploy in the turn that builds;
+7. the shipper skips actions that have no `APPROVED:` line;
+8. `run` shows a plan's commands and waits for your OK when the plan came with a cloned repo.
+
+Cases 5 to 8 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
 
 Evals make real model calls on your account. Use `--ablation none` while you're iterating, to halve the cost.
 

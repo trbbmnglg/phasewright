@@ -8,6 +8,8 @@
 // Record fields: project, phase, kind (ui|backend|data|infra|docs|mixed), est_h,
 // started, previewed, approved, shipped (ISO times), build_model, build_effort,
 // runs_as (main|builder), check_rounds, prod_first_pass, rolled_back.
+// Optional: tokens { builder, checker, shipper, model_scout }, each a non-negative integer:
+// the agent tokens used for the phase. The main session's own tokens aren't counted.
 // actual_h is computed as agent time: (previewed - started) + (shipped - approved),
 // so time spent waiting for the user's approval doesn't count.
 
@@ -23,6 +25,7 @@ const median = (xs) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
+const TOKEN_KEYS = ["builder", "checker", "shipper", "model_scout"];
 const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : "n/a");
 
 function load(path) {
@@ -37,6 +40,17 @@ if (cmd === "record") {
   const r = JSON.parse(json);
   for (const k of ["project", "phase", "est_h", "build_model"]) {
     if (r[k] === undefined) { console.error(`missing field: ${k}`); process.exit(1); }
+  }
+  if (r.tokens !== undefined) {
+    const t = r.tokens;
+    if (t === null || typeof t !== "object" || Array.isArray(t)) {
+      console.error(`invalid field: tokens must be an object like { "builder": 120000 }, allowed keys: ${TOKEN_KEYS.join(", ")}`);
+      process.exit(1);
+    }
+    for (const [k, v] of Object.entries(t)) {
+      if (!TOKEN_KEYS.includes(k)) { console.error(`invalid field: tokens.${k} is not a known agent (allowed: ${TOKEN_KEYS.join(", ")})`); process.exit(1); }
+      if (!Number.isInteger(v) || v < 0) { console.error(`invalid field: tokens.${k} must be a non-negative integer (got ${JSON.stringify(v)})`); process.exit(1); }
+    }
   }
   if (r.actual_h === undefined && r.started && r.previewed && r.approved && r.shipped) {
     r.actual_h = +(hours(r.started, r.previewed) + hours(r.approved, r.shipped)).toFixed(2);
@@ -68,6 +82,11 @@ if (cmd === "record") {
     const prod = rs.filter((r) => r.prod_first_pass === true).length;
     const back = rs.filter((r) => r.rolled_back === true).length;
     console.log(`  ${c}: ${pct(first, rs.length)} / ${pct(prod, rs.length)} / ${back} over ${rs.length}`);
+  }
+  const withTokens = rows.filter((r) => r.tokens && typeof r.tokens === "object");
+  if (withTokens.length) {
+    const totals = withTokens.map((r) => TOKEN_KEYS.reduce((sum, k) => sum + (Number.isInteger(r.tokens[k]) ? r.tokens[k] : 0), 0));
+    console.log(`Agent tokens per phase: median ${Math.round(median(totals))} (tokens recorded on ${withTokens.length} of ${rows.length} phases; main session not counted)`);
   }
   console.log("Use the multiplier on raw estimates (show raw -> calibrated). Prefer the cheapest build model with a strong first-pass rate for that kind of work.");
 } else {
