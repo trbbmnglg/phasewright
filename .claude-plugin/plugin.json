@@ -1,5 +1,6 @@
 {
   "name": "phasewright",
+  "displayName": "Phasewright library",
   "description": "Reusable skills and agents for shipping software with AI assistants: planning, debugging, prompts, docs and more.",
   "version": "1.0.1",
   "author": { "name": "trbbmnglg", "url": "https://github.com/trbbmnglg" },

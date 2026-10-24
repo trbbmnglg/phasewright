@@ -1,6 +1,6 @@
 name: Board sync
 
-# Keeps the GitHub Project "phasewright" in step with what ships. A commit message
+# Keeps the GitHub Project "Phasewright" in step with what ships. A commit message
 # with `Ships #N`, `Fixes #N` or `Opens #N` (plus `Hours:` and `Deploy:` lines)
 # updates those issues and their Project cards. See scripts/board-sync.mjs.
 #

@@ -1,4 +1,6 @@
-# phasewright
+# Phasewright
+
+Formerly `phasewright`. The Claude Code marketplace and plugin names are still `phasewright`, so existing installs keep working and updating, and old links to this repo redirect here.
 
 Reusable skills, agents and plugins for AI coding assistants. Each one is a plain Markdown file or folder you can read, copy and adapt. They work in Claude Code, VS Code (GitHub Copilot) and Cursor, and in any other tool that reads skills from a folder.
 
