@@ -67,7 +67,7 @@ function skillTools(slug) {
       install: copyTo(".cursor/skills", "~/.cursor/skills", slug),
     },
     "agent-skills": {
-      ...support("partial", "Any tool that loads skills from a folder; check where it keeps them"),
+      ...support("partial", "Other tools that load skills from SKILL.md folders; check where your tool looks for them"),
       install: copyTo(".agents/skills", null, slug),
     },
   };

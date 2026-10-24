@@ -1,8 +1,6 @@
 # Phasewright
 
-Formerly `phasewright`. The Claude Code marketplace and plugin names are still `phasewright`, so existing installs keep working and updating, and old links to this repo redirect here.
-
-Reusable skills, agents and plugins for AI coding assistants. Each one is a plain Markdown file or folder you can read, copy and adapt. They work in Claude Code, VS Code (GitHub Copilot) and Cursor, and in any other tool that reads skills from a folder.
+Reusable skills, agents and plugins for AI coding assistants. Each one is a plain Markdown file or folder you can read, copy and adapt. They work in Claude Code, VS Code (GitHub Copilot) and Cursor, and in other tools that load skills from `SKILL.md` folders.
 
 MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
 
@@ -23,7 +21,9 @@ MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
 
 **Agents** (`agents/claude/`), each a single Markdown file: `debugger`, `prompt-engineer`, `docs-writer`.
 
-**Plugins** (`plugins/`): [`phased-shipping`](plugins/phased-shipping/README.md) plans work as small phases with one deploy each, and picks the model and effort for every kind of task.
+**Plugins** (`plugins/`):
+- [`phased-shipping`](plugins/phased-shipping/README.md) plans work as small phases with one deploy each, and picks the model and effort for every kind of task.
+- [`free-resources`](plugins/free-resources/README.md) reports how pressured your machine is, which processes use the most, and what a task really needs. It never closes anything.
 
 `library.json` is generated from these files and lists every item with its install steps per tool.
 
@@ -35,6 +35,7 @@ MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
 claude plugin marketplace add trbbmnglg/phasewright
 claude plugin install phasewright@phasewright       # all skills and agents
 claude plugin install phased-shipping@phasewright     # the phased-shipping plugin
+claude plugin install free-resources@phasewright      # the free-resources plugin
 ```
 
 Or copy a skill folder into `.claude/skills/` (project) or `~/.claude/skills/` (personal), and an agent file into `.claude/agents/` or `~/.claude/agents/`.
@@ -51,7 +52,7 @@ Copy a skill folder into `.cursor/skills/` or `.agents/skills/` (project), or `~
 
 ### Other tools
 
-Copy a skill folder into your tool's skills folder, or `.agents/skills/` if it follows the shared convention.
+Copy a skill folder into your tool's skills folder.
 
 ### Download a single item
 

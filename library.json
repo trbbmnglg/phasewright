@@ -334,7 +334,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/prompt-engineering into .agents/skills/ (project)"
           ]
@@ -388,7 +388,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/planner into .agents/skills/ (project)"
           ]
@@ -441,7 +441,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/docs-generator into .agents/skills/ (project)"
           ]
@@ -494,7 +494,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/business-analyst into .agents/skills/ (project)"
           ]
@@ -546,7 +546,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/refactoring into .agents/skills/ (project)"
           ]
@@ -599,7 +599,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/error-handling into .agents/skills/ (project)"
           ]
@@ -652,7 +652,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/performance into .agents/skills/ (project)"
           ]
@@ -704,7 +704,7 @@
         },
         "agent-skills": {
           "support": "partial",
-          "note": "Any tool that loads skills from a folder; check where it keeps them",
+          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
           "install": [
             "Copy skills/commits into .agents/skills/ (project)"
           ]
