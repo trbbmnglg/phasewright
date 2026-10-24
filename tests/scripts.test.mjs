@@ -1,7 +1,7 @@
 // Run with: node --test tests/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, cpSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -162,6 +162,214 @@ test("denylist terms match whole words only", () => {
   rmSync(bad, { recursive: true });
   rmSync(ok + "-denylist.txt");
   rmSync(bad + "-denylist.txt");
+});
+
+test("key patterns need a left word boundary: slugs like risk-deadlines pass, a standalone key fails", () => {
+  const ok = fixture({
+    "skills/s/SKILL.md": skill("s", `See risk-deadlines-and-other-key-changes and task-${"AKIA" + "A".repeat(16)} and my_${"ghp_" + "a".repeat(36)}.`),
+    "agents/claude/helper.md": agent("helper"),
+  });
+  const okRun = run("lint.mjs", ok);
+  assert.equal(okRun.status, 0, okRun.stdout);
+  for (const key of ["sk-" + "a".repeat(20), "ghp_" + "a".repeat(36), "AKIA" + "A".repeat(16), "xoxb-" + "1".repeat(12)]) {
+    const bad = fixture({
+      "skills/s/SKILL.md": skill("s", `token=${key} here`),
+      "agents/claude/helper.md": agent("helper"),
+    });
+    const r = run("lint.mjs", bad);
+    assert.match(r.stdout, /API key or token found/, key);
+    assert.equal(r.status, 1);
+    rmSync(bad, { recursive: true });
+  }
+  rmSync(ok, { recursive: true });
+});
+
+// A fixture with one plugin. Plugin files carry no metadata block or license (root-only rule).
+const PLUGIN_JSON = JSON.stringify({ name: "plug", version: "1.0.0", description: "A plugin." });
+const pAgent = (extra = "", { model = "sonnet", desc = '"An agent."', name = "pa" } = {}) =>
+  `---\nname: ${name}\ndescription: ${desc}\nmodel: ${model}\n${extra}---\n\nBody\n`;
+const pSkill = (extra = "", name = "ps") => `---\nname: ${name}\ndescription: "Does a thing."\n${extra}---\n\n# Skill\n`;
+const withPlugin = (files) => fixture({
+  "skills/good-skill/SKILL.md": skill("good-skill"),
+  "agents/claude/helper.md": agent("helper"),
+  "plugins/plug/.claude-plugin/plugin.json": PLUGIN_JSON,
+  ...files,
+});
+// Lints a fixture and removes it. Returns { out, status }.
+function lintOf(root) {
+  const r = run("lint.mjs", root);
+  rmSync(root, { recursive: true, force: true });
+  return { out: r.stdout, status: r.status };
+}
+const agentFile = (text) => lintOf(withPlugin({ "plugins/plug/agents/pa.md": text }));
+const skillFile = (text, folder = "ps") => lintOf(withPlugin({ [`plugins/plug/skills/${folder}/SKILL.md`]: text }));
+
+test("a clean plugin agent and skill pass, with no metadata block needed", () => {
+  const r = lintOf(withPlugin({
+    "plugins/plug/agents/pa.md": pAgent("effort: low\nmaxTurns: 20\ntools: Read, Grep\n", { model: "fable" }),
+    "plugins/plug/skills/ps/SKILL.md": pSkill("model: best\neffort: high\n"),
+  }));
+  assert.equal(r.status, 0, r.out);
+  assert.doesNotMatch(r.out, /warning\s+(plugins|skills|agents)\//);
+});
+
+test("an unquoted colon in a plugin agent description fails (audit mutation test)", () => {
+  const r = agentFile(pAgent("", { desc: "Use this agent. TRIGGER on: any request" }));
+  assert.match(r.out, /plugins\/plug\/agents\/pa\.md: frontmatter "description" has an unquoted ": "/);
+  assert.equal(r.status, 1);
+});
+
+test("plugin agents: bad effort and maxTurns fail", () => {
+  const e = agentFile(pAgent("effort: extreme\n"));
+  assert.match(e.out, /effort "extreme" must be one of/);
+  assert.equal(e.status, 1);
+  const zero = agentFile(pAgent("maxTurns: 0\n"));
+  assert.match(zero.out, /maxTurns "0" must be a positive whole number/);
+  assert.equal(zero.status, 1);
+  const word = agentFile(pAgent("maxTurns: ten\n"));
+  assert.match(word.out, /maxTurns "ten" must be a positive whole number/);
+  assert.equal(word.status, 1);
+});
+
+test("plugin agents: fields that plugins ignore fail", () => {
+  const h = agentFile(pAgent("hooks:\n  PreToolUse: x\n"));
+  assert.match(h.out, /"hooks" is ignored in plugin agents/);
+  assert.equal(h.status, 1);
+  const p = agentFile(pAgent("permissionMode: acceptEdits\n"));
+  assert.match(p.out, /"permissionMode" is ignored in plugin agents/);
+  assert.equal(p.status, 1);
+  assert.match(agentFile(pAgent("mcpServers: x\n")).out, /"mcpServers" is ignored/);
+  assert.match(agentFile(pAgent("initialPrompt: x\n")).out, /"initialPrompt" is ignored/);
+});
+
+test("an unknown frontmatter key warns but does not fail", () => {
+  const r = agentFile(pAgent("colour: red\n"));
+  assert.match(r.out, /warning\s+plugins\/plug\/agents\/pa\.md: unknown frontmatter field "colour"/);
+  assert.equal(r.status, 0, r.out);
+});
+
+test("agent model: best warns, a full ID fails, fable passes", () => {
+  const best = agentFile(pAgent("", { model: "best" }));
+  assert.match(best.out, /warning\s+.*model "best" is not listed for subagent frontmatter/);
+  assert.equal(best.status, 0, best.out);
+  const id = agentFile(pAgent("", { model: "claude-opus-5-5" }));
+  assert.match(id.out, /model "claude-opus-5-5" must be an alias/);
+  assert.equal(id.status, 1);
+  const fable = agentFile(pAgent("", { model: "fable" }));
+  assert.equal(fable.status, 0, fable.out);
+});
+
+test("plugin agent names must match the file and have no colon", () => {
+  const r = agentFile(pAgent("", { name: "other" }));
+  assert.match(r.out, /name "other" must match the file name/);
+  assert.equal(r.status, 1);
+  assert.match(agentFile(pAgent("", { name: "ns:pa" })).out, /must not contain ":"/);
+});
+
+test("plugin skills: name must match the folder, allowed-tools warns, bad effort and model fail", () => {
+  const name = skillFile(pSkill("", "other"));
+  assert.match(name.out, /plugins\/plug\/skills\/ps: name "other" must match the folder "ps"/);
+  assert.equal(name.status, 1);
+  const tools = skillFile(pSkill("allowed-tools: Bash\n"));
+  assert.match(tools.out, /warning\s+plugins\/plug\/skills\/ps: "allowed-tools" pre-approves/);
+  assert.equal(tools.status, 0, tools.out);
+  assert.equal(skillFile(pSkill("effort: huge\n")).status, 1);
+  assert.match(skillFile(pSkill("model: claude-opus-5-5\n")).out, /model "claude-opus-5-5" must be an alias/);
+});
+
+test("plugin skills: missing description, broken link and a long body are caught", () => {
+  const desc = skillFile("---\nname: ps\n---\n\n# S\n");
+  assert.match(desc.out, /description is missing/);
+  assert.equal(desc.status, 1);
+  const link = skillFile(pSkill("") + "See [x](references/nope.md).\n");
+  assert.match(link.out, /broken link: references\/nope\.md/);
+  assert.equal(link.status, 1);
+  const long = skillFile(pSkill("") + "line\n".repeat(520));
+  assert.match(long.out, /warning\s+.*body is \d+ lines/);
+  assert.equal(long.status, 0, long.out);
+});
+
+test("root items follow the same effort rules, and a root skill without metadata still fails", () => {
+  const root = (extra, skillText) => lintOf(fixture({
+    "skills/s/SKILL.md": skillText ?? skill("s"),
+    "agents/claude/helper.md": agent("helper").replace("model: sonnet", `model: sonnet\n${extra}`),
+  }));
+  assert.equal(root("effort: high").status, 0);
+  const huge = root("effort: huge");
+  assert.match(huge.out, /effort "huge" must be one of/);
+  assert.equal(huge.status, 1);
+  const bare = root("", "---\nname: s\ndescription: x\nlicense: MIT\n---\n\nBody\n");
+  assert.match(bare.out, /missing metadata block/);
+  assert.equal(bare.status, 1);
+});
+
+test("the real repo lints with no errors, including the plugin files", () => {
+  const lint = spawnSync(process.execPath, [join(REPO, "scripts", "lint.mjs")], { encoding: "utf8" });
+  assert.equal(lint.status, 0, lint.stdout);
+  assert.doesNotMatch(lint.stdout, /^error/m);
+});
+
+const PS = join(REPO, "plugins", "phased-shipping");
+const text = (...parts) => readFileSync(join(PS, ...parts), "utf8");
+
+test("the plan skill's env regex catches the override variables and no key variables", () => {
+  const m = text("skills", "plan", "SKILL.md").match(/env \| grep -E '([^']+)'/);
+  assert.ok(m, "grep -E pattern not found in plan/SKILL.md");
+  const re = new RegExp(m[1]);
+  for (const v of ["CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1", "CLAUDE_CODE_SUBAGENT_MODEL=haiku", "CLAUDE_CODE_EFFORT_LEVEL=low", "ANTHROPIC_DEFAULT_OPUS_MODEL=x"]) {
+    assert.ok(re.test(v), `should match ${v}`);
+  }
+  for (const v of ["ANTHROPIC_API_KEY=x", "ANTHROPIC_AUTH_TOKEN=x"]) assert.ok(!re.test(v), `should not match ${v}`);
+});
+
+test("run's override and version gates, the template line and both READMEs say what the plan promises", () => {
+  const run = text("skills", "run", "SKILL.md");
+  assert.match(run, /CLAUDE_CODE_SUBAGENT_MODEL_FORCE/);
+  assert.match(run, /CLAUDE_CODE_EFFORT_LEVEL/);
+  assert.match(run, /proceed anyway/);
+  assert.match(run, /2\.1\.292/);
+  assert.match(run, /override: <variable>=<value>, proceed anyway <ISO>/);
+  // The gate prints only the named variables and the version gate names the binary it checked.
+  assert.match(run, /env \| grep -E '\^\(CLAUDE_CODE_SUBAGENT_MODEL\[A-Z_\]\*\|CLAUDE_CODE_EFFORT_LEVEL\)='/);
+  assert.match(run, /name which binary you checked/);
+  assert.match(text("skills", "plan", "references", "templates.md"), /^- Overrides: </m);
+  assert.match(text("agents", "model-scout.md"), /`Overrides:` line/);
+  assert.match(text("README.md"), /v2\.1\.292 or later/);
+  assert.match(readFileSync(join(REPO, "README.md"), "utf8"), /v2\.1\.292 or later/);
+});
+
+const git = (root, ...args) =>
+  execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.com", ...args], { cwd: root, stdio: "ignore" });
+
+test("in a git repo only the published tree is scanned; outside git the full walk still applies", () => {
+  const key = "sk-" + "a".repeat(24);
+  const files = {
+    "skills/s/SKILL.md": skill("s"),
+    "agents/claude/helper.md": agent("helper"),
+    ".gitignore": ".plans/\n",
+    ".plans/notes.md": `key ${key}\n`,
+  };
+  // Git repo: the ignored folder is skipped.
+  const repo = fixture(files);
+  git(repo, "init", "-q");
+  git(repo, "add", ".gitignore", "skills", "agents");
+  const clean = run("lint.mjs", repo);
+  assert.equal(clean.status, 0, clean.stdout);
+  // A tracked file and an untracked, not-ignored file are both scanned.
+  writeFileSync(join(repo, "untracked.md"), `key ${key}\n`);
+  const untracked = run("lint.mjs", repo);
+  assert.match(untracked.stdout, /untracked\.md: API key or token found/);
+  rmSync(join(repo, "untracked.md"));
+  writeFileSync(join(repo, "tracked.md"), `key ${key}\n`);
+  git(repo, "add", "tracked.md");
+  assert.match(run("lint.mjs", repo).stdout, /tracked\.md: API key or token found/);
+  // Non-git folder: the old full walk applies, so the same ignored folder is scanned.
+  const plain = fixture(files);
+  const walk = run("lint.mjs", plain);
+  assert.match(walk.stdout, /\.plans\/notes\.md: API key or token found/);
+  assert.equal(walk.status, 1);
+  rmSync(repo, { recursive: true, force: true });
+  rmSync(plain, { recursive: true });
 });
 
 test("manifest --check fails after an edit until the manifest is rebuilt", () => {

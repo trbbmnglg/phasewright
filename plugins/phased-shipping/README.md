@@ -26,9 +26,14 @@ State lives in two places:
   - the Model check is stale;
   - the plan's model isn't available to you;
   - the plan puts risky core logic below the mid tier, or a security review below the strongest tier.
+- **The override gate** also stops `run` when `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is set, or when `CLAUDE_CODE_EFFORT_LEVEL` differs from the plan's build effort, because either one silently changes what the plan promised. You can say "proceed anyway", and the plan records it. The gate checks environment variables and the settings files the session can read, so a managed-settings override it can't read won't be caught. A separate version check warns, without stopping, when Claude Code is older than v2.1.292.
 - **Checks and shipping** always use the cheap agents.
 
 A hook can't do this gate, because tool-call hooks never see the model name.
+
+## Requirements
+
+- Claude Code v2.1.292 or later (per-call effort; older versions run subagents at their file's effort).
 
 ## Install
 
@@ -69,7 +74,7 @@ Personal skills and agents aren't namespaced, so the copies get a `ps-` prefix. 
 ## Customize
 
 - **Different defaults:** edit `model:` and `effort:` in `skills/*/SKILL.md` and `agents/*.md`.
-- **Pinning versions:** use aliases (`opus`, `sonnet`, `haiku`, `best`) and pin versions with `ANTHROPIC_DEFAULT_*_MODEL`. That way the files don't go stale when models change.
+- **Pinning versions:** use aliases (`opus`, `sonnet`, `haiku`, `fable`) and pin versions with `ANTHROPIC_DEFAULT_*_MODEL`. That way the files don't go stale when models change.
 - **Team conventions:** put your model convention in CLAUDE.md. The plan skill follows it over the scout's picks, unless a model is retired or unavailable.
 - **Other providers:** on Bedrock, Vertex and Foundry the aliases can resolve to older versions. The Model check records what they resolve to.
 

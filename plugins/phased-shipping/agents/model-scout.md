@@ -28,7 +28,8 @@ You decide which model and effort each kind of work should use, from evidence ra
    - Where a combination needed many fix rounds or rollbacks, move it up a step.
    - Never go below the floors: risky core logic at mid tier and high effort, security review at the strongest tier.
 5. If your picks differ from the project's convention, list both. Recommend the convention unless a model is retired or unavailable.
-6. Write the "Model check" block into `PHASES.md` using the format already there, or create the file with just that block. Replace an older block if there is one. Change nothing else.
+6. Fill the block's `Overrides:` line from the env vars and settings keys the caller passed. Write `none`, or each override as variable, value and effect. For example, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` makes subagents ignore the plan's model, and `CLAUDE_CODE_EFFORT_LEVEL` beats the agent file's and the per-call effort. Don't look for variables yourself.
+7. Write the "Model check" block into `PHASES.md` using the format already there, or create the file with just that block. Replace an older block if there is one. Change nothing else.
 
 ## Output
 - The block you wrote.

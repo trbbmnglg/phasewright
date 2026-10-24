@@ -18,6 +18,7 @@ Status as of <YYYY-MM-DD>. Current phase: N.
 - Provider: <Anthropic API | Bedrock | Vertex | Foundry>
 - Session model: <id> · Pinned: <env vars / settings keys found, or none>
 - Available: <aliases and the ids they resolve to>
+- Overrides: <none | variable, value and effect>
 - Sources: <URLs>
 - Picks: plan <alias (effort)> · risky build <...> · routine build <...> · tests <...> · checks and ship <...> · security review <...>
 - From history: <multiplier, notable model outcomes, or "no history yet">

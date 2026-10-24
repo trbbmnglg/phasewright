@@ -37,6 +37,8 @@ claude plugin install phased-shipping@phasewright     # the phased-shipping plug
 
 Or copy a skill folder into `.claude/skills/` (project) or `~/.claude/skills/` (personal), and an agent file into `.claude/agents/` or `~/.claude/agents/`.
 
+The phased-shipping plugin needs Claude Code v2.1.292 or later, because it sets effort per call; older versions run subagents at their file's effort.
+
 ### VS Code with GitHub Copilot
 
 Copy a skill folder into `.github/skills/`, `.claude/skills/` or `.agents/skills/` in your project, or into `~/.copilot/skills/` for all projects. VS Code also reads Claude-format agents from `.claude/agents/`, so the agent files work there unchanged.

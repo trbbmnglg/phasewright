@@ -35,7 +35,7 @@ Your system context names the model you are running as. If it isn't the planning
    - the arguments say `refresh-models`.
 
    Otherwise reuse it. To refresh:
-   - With your shell tool, print **only** these variables, because other `ANTHROPIC_*` variables can hold keys: `env | grep -E '^(ANTHROPIC_MODEL|ANTHROPIC_DEFAULT_[A-Z]+_MODEL|CLAUDE_CODE_SUBAGENT_MODEL|CLAUDE_CODE_EFFORT_LEVEL|CLAUDE_CODE_USE_[A-Z]+)='`
+   - With your shell tool, print **only** these variables, because other `ANTHROPIC_*` variables can hold keys: `env | grep -E '^(ANTHROPIC_MODEL|ANTHROPIC_DEFAULT_[A-Z]+_MODEL|CLAUDE_CODE_SUBAGENT_MODEL[A-Z_]*|CLAUDE_CODE_EFFORT_LEVEL|CLAUDE_CODE_USE_[A-Z]+)='`
    - Read the `model`, `availableModels` and `effortLevel` keys from the user, project and managed settings, and any model convention in CLAUDE.md.
    - Pass those facts, the calibration output and the `PHASES.md` path to the `phased-shipping:model-scout` agent.
 3. **Project conventions.** If the project has its own plan template, planning skill or required sections (CLAUDE.md, `.claude/skills`), the phase plan includes them. This skill owns phasing, routing and gates. The project's conventions own the content.
