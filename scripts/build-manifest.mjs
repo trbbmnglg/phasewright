@@ -66,10 +66,6 @@ function skillTools(slug) {
       ...support("full", "Cursor reads .cursor/skills and .agents/skills"),
       install: copyTo(".cursor/skills", "~/.cursor/skills", slug),
     },
-    "agent-skills": {
-      ...support("partial", "Other tools that load skills from SKILL.md folders; check where your tool looks for them"),
-      install: copyTo(".agents/skills", null, slug),
-    },
   };
 }
 
@@ -84,7 +80,6 @@ function agentTools(slug) {
       install: [`Copy agents/claude/${slug}.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)`],
     },
     cursor: { ...support("none", "No documented custom-agent file format; use the matching skill instead"), install: [] },
-    "agent-skills": { ...support("none", "Agents are tool-specific"), install: [] },
   };
 }
 
@@ -111,7 +106,6 @@ function pluginTools(slug, needsClaudeCode) {
     },
     copilot: { ...other, install: [`Copy plugins/${slug}/skills/* into .github/skills/`] },
     cursor: { ...other, install: [`Copy plugins/${slug}/skills/* into .cursor/skills/`] },
-    "agent-skills": { ...support("none"), install: [] },
   };
 }
 

@@ -13,7 +13,7 @@ metadata:
   tags: "docs,diagrams,changelog"
   featured: "false"
   order: "3"
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Technical Writer — Agent Persona
@@ -224,8 +224,7 @@ One file, prepend entries at the top.
 ```markdown
 # Changelog
 
-All notable changes to this project are documented here.
-Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+All notable changes to this project are documented here, newest first.
 
 ## [Unreleased]
 

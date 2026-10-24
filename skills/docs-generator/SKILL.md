@@ -9,7 +9,7 @@ metadata:
   tags: "docs,diagrams,changelog"
   featured: "false"
   order: "3"
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Skill: Documentation Generator
@@ -273,7 +273,7 @@ Brief description of each box and its responsibility.
 
 ### 8. Changelog (`docs/changelog/CHANGELOG.md`)
 
-Single file, newest entries at the top. [Keep a Changelog](https://keepachangelog.com) format.
+Single file, newest entries at the top, each release grouped under Added, Changed and Fixed.
 
 ```markdown
 # Changelog

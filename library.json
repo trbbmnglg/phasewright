@@ -43,11 +43,6 @@
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
           "install": []
-        },
-        "agent-skills": {
-          "support": "none",
-          "note": "Agents are tool-specific",
-          "install": []
         }
       }
     },
@@ -90,11 +85,6 @@
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
           "install": []
-        },
-        "agent-skills": {
-          "support": "none",
-          "note": "Agents are tool-specific",
-          "install": []
         }
       }
     },
@@ -111,7 +101,7 @@
       ],
       "featured": false,
       "order": 3,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "license": "MIT",
       "path": "agents/claude/docs-writer.md",
       "files": [
@@ -137,11 +127,6 @@
         "cursor": {
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
-          "install": []
-        },
-        "agent-skills": {
-          "support": "none",
-          "note": "Agents are tool-specific",
           "install": []
         }
       }
@@ -208,10 +193,6 @@
           "install": [
             "Copy plugins/free-resources/skills/* into .cursor/skills/"
           ]
-        },
-        "agent-skills": {
-          "support": "none",
-          "install": []
         }
       }
     },
@@ -281,10 +262,6 @@
           "install": [
             "Copy plugins/phased-shipping/skills/* into .cursor/skills/"
           ]
-        },
-        "agent-skills": {
-          "support": "none",
-          "install": []
         }
       }
     },
@@ -330,13 +307,6 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/prompt-engineering into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
-          ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/prompt-engineering into .agents/skills/ (project)"
           ]
         }
       }
@@ -385,13 +355,6 @@
           "install": [
             "Copy skills/planner into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/planner into .agents/skills/ (project)"
-          ]
         }
       }
     },
@@ -408,7 +371,7 @@
       ],
       "featured": false,
       "order": 3,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "license": "MIT",
       "path": "skills/docs-generator",
       "files": [
@@ -437,13 +400,6 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/docs-generator into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
-          ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/docs-generator into .agents/skills/ (project)"
           ]
         }
       }
@@ -491,13 +447,6 @@
           "install": [
             "Copy skills/business-analyst into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/business-analyst into .agents/skills/ (project)"
-          ]
         }
       }
     },
@@ -542,13 +491,6 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/refactoring into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
-          ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/refactoring into .agents/skills/ (project)"
           ]
         }
       }
@@ -596,13 +538,6 @@
           "install": [
             "Copy skills/error-handling into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/error-handling into .agents/skills/ (project)"
-          ]
         }
       }
     },
@@ -649,13 +584,6 @@
           "install": [
             "Copy skills/performance into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/performance into .agents/skills/ (project)"
-          ]
         }
       }
     },
@@ -700,13 +628,6 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/commits into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
-          ]
-        },
-        "agent-skills": {
-          "support": "partial",
-          "note": "Other tools that load skills from SKILL.md folders; check where your tool looks for them",
-          "install": [
-            "Copy skills/commits into .agents/skills/ (project)"
           ]
         }
       }
