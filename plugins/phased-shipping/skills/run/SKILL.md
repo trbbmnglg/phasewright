@@ -16,7 +16,7 @@ Arguments: `$ARGUMENTS`.
 
 History file: `${CLAUDE_PLUGIN_DATA}/history.jsonl`
 
-Record timestamps with your shell tool (`date -u +%Y-%m-%dT%H:%M:%SZ`) in the phase plan: `started` when you begin, `previewed` at the preview, `approved` on approve, and `shipped` when the prod check passes.
+Record timestamps in the phase plan: `started` when you begin, `previewed` at the preview, `approved` on approve, and `shipped` when the prod check passes. Read the clock with your shell tool, in UTC: on Windows, when a PowerShell tool exists, `(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')`, otherwise `date -u +%Y-%m-%dT%H:%M:%SZ`. If only one shell tool is available, use that one. This session records the timestamps. Agents never read the clock or report times.
 
 ## Gates (stop at the first failure and say exactly what is missing; gate 5 only warns)
 
@@ -53,6 +53,11 @@ Record timestamps with your shell tool (`date -u +%Y-%m-%dT%H:%M:%SZ`) in the ph
 - **No production personal data.** Use synthetic or masked data only. Never copy production personal data into a brief, a plan file, a report or the history record.
 - **Partial results.** If an agent's result is marked partial (it stopped at its turn limit), stop. Report what was done and what is left, and never treat it as complete. Don't go on to the next step. The user can resume the phase.
 - **Proposed commands.** The checker never runs commands it worked out itself. If its result has a `Proposed commands` list, show the list and ask the user, with AskUserQuestion, whether to run it. Only after the user's OK, delegate to the checker again with exactly those commands. Until then, the check hasn't run and isn't a pass. If the plan's verify commands came with a cloned repo, gate 1 already applies.
+- **No shell.** If an agent's result starts with `NO SHELL:`, or says it had no working shell tool, treat it as partial and unverified. Say so plainly, and name the step that was not verified.
+  - For a builder result, mark the build "unverified" and run the plan's verify commands in this session's shell.
+  - If this session has no working shell either, stop and tell the user.
+  - Never report a phase as built or checked on the result of an agent that had no shell.
+- **Unfinished checks.** If the checker's result says a command is `UNFINISHED` or `TIMED OUT`, or shows no exit code for a command, it is not a pass. Run that command yourself in this session's shell, in the foreground, with a long timeout, and say that you did. In the preview's gates table, mark that row "(re-run in main)".
 
 ## Baseline
 
@@ -83,6 +88,15 @@ Say it in the preview whichever way it went, and carry on. The guard is an extra
 
 - **Compare against the baseline.** Delegate to `phased-shipping:checker` in **compare** mode against the baseline. Include the browser check if the project has one. Only **new** failures block.
 - **Fix rounds.** Send new failures to the builder, on the same model. Allow at most 2 rounds, then stop and report. Count the rounds for the history.
+- **Attribute each fix round and each rollback to its source,** as it happens, for the history's `caught_by` (in order):
+  - the compare checker: `compare`;
+  - your own review of the diff: `own-review`;
+  - the security-review agent: `security-review`;
+  - the browser check: `browser-check`;
+  - the shipper's prod check (a rollback): `prod-check`;
+  - a builder that came back incomplete or failing and was run again: `builder-self`.
+
+  If the source is unclear, record the check that first reported the problem.
 - **Review.**
   - `standard`: read the diff yourself, briefly.
   - `security`: delegate a read-only review to a `general-purpose` agent, with `model` set to the strongest tier and high effort.
@@ -100,7 +114,7 @@ First, bind the preview to the plan's commands. The record folder is `${CLAUDE_P
 
 Then report:
 - what changed;
-- a gates table: baseline, then each check, then the **Guard** row;
+- a gates table: baseline, then each check, then the **Guard** row (a row that rests on a command this session re-ran says "(re-run in main)");
 - preview or screenshot paths;
 - calibrated estimate against time so far;
 - models used;
@@ -141,6 +155,7 @@ Then end the turn. Never deploy in the same turn as the build.
    - the four timestamps;
    - `build_model`, `build_effort`, `runs_as`;
    - `check_rounds`, `prod_first_pass`, `rolled_back`;
+   - `caught_by`: the sources noted under Check, in order, one per fix round and one for a rollback, so its length is `check_rounds` plus 1 if `rolled_back` (the script refuses any other length). Use `[]` when the phase needed no fix round and no rollback;
    - `guard`: `"active"`, `"inactive"` or `"unknown"`, from the guard probe (see Guard);
    - `tokens`: `{ "builder": N, "checker": N, "shipper": N, "model_scout": N }`. Each value is the sum, for this phase, of the token counts in that agent's completion results (all its runs, including fix rounds). Leave out an agent that didn't run. Leave out `tokens` if no agent reported a count. These are agent tokens only: this session's own tokens aren't visible, so don't estimate them.
 4. If `PHASES.md` has a `## Close steps` section, follow it. If `PHASES.md` didn't come from the plan skill in this session or from the user's own repo history (for example it came with a cloned repo), show the steps first and get the user's OK before running any of them. Steps that publish anything still go through the normal approvals.

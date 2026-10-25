@@ -195,3 +195,71 @@ test("stats prints how many phases had the guard active, counting only phases th
   assert.doesNotMatch(node("stats", file).out, /Guard active/);
   rmSync(dir, { recursive: true });
 });
+
+test("a valid caught_by is saved as given: [] with no rounds, one entry per round, plus one for a rollback", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  for (const [i, over] of [
+    { caught_by: [] },
+    { check_rounds: 1, caught_by: ["compare"] },
+    { check_rounds: 1, rolled_back: true, caught_by: ["security-review", "prod-check"] },
+    { check_rounds: 0, rolled_back: true, caught_by: ["prod-check"] },
+  ].entries()) {
+    const r = record(file, base({ phase: i + 1, ...over }));
+    assert.equal(r.status, 0, r.err);
+  }
+  assert.deepEqual(lines(file).map((r) => r.caught_by), [[], ["compare"], ["security-review", "prod-check"], ["prod-check"]]);
+  rmSync(dir, { recursive: true });
+});
+
+test("an invalid caught_by is rejected with invalid field: caught_by, and nothing is written", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  const cases = [
+    { check_rounds: 1, caught_by: ["luck"] },
+    { check_rounds: 1, caught_by: [null] },
+    { check_rounds: 1, caught_by: "compare" },
+    { check_rounds: 1, caught_by: null },
+    { check_rounds: 1, caught_by: [] },
+    { check_rounds: 0, caught_by: ["compare"] },
+    { check_rounds: 1, rolled_back: true, caught_by: ["compare"] },
+  ];
+  for (const over of cases) {
+    const r = record(file, base(over));
+    assert.equal(r.status, 1, JSON.stringify(over));
+    assert.match(r.err, /^invalid field: caught_by/, JSON.stringify(over));
+  }
+  assert.equal(existsSync(file), false);
+  rmSync(dir, { recursive: true });
+});
+
+test("a record without caught_by still loads, and stats prints no catches line for such a file", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  assert.equal(record(file, base()).status, 0);
+  assert.equal("caught_by" in lines(file)[0], false);
+  writeFileSync(file, FIXTURE);
+  const out = node("stats", file).out;
+  assert.doesNotMatch(out, /Caught by/);
+  assert.doesNotMatch(out, /Conditional compare/);
+  assert.equal(out, EXPECTED_STATS);
+  rmSync(dir, { recursive: true });
+});
+
+test("stats counts each check, says how many phases recorded caught_by, and shows progress to 15", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  const [a, b, c] = FIXTURE.split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  const d = { ...a, phase: 4 };
+  writeFileSync(file, [
+    { ...a, caught_by: [] },
+    { ...b, check_rounds: 2, caught_by: ["security-review", "own-review", "prod-check"] },
+    { ...c, check_rounds: 1, rolled_back: false, caught_by: ["security-review"] },
+    d,
+  ].map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const r = node("stats", file);
+  assert.equal(r.status, 0);
+  assert.match(r.out, /^Caught by \(phases with caught_by recorded: 3 of 4; 1 needed no fix\): builder-self 0, compare 0, own-review 1, security-review 2, browser-check 0, prod-check 1$/m);
+  assert.match(r.out, /^Conditional compare needs 15 phases with caught_by recorded \(3 so far\)$/m);
+  rmSync(dir, { recursive: true });
+});

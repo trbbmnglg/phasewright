@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.5.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -111,7 +111,7 @@ test("each of the four safety evals has a prompt with max_turns and allowed_tool
 
 test("every eval folder, old and new, has a prompt and at least one grader", () => {
   const dirs = readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory());
-  assert.equal(dirs.length, 8);
+  assert.equal(dirs.length, 9);
   for (const d of dirs) assert.ok(readdirSync(join(PS, "evals", d, "graders")).length >= 1, d);
 });
 
@@ -258,4 +258,75 @@ test("phase 7: the changelog has a 0.5.0 entry above 0.4.0, and the README is ho
   assert.match(readme, /does not protect against a malicious local process that can rewrite both the plan and the record/);
   assert.match(readme, /to preview the current commands/);
   assert.match(readme, /best effort|reads literal paths in the common write forms only/);
+});
+
+test("phase 7b: run attributes fix rounds, records caught_by, and reads NO SHELL and UNFINISHED results", () => {
+  const run = text("skills", "run", "SKILL.md");
+  for (const phrase of ["NO SHELL:", "UNFINISHED", "TIMED OUT", "caught_by", "(re-run in main)", "unverified"]) assert.ok(run.includes(phrase), phrase);
+  for (const source of ["builder-self", "compare", "own-review", "security-review", "browser-check", "prod-check"]) assert.ok(run.includes("`" + source + "`"), source);
+  assert.match(run, /\(Get-Date\)\.ToUniversalTime\(\)\.ToString\('yyyy-MM-ddTHH:mm:ssZ'\)/);
+  assert.match(run, /date -u/);
+  assert.match(run, /Agents never read the clock/);
+  assert.match(run, /Never report a phase as built or checked on the result of an agent that had no shell/);
+  // The approval-binding text from phases 6 and 7 is still there.
+  assert.match(run, /### Guard \(warns, never stops\)/);
+  assert.match(run, /--check previewed --data/);
+});
+
+test("phase 7b: the checker runs long commands in the foreground with a 10-minute timeout and reports unfinished ones", () => {
+  const checker = text("agents", "checker.md");
+  assert.match(checker, /\*\*Long commands\.\*\*/);
+  assert.match(checker, /`timeout` parameter as 600000/);
+  assert.match(checker, /never use background mode/);
+  assert.match(checker, /at most 5 times/);
+  assert.match(checker, /`UNFINISHED`/);
+  assert.match(checker, /TIMED OUT after 10 min/);
+  assert.match(checker, /`pass`, `fail` or `unfinished`/);
+  assert.match(checker, /overall: not complete/);
+});
+
+test("phase 7b: builder, checker and shipper carry the NO SHELL rule and the Windows note, and never tell the agent to call powershell or cmd", () => {
+  for (const agent of ["builder", "checker", "shipper"]) {
+    const md = text("agents", `${agent}.md`);
+    assert.ok(md.includes("NO SHELL:"), `${agent} NO SHELL:`);
+    assert.ok(md.includes("cmd /c npm"), `${agent} cmd /c note`);
+    assert.match(md, /^## Windows and Git Bash$/m, agent);
+    assert.match(md, /Don't read the clock or report times/, agent);
+    // Instruction position: "run/use/call/invoke powershell|cmd", other than the "don't use" note.
+    for (const line of md.split(/\r?\n/)) {
+      if (/don't use|Don't use|prints only the cmd banner/.test(line)) continue;
+      assert.doesNotMatch(line, /\b(run|use|call|invoke|launch|start)\b[^.\n]*\b(powershell|pwsh|cmd)\b/i, `${agent}: ${line}`);
+    }
+  }
+  assert.match(text("agents", "builder.md"), /Edit a file only when you can run that step's test afterwards/);
+  assert.match(text("agents", "builder.md"), /files you edited since your last passing test run/);
+  assert.match(text("agents", "shipper.md"), /Don't retry\. Start your report with `NO SHELL:`/);
+  assert.match(text("agents", "checker.md"), /list the commands that did not run/);
+});
+
+test("phase 7b: the eval run-no-shell-not-verified has a prompt and at least two graders with a typed llm grader", () => {
+  const dir = join(PS, "evals", "run-no-shell-not-verified");
+  const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
+  const fm = frontmatter(prompt);
+  assert.match(fm, /^max_turns: \d+$/m);
+  assert.match(fm, /^allowed_tools: \[.+\]$/m);
+  assert.match(prompt, /^NO SHELL: edited 3 files, no test run/m);
+  const graders = readdirSync(join(dir, "graders")).filter((f) => f.endsWith(".md"));
+  assert.ok(graders.length >= 2);
+  const types = graders.map((f) => frontmatter(readFileSync(join(dir, "graders", f), "utf8")).match(/^type: (llm|tool_used)$/m)?.[1]);
+  assert.ok(types.every(Boolean));
+  assert.ok(types.includes("llm"));
+});
+
+test("phase 7b: the changelog has one 0.6.0 block above 0.5.0, and the README has the Windows note and the two limits", () => {
+  const log = text("CHANGELOG.md");
+  assert.equal(log.split("## 0.6.0").length, 2, "one 0.6.0 block");
+  const at = log.indexOf("## 0.6.0");
+  assert.ok(at >= 0 && at < log.indexOf("## 0.5.0"));
+  for (const heading of ["### Added", "### Changed"]) assert.ok(log.indexOf(heading, at) > at, heading);
+  const readme = text("README.md");
+  assert.match(readme, /^## Windows and Git Bash$/m);
+  assert.match(readme, /`cmd \/c npm \.\.\.` prints only the cmd banner/);
+  assert.match(readme, /A checker can report `UNFINISHED`/);
+  assert.match(readme, /`caught_by` in the history is only as good as the main session's attribution/);
 });

@@ -136,6 +136,10 @@ Each agent has a turn limit (`maxTurns` in its file), so a runaway agent stops. 
 
 When an agent stops at its limit, `run` stops too. It reports what was done and what is left, and never treats the partial result as complete. You can resume the phase. Partial output at the limit needs Claude Code v2.1.246 or later, which the stated minimum already covers. Treat the values as starting points and tune them from your own history.
 
+A checker can report `UNFINISHED` or `TIMED OUT` for a command that was still running after its bounded wait (10 minutes, or 5 reads of a background output file). That is not a pass: `run` runs the command itself in the foreground and marks the row "(re-run in main)". The long-command rule is a prompt change, so a model can still ignore it.
+
+`caught_by` in the history is only as good as the main session's attribution of each fix round or rollback to a check. An unclear source is recorded as the check that first reported it. Records made before 0.6.0 have no `caught_by` and are not backfilled.
+
 The guard has limits of its own:
 - **It can be switched off.** An organization policy that allows only managed hooks (`allowManagedHooksOnly`) blocks plugin hooks, unless an admin force-enables the plugin. `disableAllHooks` does the same. The probe shows which case you are in, run by run.
 - **It needs node.** The hook runs `node`. If `node` isn't on the PATH, the plugin's hook can't start, and Claude Code lets the call go ahead, because the plugin's `hooks.json` can't set `onFailure: block` without blocking your main session as well. The same goes for a hook that times out (10 seconds). The personal copies do set `onFailure: block`, so a missing `node` stops the agent's calls there instead (v2.1.295 or later; on an older version the key is most likely ignored, and the hook then fails open).
@@ -144,6 +148,12 @@ The guard has limits of its own:
 - **It over-denies on purpose.** An unclear form is denied, and a false deny costs the agent one retry. A builder that types `git commit` in a scratch repository to set up a fixture is denied, and so are `git reset HEAD file` (use `git restore --staged`), `git branch new-name` (use `git checkout -b`), `git commit-tree`, `git config user.name x`, a `$'..'` string, `{a,b}` braces, and any `gh` write. A test suite that commits inside its own temporary repositories, run as `npm test`, is not denied, because the guard sees only the command the agent types. The agent reports the denial instead of working around it.
 - **A session started as an agent is restricted too.** `claude --agent phased-shipping:builder` makes the main session that agent, so the guard restricts it as well. That is the guard working as designed.
 - **Not yet seen firing in a real run.** Hooks can't run on the machine this was built on (an organization policy), so the guard is proven only by feeding sample payloads to the scripts, in this repo's tests, which include a regression case for every gap an independent security review found. The `agent_type` field, the frontmatter `hooks:` block and `onFailure` come from the Claude Code docs and the release notes, not from a run here. The first real-run check is the probe on a machine without that policy.
+
+## Windows and Git Bash
+
+- The agents run `npm`, `node` and `git` directly. In Git Bash, `cmd /c npm ...` prints only the cmd banner and runs nothing, so don't wrap commands in `cmd`. The guard may also block `cmd` and `powershell` for the agents.
+- The main session records the timestamps (PowerShell `(Get-Date).ToUniversalTime()` on Windows when it has a PowerShell tool, otherwise `date -u`). The agents don't read the clock. A local-time question, such as a no-deploy window, is for the main session to check with PowerShell.
+- A long command can be moved to the background by the Bash tool once it passes its timeout (2 minutes by default, 10 at most). The checker passes the 10-minute timeout on every call.
 
 ## Install
 
@@ -196,7 +206,7 @@ claude plugin validate . --strict
 claude plugin eval . --allow-tools WebSearch,WebFetch,Bash
 ```
 
-The eight cases check that:
+The nine cases check that:
 1. a multi-part request produces a phased roadmap with model and effort for each phase;
 2. a typo fix doesn't trigger the plan skill;
 3. tests, browser checks, commit and deploy are routed to the cheap tier;
@@ -204,9 +214,10 @@ The eight cases check that:
 5. `run` refuses to build when there is no plan;
 6. `run` doesn't deploy in the turn that builds;
 7. the shipper skips actions that have no `APPROVED:` line;
-8. `run` shows a plan's commands and waits for your OK when the plan came with a cloned repo.
+8. `run` shows a plan's commands and waits for your OK when the plan came with a cloned repo;
+9. `run` treats a builder result that starts with `NO SHELL:` as unverified, and doesn't go on to the preview as if the checks had passed.
 
-Cases 5 to 8 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
+Cases 5 to 9 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
 
 The guard has its own tests, which run in this repo's `npm test`: `node --test tests/guard.test.mjs tests/shell-split.test.mjs`. They feed sample hook payloads to the scripts; they don't need hooks to run.
 

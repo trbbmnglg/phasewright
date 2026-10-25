@@ -12,6 +12,9 @@
 // the agent tokens used for the phase. The main session's own tokens aren't counted.
 // Optional: guard (active|inactive|unknown): whether the guard hook was active in that run, from the
 // checker's probe. An organization policy can turn hooks off, so "inactive" is a normal answer.
+// Optional: caught_by, an array with one entry per fix round or rollback, in order. Each entry is one of
+// builder-self, compare, own-review, security-review, browser-check, prod-check (the check that found the
+// problem). Its length must equal check_rounds plus 1 if rolled_back is true. Old records without it stay valid.
 // actual_h is computed as agent time: (previewed - started) + (shipped - approved),
 // so time spent waiting for the user's approval doesn't count.
 
@@ -29,6 +32,8 @@ const median = (xs) => {
 };
 const TOKEN_KEYS = ["builder", "checker", "shipper", "model_scout"];
 const GUARD_VALUES = ["active", "inactive", "unknown"];
+const CAUGHT_BY = ["builder-self", "compare", "own-review", "security-review", "browser-check", "prod-check"];
+const COMPARE_NEEDS = 15;
 const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : "n/a");
 
 function load(path) {
@@ -58,6 +63,23 @@ if (cmd === "record") {
   if (r.guard !== undefined && !GUARD_VALUES.includes(r.guard)) {
     console.error(`invalid field: guard must be one of ${GUARD_VALUES.join(", ")} (got ${JSON.stringify(r.guard)})`);
     process.exit(1);
+  }
+  if (r.caught_by !== undefined) {
+    const want = (Number.isInteger(r.check_rounds) ? r.check_rounds : 0) + (r.rolled_back === true ? 1 : 0);
+    const allowed = `allowed: ${CAUGHT_BY.join(", ")}`;
+    if (!Array.isArray(r.caught_by)) {
+      console.error(`invalid field: caught_by must be an array like ["compare"], one entry per fix round or rollback (${allowed})`);
+      process.exit(1);
+    }
+    const at = r.caught_by.findIndex((v) => !CAUGHT_BY.includes(v));
+    if (at >= 0) {
+      console.error(`invalid field: caught_by has an unknown value ${JSON.stringify(r.caught_by[at])} (${allowed})`);
+      process.exit(1);
+    }
+    if (r.caught_by.length !== want) {
+      console.error(`invalid field: caught_by has ${r.caught_by.length} entries but check_rounds plus rollback is ${want}`);
+      process.exit(1);
+    }
   }
   if (r.actual_h === undefined && r.started && r.previewed && r.approved && r.shipped) {
     r.actual_h = +(hours(r.started, r.previewed) + hours(r.approved, r.shipped)).toFixed(2);
@@ -97,6 +119,13 @@ if (cmd === "record") {
   }
   const withGuard = rows.filter((r) => GUARD_VALUES.includes(r.guard));
   if (withGuard.length) console.log(`Guard active on ${withGuard.filter((r) => r.guard === "active").length} of ${withGuard.length} phases`);
+  const withCaught = rows.filter((r) => Array.isArray(r.caught_by));
+  if (withCaught.length) {
+    const counts = CAUGHT_BY.map((k) => `${k} ${withCaught.reduce((n, r) => n + r.caught_by.filter((v) => v === k).length, 0)}`);
+    const clean = withCaught.filter((r) => r.caught_by.length === 0).length;
+    console.log(`Caught by (phases with caught_by recorded: ${withCaught.length} of ${rows.length}; ${clean} needed no fix): ${counts.join(", ")}`);
+    console.log(`Conditional compare needs ${COMPARE_NEEDS} phases with caught_by recorded (${withCaught.length} so far)`);
+  }
   console.log("Use the multiplier on raw estimates (show raw -> calibrated). Prefer the cheapest build model with a strong first-pass rate for that kind of work.");
 } else {
   console.error("usage: history.mjs stats <file> | record <file> '<json>' | record <file> --from <json-file>");

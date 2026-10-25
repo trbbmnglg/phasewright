@@ -2,6 +2,22 @@
 
 Newest first.
 
+## 0.6.0
+
+### Added
+- `caught_by` in the phase history (issue #83). An optional array with one entry per fix round or rollback, in order, each one of `builder-self`, `compare`, `own-review`, `security-review`, `browser-check` or `prod-check`. Its length must equal `check_rounds` plus 1 if `rolled_back` (`invalid field: caught_by ...` and exit 1 otherwise); records without it stay valid and nothing is backfilled. `history.mjs stats` prints "Caught by (phases with caught_by recorded: X of Y; Z needed no fix): ..." and "Conditional compare needs 15 phases with caught_by recorded (X so far)", only when at least one record has the field. `run` notes the source of each fix round as it happens and writes the list into the history record.
+- A "Long commands" rule for the checker: each command in the foreground, one at a time, with the Bash tool's `timeout` set to 600000 on every call and never background mode; if the tool still moves a command to the background it reads the output file at most 5 times, then reports `UNFINISHED` with the output path. A command over 10 minutes is `TIMED OUT after 10 min`. The result table says `pass`, `fail` or `unfinished`, and the last line says `overall: not complete` if any command is unfinished. `run` treats `UNFINISHED`, `TIMED OUT` or a missing exit code as not a pass, runs that command itself in the foreground and marks the row "(re-run in main)".
+- A `NO SHELL:` rule for the builder, checker and shipper: with no working shell, or one that stops responding, the agent stops at once and starts its report with `NO SHELL:`, what is done and what is left. The builder edits only when it can run that step's test afterwards and lists the files edited since its last passing test run; the shipper doesn't retry; the checker and shipper list the commands that did not run. `run` treats such a result as partial and unverified, marks the build "unverified", runs the verify commands in its own shell, and stops if it has none.
+- A short "Windows and Git Bash" block in the three agent files: run `npm`, `node` and `git` directly (in Git Bash `cmd /c npm ...` prints only the cmd banner and runs nothing), don't use `cmd` or `powershell`, and don't read the clock or report times.
+- An eval, `run-no-shell-not-verified` (authored and shape-checked; not yet run against a model).
+- README: a "Windows and Git Bash" note and two lines in Limits.
+
+### Changed
+- The guard version is 0.6.0 (the probe message names it, and a test keeps it equal to the plugin version). No guard rule changed.
+- `run` records timestamps in the main session only: PowerShell `(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')` on Windows when a PowerShell tool exists, otherwise `date -u`. Agents never read the clock.
+- The compare check is unchanged. Whether it should become conditional waits for 15 phases with `caught_by` recorded.
+- The long-command rule is a prompt change, so it is probabilistic: the bounded wait and the `UNFINISHED` result exist so that a failure to follow it is still reported honestly.
+
 ## 0.5.0
 
 ### Added
