@@ -148,3 +148,50 @@ test("stats with no history still says so and exits 0", () => {
   assert.match(r.out, /No phase history yet/);
   rmSync(dir, { recursive: true });
 });
+
+test("a record with a guard value is saved as given, for each of the three values", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  for (const [i, guard] of ["active", "inactive", "unknown"].entries()) {
+    const r = record(file, base({ phase: i + 1, guard }));
+    assert.equal(r.status, 0, r.err);
+  }
+  assert.deepEqual(lines(file).map((r) => r.guard), ["active", "inactive", "unknown"]);
+  rmSync(dir, { recursive: true });
+});
+
+test("an invalid guard value is rejected with invalid field: guard, and nothing is written", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  for (const guard of ["maybe", "Active", true, null]) {
+    const r = record(file, base({ guard }));
+    assert.equal(r.status, 1, JSON.stringify(guard));
+    assert.match(r.err, /^invalid field: guard must be one of active, inactive, unknown \(got /);
+  }
+  const maybe = record(file, base({ guard: "maybe" }));
+  assert.match(maybe.err, /invalid field: guard/);
+  assert.match(maybe.err, /\(got "maybe"\)/);
+  assert.equal(existsSync(file), false);
+  rmSync(dir, { recursive: true });
+});
+
+test("stats prints how many phases had the guard active, counting only phases that recorded it", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  const [a, b, c] = FIXTURE.split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  writeFileSync(file, [{ ...a, guard: "active" }, { ...b, guard: "inactive" }, { ...c, guard: "active" }].map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const all = node("stats", file);
+  assert.equal(all.status, 0);
+  assert.match(all.out, /^Guard active on 2 of 3 phases$/m);
+  // Every other line is exactly what it was without the guard field.
+  assert.equal(all.out.split("\n").filter((l) => !l.startsWith("Guard active on")).join("\n"), EXPECTED_STATS);
+
+  // Older records without the field are not counted as inactive.
+  writeFileSync(file, [{ ...a, guard: "active" }, b, { ...c, guard: "unknown" }].map((r) => JSON.stringify(r)).join("\n") + "\n");
+  assert.match(node("stats", file).out, /^Guard active on 1 of 2 phases$/m);
+
+  // No record has the field: no line.
+  writeFileSync(file, FIXTURE);
+  assert.doesNotMatch(node("stats", file).out, /Guard active/);
+  rmSync(dir, { recursive: true });
+});

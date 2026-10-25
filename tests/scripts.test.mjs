@@ -399,3 +399,92 @@ test("the manifest is deterministic and orders by type then order then slug", ()
   assert.deepEqual(order, ["agent/helper", "skill/c-skill", "skill/a-skill", "skill/b-skill"]);
   rmSync(root, { recursive: true });
 });
+
+// ---------- plugin hooks/hooks.json ----------
+
+const hooksJson = (command, event = "PreToolUse") => JSON.stringify({
+  hooks: { [event]: [{ matcher: "Bash", hooks: [{ type: "command", command, timeout: 10 }] }] },
+});
+const hooksFile = (text) => lintOf(withPlugin({ "plugins/plug/hooks/hooks.json": text }));
+const GOOD_COMMAND = 'node "${CLAUDE_PLUGIN_ROOT}/hooks/guard.mjs"';
+
+test("hooks.json: a valid file passes, and so does one with no hooks folder at all", () => {
+  const ok = hooksFile(hooksJson(GOOD_COMMAND));
+  assert.equal(ok.status, 0, ok.out);
+  assert.doesNotMatch(ok.out, /hooks\.json/);
+  assert.equal(lintOf(withPlugin({})).status, 0);
+  assert.equal(hooksFile(hooksJson("echo hello")).status, 0, "a command with no script path is fine");
+});
+
+test("hooks.json: a file that does not parse fails", () => {
+  const r = hooksFile("{ not json");
+  assert.match(r.out, /plugins\/plug\/hooks\/hooks\.json: hooks\.json does not parse/);
+  assert.equal(r.status, 1);
+});
+
+test("hooks.json: the shape is checked", () => {
+  const noHooks = hooksFile("{}");
+  assert.match(noHooks.out, /needs a "hooks" object/);
+  assert.equal(noHooks.status, 1);
+  assert.match(hooksFile("[]").out, /must be a JSON object/);
+  assert.match(hooksFile(JSON.stringify({ hooks: { PreToolUse: {} } })).out, /hooks\.PreToolUse must be an array/);
+  assert.match(hooksFile(JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Bash" }] } })).out, /entries need a "hooks" array/);
+  const empty = hooksFile(JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: "command" }] }] } }));
+  assert.match(empty.out, /has no command/);
+  assert.equal(empty.status, 1);
+});
+
+test("hooks.json: an unknown event fails", () => {
+  const r = hooksFile(hooksJson(GOOD_COMMAND, "BeforeTool"));
+  assert.match(r.out, /unknown hook event "BeforeTool"/);
+  assert.equal(r.status, 1);
+  for (const event of ["PreToolUse", "PostToolUse", "SessionStart", "SubagentStop", "Stop"]) {
+    assert.equal(hooksFile(hooksJson(GOOD_COMMAND, event)).status, 0, event);
+  }
+});
+
+// The 33 events of the lifecycle table in https://code.claude.com/docs/en/hooks (read 2026-10-25).
+const OFFICIAL_HOOK_EVENTS = [
+  "SessionStart", "Setup", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PermissionRequest", "PermissionDenied", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification",
+  "MessageDisplay", "SubagentStart", "SubagentStop", "TaskCreated", "TaskCompleted", "Stop", "StopFailure", "TeammateIdle", "InstructionsLoaded", "ConfigChange", "CwdChanged", "DirectoryAdded",
+  "FileChanged", "WorktreeCreate", "WorktreeRemove", "PreCompact", "PostCompact", "PreModelSwitch", "PostModelSwitch", "Elicitation", "ElicitationResult", "SessionEnd",
+];
+
+test("hooks.json: every one of the 33 official events passes, and near misses fail", () => {
+  assert.equal(OFFICIAL_HOOK_EVENTS.length, 33);
+  assert.equal(new Set(OFFICIAL_HOOK_EVENTS).size, 33);
+  for (const event of OFFICIAL_HOOK_EVENTS) assert.equal(hooksFile(hooksJson(GOOD_COMMAND, event)).status, 0, event);
+  for (const event of ["pretooluse", "PreToolUsage", "BeforeTool", "SessionStop", "Compact", "ModelSwitch", "PostToolCall"]) {
+    const r = hooksFile(hooksJson(GOOD_COMMAND, event));
+    assert.equal(r.status, 1, event);
+    assert.match(r.out, new RegExp(`unknown hook event "${event}"`));
+  }
+});
+
+test("hooks.json: scripts must be reached through CLAUDE_PLUGIN_ROOT", () => {
+  const bad = [
+    'node "/opt/plug/hooks/guard.mjs"',
+    "node /opt/plug/hooks/guard.mjs",
+    "node C:/plug/hooks/guard.mjs",
+    String.raw`node "C:\plug\hooks\guard.mjs"`,
+    "node ~/plug/hooks/guard.mjs",
+    "node ./hooks/guard.mjs",
+    "node ../hooks/guard.mjs",
+    "node hooks/guard.mjs",
+    "bash guard.sh",
+  ];
+  for (const command of bad) {
+    const r = hooksFile(hooksJson(command));
+    assert.match(r.out, /error\s+plugins\/plug\/hooks\/hooks\.json: hook (command path|script) /, command);
+    assert.equal(r.status, 1, command);
+  }
+});
+
+test("the real phased-shipping hooks.json passes lint and is wired to the guard", () => {
+  const file = join(REPO, "plugins", "phased-shipping", "hooks", "hooks.json");
+  const cfg = JSON.parse(readFileSync(file, "utf8"));
+  assert.match(cfg.hooks.PreToolUse[0].hooks[0].command, /^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/guard\.mjs"$/);
+  const lint = spawnSync(process.execPath, [join(REPO, "scripts", "lint.mjs")], { encoding: "utf8" });
+  assert.equal(lint.status, 0, lint.stdout);
+  assert.doesNotMatch(lint.stdout, /hooks\.json/);
+});

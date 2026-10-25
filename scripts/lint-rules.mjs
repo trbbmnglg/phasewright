@@ -26,7 +26,49 @@ const SKILL_KEYS = new Set([
 const PLUGIN_AGENT_IGNORED = ["hooks", "mcpServers", "permissionMode", "initialPrompt"];
 const META_KEYS = ["title", "tags", "featured", "order", "version"];
 
+// The 33 hook events in the lifecycle table of https://code.claude.com/docs/en/hooks (read
+// 2026-10-25). A plugin's hooks.json must use one of these; an unknown name is never run, so it would
+// look like protection while doing nothing. Re-read the table when Claude Code adds events.
+export const HOOK_EVENTS = new Set([
+  "SessionStart", "Setup", "UserPromptSubmit", "UserPromptExpansion", "PreToolUse", "PermissionRequest", "PermissionDenied",
+  "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification", "MessageDisplay", "SubagentStart", "SubagentStop",
+  "TaskCreated", "TaskCompleted", "Stop", "StopFailure", "TeammateIdle", "InstructionsLoaded", "ConfigChange", "CwdChanged",
+  "DirectoryAdded", "FileChanged", "WorktreeCreate", "WorktreeRemove", "PreCompact", "PostCompact", "PreModelSwitch",
+  "PostModelSwitch", "Elicitation", "ElicitationResult", "SessionEnd",
+]);
+const SCRIPT_FILE = /\.(mjs|cjs|js|ts|sh|bash|py|ps1|cmd|bat)$/i;
+const PLUGIN_ROOT = "${CLAUDE_PLUGIN_ROOT}";
+
 export function makeRules({ fail, warn }) {
+  // A plugin's hooks/hooks.json: it must parse, use only known events, and reach its scripts
+  // through ${CLAUDE_PLUGIN_ROOT} (a plugin is copied to a cache folder, so any other path breaks).
+  function checkHooksJson(where, text) {
+    let cfg;
+    try { cfg = JSON.parse(text); } catch (e) { return fail(where, `hooks.json does not parse: ${e.message}`); }
+    if (cfg === null || typeof cfg !== "object" || Array.isArray(cfg)) return fail(where, "hooks.json must be a JSON object");
+    const events = cfg.hooks;
+    if (events === null || typeof events !== "object" || Array.isArray(events)) return fail(where, 'hooks.json needs a "hooks" object keyed by event name');
+    for (const [event, entries] of Object.entries(events)) {
+      if (!HOOK_EVENTS.has(event)) fail(where, `unknown hook event "${event}"`);
+      if (!Array.isArray(entries)) { fail(where, `hooks.${event} must be an array`); continue; }
+      for (const entry of entries) {
+        if (entry === null || typeof entry !== "object" || !Array.isArray(entry.hooks)) { fail(where, `hooks.${event} entries need a "hooks" array`); continue; }
+        for (const h of entry.hooks) {
+          if (h?.type !== "command") continue;
+          if (typeof h.command !== "string" || !h.command.trim()) { fail(where, `a command hook under ${event} has no command`); continue; }
+          const tokens = h.command.match(/"[^"]*"|'[^']*'|\S+/g).map((t) => t.replace(/^["']|["']$/g, ""));
+          for (const t of tokens) {
+            const viaRoot = t.startsWith(PLUGIN_ROOT);
+            const absolute = /^([A-Za-z]:[\\/]|\/|~)/.test(t);
+            const relative = /^\.{1,2}[\\/]/.test(t);
+            if (!viaRoot && (absolute || relative)) fail(where, `hook command path "${t}" must start with ${PLUGIN_ROOT}`);
+            else if (!viaRoot && SCRIPT_FILE.test(t)) fail(where, `hook script "${t}" must be reached through ${PLUGIN_ROOT}`);
+          }
+        }
+      }
+    }
+  }
+
   // Real YAML rejects some plain scalars that the lenient parser accepts, and Claude Code then
   // drops every frontmatter field silently. Catch the common causes: ": " or " #" inside an
   // unquoted value, or a value that starts with a YAML indicator.
@@ -87,5 +129,5 @@ export function makeRules({ fail, warn }) {
     if ("allowed-tools" in data) warn(where, '"allowed-tools" pre-approves those tools for the turn; confirm that is intended');
   }
 
-  return { checkYaml, checkMeta, checkAgent, checkSkill };
+  return { checkYaml, checkMeta, checkAgent, checkSkill, checkHooksJson };
 }

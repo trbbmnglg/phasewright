@@ -14,7 +14,7 @@ const errors = [];
 const warnings = [];
 const fail = (where, msg) => errors.push(`${where}: ${msg}`);
 const warn = (where, msg) => warnings.push(`${where}: ${msg}`);
-const { checkYaml, checkMeta, checkAgent, checkSkill } = makeRules({ fail, warn });
+const { checkYaml, checkMeta, checkAgent, checkSkill, checkHooksJson } = makeRules({ fail, warn });
 
 const PII = [
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "email address", (m) => /noreply\.github\.com$|@example\.(com|org)$/.test(m)],
@@ -85,6 +85,8 @@ if (existsSync(pluginsDir)) {
     if (existsSync(pSkills)) for (const s of readdirSync(pSkills).sort()) lintSkill(pSkills, s, `${base}/skills`, { plugin: true });
     const pAgents = join(pluginsDir, slug, "agents");
     if (existsSync(pAgents)) for (const f of mdFiles(pAgents)) lintAgent(pAgents, f, `${base}/agents`, { plugin: true });
+    const pHooks = join(pluginsDir, slug, "hooks", "hooks.json");
+    if (existsSync(pHooks)) checkHooksJson(`${base}/hooks/hooks.json`, readFileSync(pHooks, "utf8"));
   }
 }
 

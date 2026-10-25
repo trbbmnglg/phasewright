@@ -10,6 +10,8 @@
 // runs_as (main|builder), check_rounds, prod_first_pass, rolled_back.
 // Optional: tokens { builder, checker, shipper, model_scout }, each a non-negative integer:
 // the agent tokens used for the phase. The main session's own tokens aren't counted.
+// Optional: guard (active|inactive|unknown): whether the guard hook was active in that run, from the
+// checker's probe. An organization policy can turn hooks off, so "inactive" is a normal answer.
 // actual_h is computed as agent time: (previewed - started) + (shipped - approved),
 // so time spent waiting for the user's approval doesn't count.
 
@@ -26,6 +28,7 @@ const median = (xs) => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 const TOKEN_KEYS = ["builder", "checker", "shipper", "model_scout"];
+const GUARD_VALUES = ["active", "inactive", "unknown"];
 const pct = (n, d) => (d ? `${Math.round((100 * n) / d)}%` : "n/a");
 
 function load(path) {
@@ -51,6 +54,10 @@ if (cmd === "record") {
       if (!TOKEN_KEYS.includes(k)) { console.error(`invalid field: tokens.${k} is not a known agent (allowed: ${TOKEN_KEYS.join(", ")})`); process.exit(1); }
       if (!Number.isInteger(v) || v < 0) { console.error(`invalid field: tokens.${k} must be a non-negative integer (got ${JSON.stringify(v)})`); process.exit(1); }
     }
+  }
+  if (r.guard !== undefined && !GUARD_VALUES.includes(r.guard)) {
+    console.error(`invalid field: guard must be one of ${GUARD_VALUES.join(", ")} (got ${JSON.stringify(r.guard)})`);
+    process.exit(1);
   }
   if (r.actual_h === undefined && r.started && r.previewed && r.approved && r.shipped) {
     r.actual_h = +(hours(r.started, r.previewed) + hours(r.approved, r.shipped)).toFixed(2);
@@ -88,6 +95,8 @@ if (cmd === "record") {
     const totals = withTokens.map((r) => TOKEN_KEYS.reduce((sum, k) => sum + (Number.isInteger(r.tokens[k]) ? r.tokens[k] : 0), 0));
     console.log(`Agent tokens per phase: median ${Math.round(median(totals))} (tokens recorded on ${withTokens.length} of ${rows.length} phases; main session not counted)`);
   }
+  const withGuard = rows.filter((r) => GUARD_VALUES.includes(r.guard));
+  if (withGuard.length) console.log(`Guard active on ${withGuard.filter((r) => r.guard === "active").length} of ${withGuard.length} phases`);
   console.log("Use the multiplier on raw estimates (show raw -> calibrated). Prefer the cheapest build model with a strong first-pass rate for that kind of work.");
 } else {
   console.error("usage: history.mjs stats <file> | record <file> '<json>' | record <file> --from <json-file>");

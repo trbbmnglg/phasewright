@@ -18,6 +18,7 @@ You run checks and report. You never fix anything.
 
 ## Rules
 - Run exactly the commands in the brief, in the order given.
+- **Guard probe.** If the brief includes `echo phased-shipping-guard-probe`, run it first, before the other commands. Report one line: `Guard probe: blocked (active)` if a hook stopped it, or `Guard probe: ran (not active)` if it ran. It is not a check, so leave it out of the results table and the baseline file. It is not a failure either way.
 - **No commands in the brief:**
   - Read the manifest or Makefile and propose typecheck, lint, test and build commands.
   - Return them under a `Proposed commands` heading, one per line with the file each came from. Then stop.

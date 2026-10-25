@@ -29,11 +29,35 @@ State lives in two places:
 - **The override gate** also stops `run` when `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` is set, or when `CLAUDE_CODE_EFFORT_LEVEL` differs from the plan's build effort, because either one silently changes what the plan promised. You can say "proceed anyway", and the plan records it. The gate checks environment variables and the settings files the session can read, so a managed-settings override it can't read won't be caught. A separate version check warns, without stopping, when Claude Code is older than v2.1.292.
 - **Checks and shipping** always use the cheap agents.
 
-A hook can't do this gate, because tool-call hooks never see the model name.
+No hook can enforce the model, because tool-call hooks never see the model name. The guard below, a different hook, does a different job: it limits what the plugin's agents may run.
+
+## The guard
+
+The guard is an extra layer. The agents' own rules and `run`'s gates are still the controls, and the guard is never the only one.
+
+It is a `PreToolUse` hook (`hooks/guard.mjs`) that looks at every Bash, PowerShell, Write, Edit and NotebookEdit call. It only restricts a call made inside one of the four agents; with no agent it allows at once, so your main session and every other agent are never restricted. When it denies, it names the rule and what is allowed, and the agent gets one clear reason to report instead of working around it.
+
+`git` and `gh` are **allowlists** by role. Each agent gets the subcommands its job needs, and everything else is denied, including aliases, subcommands the guard has never heard of and the write forms of allowed ones. Over-denying costs the agent one retry; letting something through is the failure that matters, so when a form is unclear the guard denies it.
+
+| Agent | The guard allows | Everything else is denied, in particular |
+|---|---|---|
+| `builder`, `checker` | `git`: status, diff, log, show, blame, grep, ls-files, ls-tree, ls-remote, rev-parse, rev-list, describe, name-rev, merge-base, show-ref, cat-file, shortlog, diff-tree, check-ignore, fetch (no `--force`, no `+` refspec), add, restore, rm, mv, apply; `remote` (-v, show, get-url), `stash` (push, list, show, pop), `branch` and `tag` (list forms only), `config` (get and list only), `reflog` (show, list), `checkout` and `switch` (no force, no orphan), `clean` (dry run only). `gh`: view, list, status, diff, checks, watch, search and download on pr, issue, run, release, repo, workflow, gist, label and project; `auth status`; `api` with GET only | `git` commit, push, pull, merge, rebase, cherry-pick, revert, reset, am, notes, update-ref, aliases, force forms and unknown subcommands; `git -c` for any key that can run a program; `gh` writes of every kind, `gh alias`, `gh extension`, `gh auth token`; `curl`, `wget` and `Invoke-WebRequest` calls with a method other than GET, a body, a form or an upload, including attached short options such as `-d@file`; publishing and deploying (`npm publish`, `npm version patch`, `docker push`, `wrangler deploy`, `wrangler workflows trigger`, `terraform apply`, `kubectl apply`, `goreleaser release`, `jsr publish`, task runners given a deploy, release or publish target such as `turbo run deploy`, `nx run app:deploy`, `lerna run deploy`, `run-s deploy`, `node node_modules/.bin/wrangler deploy` and the long list in `hooks/guard-rules.mjs`); `powershell`, `pwsh`, `cmd` and the PowerShell tool (every role uses Bash) |
+| `shipper` | `git`: add, commit, push, revert, status, diff, log, show, rev-parse, rev-list, describe, fetch (no `--force`, no `+` refspec), ls-remote, cat-file, `remote` (-v, show, get-url), `branch` (list), `tag` (create or list), `config` (get and list). `gh`: run (watch, view, list), issue (view, list, close, reopen), pr (view, list, checks), release (view, list), repo view, workflow (view, list), auth status, api with GET | force-pushes (every spelling, including short prefixes like `--force-w`, `--mirr`, `--del`), `--mirror`, `--prune`, deleting a remote ref; skipping hooks or signing; `commit --amend`, `rebase`, `reset`, `clean`, branch delete, stash, pull; every other `gh` command, including delete, merge, release create and `gh api` writes; `curl`, `wget` and `Invoke-WebRequest` calls with a method other than GET, a body, a form or an upload, including attached short options such as `-d@file`; `xargs`; `powershell`, `pwsh`, `cmd` and the PowerShell tool (use Bash); any variable, `$(...)` or backtick in an argument of `git push`, `commit`, `revert` or `tag`, because it could hide `--force`, `--no-verify` or `+main` (the one exception is the text after `-m`, `--message`, `-F` or `--file`, so `git commit -F "$TEMP/msg.txt"` works) |
+| every role | | Environment that changes git or skips hooks or moves git's config (assignments, `export` and the targets of `read`, `printf -v`, `mapfile` and `getopts` are checked for any `GIT_*` variable, `HOME`, `USERPROFILE`, `XDG_CONFIG_HOME`, `HOMEDRIVE`, `HOMEPATH`, `HUSKY*`, `SKIP`, `LEFTHOOK*`, `BASH_ENV` and a few more), and git's `--git-dir` and `--work-tree`; any word with a `.git` or `.husky` folder in it, or naming git's global or system config file (`.gitconfig`, `.config/git/config`, `etc/gitconfig`, `ProgramData/Git/config`) (the shell, and the Write, Edit and NotebookEdit tools): that is where hooks and config live (`.gitignore`, `.github` and `.gitattributes` are fine); syntax the guard can't read (`$'..'` quoting, `{a,b}` brace expansion, function definitions, a Windows path with single backslashes outside quotes); `eval`, `Invoke-Expression`, `Start-Process`, `Start-Job`, `Invoke-Command`, `trap`, `alias`, `hash`, `coproc`, `enable`, `shopt -s expand_aliases`, a shell that reads its commands from stdin (`echo 'git push -f' \| bash`, `bash <<< '...'`, a bare `bash`, `bash -s`) and launchers it can't follow (`busybox`, `su`, `script`, `parallel`, `flock`, `strace` and similar); `gh auth status -t` and `--show-token` (they print the token); any command over 32768 characters ("command too long to check") |
+| `model-scout` | writing `PHASES.md` in the project folder (the hook input's `cwd`) | writing any other file, any path with a `.claude` folder in it, any write when `cwd` is missing; it has no shell |
+
+The guard splits each command before matching: `cd x && git push`, `git -C ../repo push`, `FOO=1 git push`, `/usr/bin/git push`, `bash -c "git push"`, `bash -c -- "git push"`, `env -S "git push"`, `npx wrangler@latest deploy`, `pnpm -C app exec wrangler deploy`, `powershell -Command "git push"`, `cmd //c "git push"`, `echo $(git push)` and `sudo git push` are all seen. PowerShell and cmd are not parsed for the agents: all three roles are refused `powershell`, `pwsh`, `cmd` and the PowerShell tool outright (their workflows use Bash), because their quoting, aliases, assignment and script-block syntax kept hiding commands. `hooks/lib/shell.mjs` still reads PowerShell and cmd text (backticks, curly quotes, Unicode spaces, `<# #>` comments, `$x = git ...` assignments, every `{ }` block, cmd's `call`, `@` and `if`) for other hook plugins that copy the file. git accepts any unique prefix of a long option, so the guard treats `--x` as a flag whenever the flag's name starts with `x`. The exact lists are in `hooks/guard-rules.mjs`.
+
+**It says when it isn't active.** Every `run` starts the checker with a self-test probe, `echo phased-shipping-guard-probe`. When the guard is on, it blocks the probe ("phased-shipping guard is active for checker"), and nothing runs. If the probe runs, the guard isn't active in that session, and the preview says so. This never stops the phase. The result is recorded as `guard` in the phase history, and `history.mjs stats` prints how many phases had it active.
+
+**Fail-closed rule.** The guard works out the role first (from `agent_type`, or from `--agent` in a personal copy) and only then loads its rules. Inside a known agent, if it can't judge a call, it denies it: input it can't read, a missing or half-copied rules file, an error while judging, a command that is too long, nesting that is too deep. With `--agent <role>`, unreadable input is denied too, because the role is known from the argument. If there is no role and the input can't be read, it can't tell whose call it is, so it allows.
+
+**Plugin install and personal copies.** A plugin install wires the guard through `hooks/hooks.json`, matched on the agent type (`phased-shipping:builder` and the other three, nothing else). Plugin agents ignore a `hooks` field in their own files, so the plugin's agent files have none. `sync-personal.mjs` instead copies the hook scripts to `~/.claude/phased-shipping/hooks/` and adds a `hooks:` block to each generated `ps-*` agent file that runs the guard with that agent's name (`--agent builder` and so on); the `ps-*` names are not roles, so a personal copy relies on that argument. It edits no settings file. The personal block also sets `onFailure: block`, so if the hook can't run (node missing, the script gone), the call is blocked instead of going ahead. That needs Claude Code v2.1.295 or later; on an older version the key is most likely ignored (what an older version does with an unknown key is undocumented), so the personal-copy hook then fails open like the plugin's. The plugin's `hooks.json` does not set it: a missing `node` would then block your main session too, so there a hook that can't start lets the call through. The script refuses to install when the Claude home path contains a `$`, a backtick or a double quote, because the hook command is shell text.
 
 ## Requirements
 
 - Claude Code v2.1.292 or later (per-call effort; older versions run subagents at their file's effort).
+- For the guard: `node` on your PATH (the hook is a node script), and, for the personal copies' `onFailure: block`, Claude Code v2.1.295 or later.
 
 ## What it touches
 
@@ -43,6 +67,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - Your project: the files named in the phase plan, plus the manifest, README and source files the planner needs to size the work.
 - Settings and environment: the `model`, `availableModels` and `effortLevel` keys of your Claude Code settings files, any model convention in `CLAUDE.md`, and the values of only these environment variables: `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL*`, `CLAUDE_CODE_EFFORT_LEVEL` and `CLAUDE_CODE_USE_*`. It never prints the rest of the environment or of those files.
 - The phase history file.
+- **The guard hook** reads nothing but the call it is handed (the tool name, the command or the file path, the working folder and the agent type). It runs on every Bash, PowerShell, Write, Edit and NotebookEdit call in any session where the plugin is enabled, your main session included, where it allows at once. Each call starts one node process. Measured on the allow path (a main-session payload, 30 runs, on a busy Windows laptop): median 1341 ms, p95 2667 ms. An empty node script on the same laptop took a median of 1298 ms, so about 40 ms is the guard's own work and the rest is node starting, which varies a lot by machine. Expect a delay on every Bash, PowerShell, Write and Edit call, in every session where the plugin is enabled. It writes no files and makes no network calls.
 
 **Files it writes**
 - `PHASES.md` at your repo root (roadmap, Model check, status).
@@ -50,6 +75,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - The checker's baseline file and its logs or screenshots, at the paths the brief names.
 - The phase history, `history.jsonl`: `${CLAUDE_PLUGIN_DATA}/history.jsonl` for a plugin install, `~/.claude/phased-shipping/history.jsonl` for personal copies. A phase record is one line with the estimate, agent time, build model and effort, fix rounds, prod outcome and, from 0.3.0, the agent tokens per phase. It holds no code and no project text beyond the project name.
 - A temporary JSON file that holds the record while the history script appends it.
+- Personal copies only: the guard scripts under `~/.claude/phased-shipping/hooks/` and the `hooks:` block in each `ps-*` agent file. `sync-personal.mjs` writes both, marks them as generated, and removes only what it marked.
 - Your source files, but only through the builder, and only to implement the approved plan.
 
 **Commands it runs**
@@ -57,6 +83,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - The plan's baseline and verify commands, through the checker. The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
 - The plan's commit, deploy, prod-check and rollback commands, through the shipper, and only after `/phased-shipping:run approve`. A push needs `/phased-shipping:run push` or a plan whose deploy step is the push, and your approval.
 - The history script (`history.mjs`), with `stats` and `record`.
+- The guard probe, `echo phased-shipping-guard-probe`, through the checker. It prints a word and changes nothing.
 
 **Network**
 - `model-scout` runs a web search and fetches up to 3 pages when the Model check refreshes. It treats page content as data.
@@ -92,6 +119,15 @@ Each agent has a turn limit (`maxTurns` in its file), so a runaway agent stops. 
 
 When an agent stops at its limit, `run` stops too. It reports what was done and what is left, and never treats the partial result as complete. You can resume the phase. Partial output at the limit needs Claude Code v2.1.246 or later, which the stated minimum already covers. Treat the values as starting points and tune them from your own history.
 
+The guard has limits of its own:
+- **It can be switched off.** An organization policy that allows only managed hooks (`allowManagedHooksOnly`) blocks plugin hooks, unless an admin force-enables the plugin. `disableAllHooks` does the same. The probe shows which case you are in, run by run.
+- **It needs node.** The hook runs `node`. If `node` isn't on the PATH, the plugin's hook can't start, and Claude Code lets the call go ahead, because the plugin's `hooks.json` can't set `onFailure: block` without blocking your main session as well. The same goes for a hook that times out (10 seconds). The personal copies do set `onFailure: block`, so a missing `node` stops the agent's calls there instead (v2.1.295 or later; on an older version the key is most likely ignored, and the hook then fails open).
+- **It is not a sandbox.** It stops direct commands. It doesn't stop an agent from writing a script that pushes and then running it (`bash script.sh`, `source script.sh`), or from a command it can't see inside, such as a variable that holds a program name (`$CMD push`, still open). Text piped into a shell (`... | sh`) is denied, but a script file, `python -`, `node -e` and other interpreters that run text are not. A `.git` path built from a variable, glob or command substitution (for example `"$(git rev-parse --git-path hooks)/pre-commit"`) is not matched, only literal text. Text piped into `xargs` is not seen for the builder and checker (`echo deploy | xargs npx wrangler`, `echo push | xargs git`); the shipper is refused `xargs` outright. A flag or verb hidden in a variable is denied for the shipper's `git push`, `commit`, `revert` and `tag`, but not for `gh api`, `curl` or the deploy tools of the builder and checker (`V=deploy; wrangler $V`). Hooks defined outside `.git` and `.husky` (`lefthook.yml`, `.pre-commit-config.yaml`, a `package.json` script) are not protected. These stay open: closing them would deny most real work.
+- **The lists are not exhaustive.** `git` and `gh` are allowlists, so an unknown form of those is denied. The publish and deploy lists are denylists, so a tool or flag that isn't listed gets through. The lists are an extra layer on top of the agents' own rules and `run`'s gates, which still apply; they are not a complete list of what could go wrong.
+- **It over-denies on purpose.** An unclear form is denied, and a false deny costs the agent one retry. A builder that types `git commit` in a scratch repository to set up a fixture is denied, and so are `git reset HEAD file` (use `git restore --staged`), `git branch new-name` (use `git checkout -b`), `git commit-tree`, `git config user.name x`, a `$'..'` string, `{a,b}` braces, and any `gh` write. A test suite that commits inside its own temporary repositories, run as `npm test`, is not denied, because the guard sees only the command the agent types. The agent reports the denial instead of working around it.
+- **A session started as an agent is restricted too.** `claude --agent phased-shipping:builder` makes the main session that agent, so the guard restricts it as well. That is the guard working as designed.
+- **Not yet seen firing in a real run.** Hooks can't run on the machine this was built on (an organization policy), so the guard is proven only by feeding sample payloads to the scripts, in this repo's tests, which include a regression case for every gap an independent security review found. The `agent_type` field, the frontmatter `hooks:` block and `onFailure` come from the Claude Code docs and the release notes, not from a run here. The first real-run check is the probe on a machine without that policy.
+
 ## Install
 
 From the library repo (Claude Code):
@@ -111,7 +147,7 @@ node scripts/sync-personal.mjs --check   # reports drift
 node scripts/sync-personal.mjs --remove  # removes them
 ```
 
-Personal skills and agents aren't namespaced, so the copies get a `ps-` prefix. The script only overwrites or removes files it generated. History goes to `~/.claude/phased-shipping/`.
+Personal skills and agents aren't namespaced, so the copies get a `ps-` prefix. The script only overwrites or removes files it generated. History goes to `~/.claude/phased-shipping/`, and so do the guard scripts (`hooks/`). Each `ps-*` agent copy also carries a `hooks:` block that runs the guard.
 
 **Other tools:** the skills load in VS Code Copilot and Cursor (they read `SKILL.md`), but model pinning and the four agents are Claude Code features.
 
@@ -154,6 +190,8 @@ The eight cases check that:
 8. `run` shows a plan's commands and waits for your OK when the plan came with a cloned repo.
 
 Cases 5 to 8 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
+
+The guard has its own tests, which run in this repo's `npm test`: `node --test tests/guard.test.mjs tests/shell-split.test.mjs`. They feed sample hook payloads to the scripts; they don't need hooks to run.
 
 Evals make real model calls on your account. Use `--ablation none` while you're iterating, to halve the cost.
 

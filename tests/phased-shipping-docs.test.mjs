@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.3.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.4.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -113,4 +113,52 @@ test("every eval folder, old and new, has a prompt and at least one grader", () 
   const dirs = readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory());
   assert.equal(dirs.length, 8);
   for (const d of dirs) assert.ok(readdirSync(join(PS, "evals", d, "graders")).length >= 1, d);
+});
+
+test("the changelog has a 0.4.0 entry above 0.3.0 that describes the guard honestly", () => {
+  const log = text("CHANGELOG.md");
+  const at = log.indexOf("## 0.4.0");
+  assert.ok(at >= 0 && at < log.indexOf("## 0.3.0"));
+  for (const heading of ["### Added", "### Changed"]) assert.ok(log.indexOf(heading, at) > at, heading);
+  const entry = log.slice(at, log.indexOf("## 0.3.0"));
+  assert.match(entry, /not a sandbox/);
+  assert.match(entry, /has not been seen firing in a real Claude Code run/);
+});
+
+test("the README describes the guard, its cost and its limits, and no longer says a hook can't help", () => {
+  const readme = text("README.md");
+  assert.match(readme, /^## The guard$/m);
+  assert.doesNotMatch(readme, /A hook can't do this gate/, "the old sentence is gone");
+  assert.match(readme, /tool-call hooks never see the model name/);
+  assert.match(readme, /does a different job: it limits what the plugin's agents may run/);
+  assert.match(readme, /echo phased-shipping-guard-probe/);
+  // What it touches: every call, the measured time, nothing read but the call.
+  assert.match(readme, /reads nothing but the call/);
+  assert.match(readme, /median \d+ ms, p95 \d+ ms/);
+  assert.match(readme, /30 runs/);
+  // Limits.
+  assert.match(readme, /allowManagedHooksOnly/);
+  assert.match(readme, /It is not a sandbox/);
+  assert.match(readme, /lists are not exhaustive/);
+  assert.match(readme, /Not yet seen firing in a real run/);
+  assert.match(readme, /sample payloads/);
+});
+
+test("run starts the checker with the probe, shows a Guard row that warns, and records guard", () => {
+  const run = text("skills", "run", "SKILL.md");
+  assert.match(run, /Start the brief with the guard probe, `echo phased-shipping-guard-probe`/);
+  assert.match(run, /### Guard \(warns, never stops\)/);
+  assert.match(run, /Guard probe: blocked \(active\)/);
+  assert.match(run, /Guard probe: ran \(not active\)/);
+  assert.match(run, /not active in this session \(an organization policy that allows only managed hooks, `disableAllHooks`, or the hook didn't load\); the prompt rules and gates still apply/);
+  for (const value of ["active", "inactive", "unknown"]) assert.match(run, new RegExp(`\`guard: "${value}"\``));
+  assert.match(run, /then the \*\*Guard\*\* row/);
+});
+
+test("the checker runs the probe first when the brief has it, and it is never a check failure", () => {
+  const checker = text("agents", "checker.md");
+  assert.match(checker, /If the brief includes `echo phased-shipping-guard-probe`, run it first/);
+  assert.match(checker, /Guard probe: blocked \(active\)/);
+  assert.match(checker, /Guard probe: ran \(not active\)/);
+  assert.match(checker, /not a failure either way/);
 });

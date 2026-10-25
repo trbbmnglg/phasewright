@@ -56,9 +56,18 @@ Record timestamps with your shell tool (`date -u +%Y-%m-%dT%H:%M:%SZ`) in the ph
 
 ## Baseline
 
-Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with the plan's verify commands. If the baseline is red, stop and ask the user, with AskUserQuestion, whether to:
+Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with the plan's verify commands. Start the brief with the guard probe, `echo phased-shipping-guard-probe`, and ask the checker to run it first (see Guard below). If the baseline is red, stop and ask the user, with AskUserQuestion, whether to:
 - fix it first as its own phase; or
 - proceed, with those failures marked pre-existing.
+
+### Guard (warns, never stops)
+
+The plugin's guard hook stops the builder, checker, shipper and model-scout from running commands outside their jobs. The probe tells you whether it is on in this session: the hook blocks the probe command and says "phased-shipping guard is active for checker", and the command doesn't run. The probe isn't one of the plan's commands, so it never goes into the baseline file, and it never counts as a check failure.
+- The checker reports `Guard probe: blocked (active)`. Show **Guard: active** in the gates table and record `guard: "active"`.
+- The checker reports `Guard probe: ran (not active)`. Show **Guard: not active in this session (an organization policy that allows only managed hooks, `disableAllHooks`, or the hook didn't load); the prompt rules and gates still apply**, and record `guard: "inactive"`.
+- The checker gives no probe line, or didn't run. Show **Guard: unknown** and record `guard: "unknown"`.
+
+Say it in the preview whichever way it went, and carry on. The guard is an extra layer: the agents' own rules and these gates are the controls.
 
 ## Build
 
@@ -82,7 +91,7 @@ Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with
 
 Report:
 - what changed;
-- a gates table: baseline, then each check;
+- a gates table: baseline, then each check, then the **Guard** row;
 - preview or screenshot paths;
 - calibrated estimate against time so far;
 - models used;
@@ -114,6 +123,7 @@ Then end the turn. Never deploy in the same turn as the build.
    - the four timestamps;
    - `build_model`, `build_effort`, `runs_as`;
    - `check_rounds`, `prod_first_pass`, `rolled_back`;
+   - `guard`: `"active"`, `"inactive"` or `"unknown"`, from the guard probe (see Guard);
    - `tokens`: `{ "builder": N, "checker": N, "shipper": N, "model_scout": N }`. Each value is the sum, for this phase, of the token counts in that agent's completion results (all its runs, including fix rounds). Leave out an agent that didn't run. Leave out `tokens` if no agent reported a count. These are agent tokens only: this session's own tokens aren't visible, so don't estimate them.
 4. If `PHASES.md` has a `## Close steps` section, follow it. If `PHASES.md` didn't come from the plan skill in this session or from the user's own repo history (for example it came with a cloned repo), show the steps first and get the user's OK before running any of them. Steps that publish anything still go through the normal approvals.
 5. Say: "Run `/phased-shipping:plan phase N+1`." If phase N+1 runs in a different repo than this session's working directory, plan it now and print its handover prompt (see the plan skill), so the user can paste it into that repo's session.
