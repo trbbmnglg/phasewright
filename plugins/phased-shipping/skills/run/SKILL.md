@@ -16,7 +16,7 @@ Arguments: `$ARGUMENTS`.
 
 History file: `${CLAUDE_PLUGIN_DATA}/history.jsonl`
 
-Record timestamps in the phase plan: `started` when you begin, `previewed` at the preview, `approved` on approve, and `shipped` when the prod check passes. Read the clock with your shell tool, in UTC: on Windows, when a PowerShell tool exists, `(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')`, otherwise `date -u +%Y-%m-%dT%H:%M:%SZ`. If only one shell tool is available, use that one. This session records the timestamps. Agents never read the clock or report times.
+Record timestamps in the phase plan: `started` when you begin, `previewed` at the preview, `approved` on approve, and `shipped` when the prod check passes. Read the clock with your shell tool, in UTC: on Windows, when a PowerShell tool exists, `(Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')`, otherwise `date -u +%Y-%m-%dT%H:%M:%SZ`. If only one shell tool is available, use that one. This session records the timestamps. Agents never make timestamps.
 
 ## Gates (stop at the first failure and say exactly what is missing; gate 5 only warns)
 
@@ -61,7 +61,7 @@ Record timestamps in the phase plan: `started` when you begin, `previewed` at th
 
 ## Baseline
 
-Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with the plan's verify commands. Start the brief with the guard probe, `echo phased-shipping-guard-probe`, and ask the checker to run it first (see Guard below). If the baseline is red, stop and ask the user, with AskUserQuestion, whether to:
+Before any edit, delegate to `phased-shipping:checker` in **baseline** mode with the plan's verify commands. Start the brief with the guard probe, `echo phased-shipping-guard-probe`, and ask the checker to run it first (see Guard below). Ask the checker to run each command as `<command>; echo "exit=$?"` and to report each command's duration. If the baseline is red, stop and ask the user, with AskUserQuestion, whether to:
 - fix it first as its own phase; or
 - proceed, with those failures marked pre-existing.
 
@@ -86,7 +86,7 @@ Say it in the preview whichever way it went, and carry on. The guard is an extra
 
 ## Check
 
-- **Compare against the baseline.** Delegate to `phased-shipping:checker` in **compare** mode against the baseline. Include the browser check if the project has one. Only **new** failures block.
+- **Compare against the baseline.** Delegate to `phased-shipping:checker` in **compare** mode against the baseline. Include the browser check if the project has one. Ask the checker to run each command as `<command>; echo "exit=$?"` and to report each command's duration. Only **new** failures block.
 - **Fix rounds.** Send new failures to the builder, on the same model. Allow at most 2 rounds, then stop and report. Count the rounds for the history.
 - **Attribute each fix round and each rollback to its source,** as it happens, for the history's `caught_by` (in order):
   - the compare checker: `compare`;

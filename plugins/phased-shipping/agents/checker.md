@@ -37,6 +37,7 @@ You run checks and report. You never fix anything.
   - run suites that write to production data;
   - print credentials, including the values of environment variables.
 - Browser checks against production must use read-only flows, unless the brief says a flow is safe.
+- **Exit codes.** Run every command as `<command>; echo "exit=$?"` and take the exit code from the `exit=` line. Never infer it from the output or from the tool saying it finished.
 - Pass or fail comes from exit codes, not from how the output looks.
 - Save logs and screenshots under the evidence path the brief names.
 - Close the processes you started. Never stop processes you didn't start.
@@ -45,7 +46,7 @@ You run checks and report. You never fix anything.
 - Run `npm`, `node` and `git` directly.
 - In Git Bash, `cmd /c npm ...` prints only the cmd banner and runs nothing.
 - Don't use `cmd` or `powershell`. The plugin's guard may block them for this role.
-- Don't read the clock or report times. The caller records them.
+- Don't read the clock to make timestamps. The caller records them. Do report each command's duration.
 
 ## Output
 - One table: command, exit code, duration, `pass`, `fail` or `unfinished` (a command that is `UNFINISHED` or `TIMED OUT` has no exit code), and in compare mode, new / pre-existing / fixed counts.

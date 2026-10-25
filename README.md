@@ -70,6 +70,27 @@ Two caveats:
 - The Cursor marketplace files (`.cursor-plugin/`) follow Cursor's published layout, but they haven't been tested end to end. Copying skill folders is the supported path.
 - Settings such as `model:` and `disable-model-invocation:` are Claude Code and Copilot features. Tools that don't know them ignore them.
 
+## Releases
+
+Releases are numbered by version and named. The version is the git tag.
+
+<!-- releases:start -->
+| Release | Name | Status | What it is |
+|---|---|---|---|
+| v1.0.0 | Allacapan | shipped | First public release: skills, agents and the phased-shipping plugin. |
+| v1.0.1 | Aparri | shipped | Fixes item summaries that were cut off mid-word. |
+| v1.1.0 | Baggao | in progress | Trust and guardrails, the free-resources plugin, a local dashboard, the README, the footprint budget and supply-chain signals. |
+| v1.2.0 | Buguey | planned | Evals, reviewer agents, security checks by default, trustworthy history, operate and rollout, plan import, a test-first gate, more harnesses and new skills. |
+| v1.3.0 | Camalaniugan | planned | Privacy and governance packs. |
+| v1.4.0 | $\color{#D4AF37}{\textbf{Gattaran}}$ | planned | The sensitive-information guard and the loop-guard plugin. |
+| v1.5.0 | Gonzaga | planned | The dependency upkeep plugin. |
+| v1.6.0 | Lal-lo | planned | Tech-stack packs and deployment platform packs. |
+| v1.7.0 | Lasam | planned | Learning from your own data, model watch, regression fixtures and the measurement tools behind them. |
+| v1.8.0 | Piat | planned | A verified compatibility matrix for more editors. |
+| v1.9.0 | Sta. Ana | planned | Enterprise platform packs. |
+| v1.10.0 | Tuguegarao | planned | Parked work and ideas that are not scheduled. |
+<!-- releases:end -->
+
 ## Develop
 
 ```bash

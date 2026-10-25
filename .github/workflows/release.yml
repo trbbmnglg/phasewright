@@ -20,6 +20,14 @@ jobs:
           node-version: 22
       - name: Lint, manifest check and tests
         run: npm run verify
+      - name: Release name
+        run: |
+          name=$(jq -r --arg v "$GITHUB_REF_NAME" '.releases[] | select(.version == $v) | .name' releases.json)
+          if [ -z "$name" ]; then
+            echo "::error::add $GITHUB_REF_NAME to releases.json"
+            exit 1
+          fi
+          echo "RELEASE_TITLE=$GITHUB_REF_NAME $name" >> "$GITHUB_ENV"
       - name: Zip every item
         run: |
           mkdir -p dist
@@ -32,4 +40,4 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$RELEASE_TITLE" --generate-notes

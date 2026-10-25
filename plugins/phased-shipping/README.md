@@ -152,7 +152,7 @@ The guard has limits of its own:
 ## Windows and Git Bash
 
 - The agents run `npm`, `node` and `git` directly. In Git Bash, `cmd /c npm ...` prints only the cmd banner and runs nothing, so don't wrap commands in `cmd`. The guard may also block `cmd` and `powershell` for the agents.
-- The main session records the timestamps (PowerShell `(Get-Date).ToUniversalTime()` on Windows when it has a PowerShell tool, otherwise `date -u`). The agents don't read the clock. A local-time question, such as a no-deploy window, is for the main session to check with PowerShell.
+- The main session records the timestamps (PowerShell `(Get-Date).ToUniversalTime()` on Windows when it has a PowerShell tool, otherwise `date -u`). The agents don't read the clock to make timestamps. The checker does report each command's duration, and it takes each exit code from an `exit=` line (it runs every command as `<command>; echo "exit=$?"`). A local-time question, such as a no-deploy window, is for the main session to check with PowerShell.
 - A long command can be moved to the background by the Bash tool once it passes its timeout (2 minutes by default, 10 at most). The checker passes the 10-minute timeout on every call.
 
 ## Install

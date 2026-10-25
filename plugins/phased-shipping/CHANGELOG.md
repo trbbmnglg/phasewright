@@ -2,6 +2,13 @@
 
 Newest first.
 
+## 0.6.1
+
+### Changed
+- The checker reports each command's duration and takes each exit code from a captured `exit=` line. The brief asks for each command to run as `<command>; echo "exit=$?"`, and the checker never infers an exit code from the output or from the tool saying it finished.
+- The Windows notes are reworded: the agents don't read the clock to make timestamps (the caller records them), instead of "don't read the clock or report times", which the checker read too broadly. `run` now says "Agents never make timestamps."
+- The guard version is 0.6.1, kept equal to the plugin version. No guard rule changed.
+
 ## 0.6.0
 
 ### Added

@@ -1,0 +1,16 @@
+{
+  "releases": [
+    { "version": "v1.0.0", "name": "Allacapan", "status": "shipped", "date": "2026-10-22", "summary": "First public release: skills, agents and the phased-shipping plugin." },
+    { "version": "v1.0.1", "name": "Aparri", "status": "shipped", "date": "2026-10-23", "summary": "Fixes item summaries that were cut off mid-word." },
+    { "version": "v1.1.0", "name": "Baggao", "status": "in progress", "summary": "Trust and guardrails, the free-resources plugin, a local dashboard, the README, the footprint budget and supply-chain signals." },
+    { "version": "v1.2.0", "name": "Buguey", "status": "planned", "summary": "Evals, reviewer agents, security checks by default, trustworthy history, operate and rollout, plan import, a test-first gate, more harnesses and new skills." },
+    { "version": "v1.3.0", "name": "Camalaniugan", "status": "planned", "summary": "Privacy and governance packs." },
+    { "version": "v1.4.0", "name": "Gattaran", "status": "planned", "accent": "gold", "summary": "The sensitive-information guard and the loop-guard plugin." },
+    { "version": "v1.5.0", "name": "Gonzaga", "status": "planned", "summary": "The dependency upkeep plugin." },
+    { "version": "v1.6.0", "name": "Lal-lo", "status": "planned", "summary": "Tech-stack packs and deployment platform packs." },
+    { "version": "v1.7.0", "name": "Lasam", "status": "planned", "summary": "Learning from your own data, model watch, regression fixtures and the measurement tools behind them." },
+    { "version": "v1.8.0", "name": "Piat", "status": "planned", "summary": "A verified compatibility matrix for more editors." },
+    { "version": "v1.9.0", "name": "Sta. Ana", "status": "planned", "summary": "Enterprise platform packs." },
+    { "version": "v1.10.0", "name": "Tuguegarao", "status": "planned", "summary": "Parked work and ideas that are not scheduled." }
+  ]
+}

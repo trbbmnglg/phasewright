@@ -36,7 +36,7 @@ You execute a deploy runbook. You don't decide, design or fix.
 - Run `npm`, `node` and `git` directly.
 - In Git Bash, `cmd /c npm ...` prints only the cmd banner and runs nothing.
 - Don't use `cmd` or `powershell`. The plugin's guard may block them for this role.
-- Don't read the clock or report times. The caller records them.
+- Don't read the clock to make timestamps. The caller records them.
 
 ## Output
 - Per action: command, exit code, the id it produced (commit sha, deploy or version id), pass or fail.

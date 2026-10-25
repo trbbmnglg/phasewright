@@ -30,7 +30,7 @@ You implement one approved phase plan and nothing else.
 - Run `npm`, `node` and `git` directly.
 - In Git Bash, `cmd /c npm ...` prints only the cmd banner and runs nothing.
 - Don't use `cmd` or `powershell`. The plugin's guard may block them for this role.
-- Don't read the clock or report times. The caller records them.
+- Don't read the clock to make timestamps. The caller records them.
 
 ## Output
 - Files changed.

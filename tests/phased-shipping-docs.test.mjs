@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.1");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -266,7 +266,9 @@ test("phase 7b: run attributes fix rounds, records caught_by, and reads NO SHELL
   for (const source of ["builder-self", "compare", "own-review", "security-review", "browser-check", "prod-check"]) assert.ok(run.includes("`" + source + "`"), source);
   assert.match(run, /\(Get-Date\)\.ToUniversalTime\(\)\.ToString\('yyyy-MM-ddTHH:mm:ssZ'\)/);
   assert.match(run, /date -u/);
-  assert.match(run, /Agents never read the clock/);
+  assert.match(run, /Agents never make timestamps/);
+  assert.ok(run.includes('echo "exit=$?"'), "run brief asks for the exit= line");
+  assert.ok(run.includes("report each command's duration"), "run brief asks for durations");
   assert.match(run, /Never report a phase as built or checked on the result of an agent that had no shell/);
   // The approval-binding text from phases 6 and 7 is still there.
   assert.match(run, /### Guard \(warns, never stops\)/);
@@ -291,7 +293,8 @@ test("phase 7b: builder, checker and shipper carry the NO SHELL rule and the Win
     assert.ok(md.includes("NO SHELL:"), `${agent} NO SHELL:`);
     assert.ok(md.includes("cmd /c npm"), `${agent} cmd /c note`);
     assert.match(md, /^## Windows and Git Bash$/m, agent);
-    assert.match(md, /Don't read the clock or report times/, agent);
+    assert.match(md, /Don't read the clock to make timestamps/, agent);
+    assert.doesNotMatch(md, /Don't read the clock or report times/, agent);
     // Instruction position: "run/use/call/invoke powershell|cmd", other than the "don't use" note.
     for (const line of md.split(/\r?\n/)) {
       if (/don't use|Don't use|prints only the cmd banner/.test(line)) continue;
@@ -302,6 +305,21 @@ test("phase 7b: builder, checker and shipper carry the NO SHELL rule and the Win
   assert.match(text("agents", "builder.md"), /files you edited since your last passing test run/);
   assert.match(text("agents", "shipper.md"), /Don't retry\. Start your report with `NO SHELL:`/);
   assert.match(text("agents", "checker.md"), /list the commands that did not run/);
+});
+
+test("phase 7g: the checker reports durations and captures exit codes; the README's Windows section says so", () => {
+  const checker = text("agents", "checker.md");
+  assert.ok(checker.includes("Do report each command's duration"));
+  assert.ok(checker.includes('echo "exit=$?"'));
+  assert.ok(checker.includes("**Exit codes.**"));
+  assert.doesNotMatch(checker, /Don't read the clock or report times/);
+  const readme = text("README.md");
+  const win = readme.slice(readme.indexOf("## Windows and Git Bash"));
+  assert.ok(win.includes("report each command's duration"));
+  assert.ok(win.includes('echo "exit=$?"'));
+  assert.doesNotMatch(readme, /The agents don't read the clock\. /);
+  const log = text("CHANGELOG.md");
+  assert.ok(log.indexOf("## 0.6.1") >= 0 && log.indexOf("## 0.6.1") < log.indexOf("## 0.6.0"));
 });
 
 test("phase 7b: the eval run-no-shell-not-verified has a prompt and at least two graders with a typed llm grader", () => {
