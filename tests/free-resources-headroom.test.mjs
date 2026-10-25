@@ -87,7 +87,7 @@ test("peaks: a corrupt line is skipped, not fatal", () => {
 
 test("task key: the command's first two words plus the folder name; --task overrides", () => {
   assert.equal(peaksLib.taskKey({ argv: ["npm", "test"], project: join("D:\\Work", "x") }), "npm test @ x");
-  assert.equal(peaksLib.taskKey({ argv: ["npm", "run", "build", "--silent"], project: "D:\\Work\\phasewright\\" }), "npm run @ phasewright");
+  assert.equal(peaksLib.taskKey({ argv: ["npm", "run", "build", "--silent"], project: "D:\\Work\\zork\\" }), "npm run @ zork");
   assert.equal(peaksLib.taskKey({ argv: ["npm test"], project: "/srv/work/proj" }), "npm test @ proj", "a command given as one quoted string still gives two words");
   assert.equal(peaksLib.taskKey({ task: "nightly build", argv: ["npm", "test"], project: "D:\\Work\\x" }), "nightly build");
   assert.equal(peaksLib.taskKey({ task: "   ", argv: ["npm", "test"], project: "D:\\Work\\x" }), "npm test @ x", "a blank --task is ignored");

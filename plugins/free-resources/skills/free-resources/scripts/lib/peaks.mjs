@@ -28,7 +28,7 @@ export function summarizeCommand(argv, { home = homedir(), max = 200 } = {}) {
 }
 
 // --task name if given, else the first two words of the command plus the project folder name:
-// `npm test @ phasewright`.
+// `npm test @ zork`.
 export function taskKey({ task = null, argv = [], project = process.cwd(), home = homedir() } = {}) {
   if (task && task.trim()) return mask(task.trim(), home);
   const words = argv.join(" ").trim().split(/\s+/).filter(Boolean).slice(0, 2).join(" ");

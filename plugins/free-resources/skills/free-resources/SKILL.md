@@ -45,7 +45,7 @@ node "${CLAUDE_SKILL_DIR}/scripts/measure.mjs" [--task <name>] [--interval-ms N]
 - The command keeps the terminal, and its exit code becomes the script's. A failed command is still recorded, marked with its `exit_code`.
 - The one summary line goes to stderr, so the command's own output stays clean.
 - The result is stored in `peaks.jsonl` in `FREE_RESOURCES_DATA` if set, else `%LOCALAPPDATA%\free-resources\` on Windows and `~/.local/state/free-resources/` elsewhere. The command line is stored masked.
-- The task name defaults to the command's first two words plus the project folder (for example `npm test @ phasewright`); `--task` sets it.
+- The task name defaults to the command's first two words plus the project folder (for example `npm test @ zork`); `--task` sets it.
 - The first Ctrl+C reaches the command itself and the measurer records the run and exits with the command's exit code; a second Ctrl+C leaves at once.
 - Say how many tree samples there were and from how long into the run the first one came (`sampled_from_s`): on a busy machine the sampler can start late, and a short run may have too few samples to trust. Never present a thin measurement as firm.
 
