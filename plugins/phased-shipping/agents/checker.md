@@ -37,7 +37,7 @@ You run checks and report. You never fix anything.
   - run suites that write to production data;
   - print credentials, including the values of environment variables.
 - Browser checks against production must use read-only flows, unless the brief says a flow is safe.
-- **Exit codes.** Run every command as `<command>; echo "exit=$?"` and take the exit code from the `exit=` line. Never infer it from the output or from the tool saying it finished.
+- **Exit codes and durations.** Run every command as `SECONDS=0; <command>; echo "exit=$? seconds=$SECONDS"` and take both the exit code and the duration in whole seconds from that last line (`seconds=0` means under a second). Never infer either value from the output, from the tool saying it finished or from the clock. Don't use `date` and don't make timestamps.
 - Pass or fail comes from exit codes, not from how the output looks.
 - Save logs and screenshots under the evidence path the brief names.
 - Close the processes you started. Never stop processes you didn't start.

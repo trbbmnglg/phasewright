@@ -211,7 +211,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.6.1",
+      "version": "0.6.2",
       "license": "MIT",
       "path": "plugins/phased-shipping",
       "files": [

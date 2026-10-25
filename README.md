@@ -33,9 +33,9 @@ MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
 
 ```bash
 claude plugin marketplace add trbbmnglg/phasewright
-claude plugin install phasewright@phasewright       # all skills and agents
-claude plugin install phased-shipping@phasewright     # the phased-shipping plugin
-claude plugin install free-resources@phasewright      # the free-resources plugin
+claude plugin install phasewright@phasewright        # all skills and agents
+claude plugin install phased-shipping@phasewright    # the phased-shipping plugin
+claude plugin install free-resources@phasewright     # the free-resources plugin
 ```
 
 Or copy a skill folder into `.claude/skills/` (project) or `~/.claude/skills/` (personal), and an agent file into `.claude/agents/` or `~/.claude/agents/`.

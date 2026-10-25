@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.6.2
+
+### Changed
+- The checker times each command with the shell's own counter and reads the exit code and the duration from one line. The brief asks for each command to run as `SECONDS=0; <command>; echo "exit=$? seconds=$SECONDS"`, so neither value is inferred or taken from the clock.
+- The guard version is 0.6.2, kept equal to the plugin version. No guard rule changed.
+
 ## 0.6.1
 
 ### Changed
