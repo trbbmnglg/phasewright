@@ -211,7 +211,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.4.0",
+      "version": "0.5.0",
       "license": "MIT",
       "path": "plugins/phased-shipping",
       "files": [
@@ -255,7 +255,8 @@
         "plugins/phased-shipping/skills/plan/SKILL.md",
         "plugins/phased-shipping/skills/plan/references/templates.md",
         "plugins/phased-shipping/skills/plan/scripts/history.mjs",
-        "plugins/phased-shipping/skills/run/SKILL.md"
+        "plugins/phased-shipping/skills/run/SKILL.md",
+        "plugins/phased-shipping/skills/run/scripts/commands-hash.mjs"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/plugins/phased-shipping",
       "zip": "plugin-phased-shipping.zip",

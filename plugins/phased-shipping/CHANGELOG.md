@@ -2,6 +2,27 @@
 
 Newest first.
 
+## 0.5.0
+
+### Added
+- Approval is bound to the commands you saw at preview (audit AL-04, issue #15). `skills/run/scripts/commands-hash.mjs` (no dependencies, no network) hashes the phase plan's `## Commands` section (SHA-256, after CRLF, trailing spaces and trailing blank lines are normalized) and keeps `planned` and `previewed` records under `<data folder>/previews/`, keyed by the plan's real path (symlinks and short Windows names resolved):
+  - `plan` records `planned` when it writes a phase plan, and adds a `**Commands hash:**` line under the Timestamps line;
+  - `run` checks `planned` at the preview (a change is a warning with the diff, a missing record is a note, never a stop), records `previewed`, and shows `Commands hash: <12 hex>` beside the verbatim commands;
+  - `--record` and a matching `--check` print the normalized section after the status line (`recorded <stage> <12 hex>` or `match <12 hex>`). The preview shows that printed section, and the shipper brief takes the deploy, prod-check and rollback commands only from the section `--check previewed` printed, never from a fresh read of the plan, the preview turn or memory, so what was hashed, shown and run are the same text;
+  - `approve` and `push` check `previewed` before briefing the shipper. A mismatch is a hard stop that shows the diff and says to run `/phased-shipping:run N` again to preview the current commands; no record, any other exit code or no `match` line is also a stop. The hash goes into the shipper's brief, and the shipper repeats it in its report;
+  - a plan with two headings that look like "Commands", or one that isn't exactly `## Commands`, is refused (exit 2); a `--record`, `--check` or `--data` with no value is a usage error (exit 1);
+  - a fix-forward round that changes the plan's commands needs a new preview (Preview steps 1 and 2 again, then end the turn) before the fresh `approve`;
+  - a `previewed` record is not used up: an `approve` in a later session still matches an old preview of an unchanged plan (the commands are unchanged, so this is accepted);
+  - an option whose value starts with `--` (`--record previewed --data --short`) is a usage error (exit 1), and nothing is created.
+- Two guard rules for the builder only: it can't write `PHASES.md` or a `phase-*.md` file inside a folder named `phases` (Write, Edit and NotebookEdit; an NTFS stream suffix counts as the same file; `.` and `..` segments, doubled slashes and a trailing `/.` are resolved first), nor from the shell in the common write forms (`>` and `>>`, also glued to a word as in `echo x>PHASES.md`, `tee`, `sed -i`, `mv`, `cp`, `install` or `rsync` onto them or into the `phases` folder (also with `-t` or `--target-directory`), `git apply`, `git mv`, `Set-Content`, `Out-File`, `git checkout` and `git restore` onto them, except `git restore --staged` alone, which only unstages, and a few more); and it can't write the approval records (`previews/<key>.planned.json`, `.previewed.json`), anything under `.claude/phased-shipping/`, `.claude/skills/ps-run`, `.claude/skills/ps-plan` or `.claude/agents/ps-*`, or the installed plugin folders for phased-shipping (`.claude/plugins/cache`, `marketplaces` and `data`, any path there with `phased-shipping` in it), and it can't run `commands-hash.mjs` with `--record` (`--check` and `--short` stay allowed) or `node -e` text that writes into a `previews` folder (rule `protected-plugin-files`). Reading stays allowed. The shell rules are best effort: they don't see a variable-built path or a glob, `git stash pop`, a whole-folder `git checkout`, subshell or brace-group redirects, `>|`, other in-place editors or scripts, and they deny a quoted literal such as `echo "a>PHASES.md"`. The builder can still forge a record by running the script from its own `node -e` or a script file it writes.
+- README: a "How approval works" section, the new guard row and the new files the plugin writes.
+
+### Changed
+- The guard version is 0.5.0 (the probe message names it).
+- This binds the approval against accidental and model-made drift. It does not protect against a malicious local process that can rewrite both the plan and the record in the data folder. It needs no hook, so it also works where hooks are disabled.
+- Plans written before 0.5.0 have no planning record: the preview says so and carries on.
+- The first approve that can use the check is the one after the release that ships it: this release was itself shipped by the 0.4.0 `run` skill.
+
 ## 0.4.0
 
 ### Added

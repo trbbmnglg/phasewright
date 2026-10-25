@@ -71,6 +71,10 @@ On `phase N`, write that phase's plan only, from [templates.md](references/templ
 
 If no rollback command exists, say so and propose one; the run skill won't deploy without it.
 
+**Record the commands.** After writing the phase plan, bind it to its `## Commands` section by running
+`node "${CLAUDE_SKILL_DIR}/../run/scripts/commands-hash.mjs" "<phase plan path>" --record planned --data "${CLAUDE_PLUGIN_DATA}"`
+It prints `recorded planned <12 hex>`, then the section it recorded. If it doesn't print `recorded planned`, stop and show the output: don't skip the step. Add `**Commands hash:** <12 hex> (planned)` under the Timestamps line of the phase plan. The record in the data folder is the one that counts, and the line in the plan is only a convenience that anyone can edit. `run` compares the plan's commands with this record at preview, and with the preview's record at approve. If the script exits 2, the plan has no `## Commands` section: fix the plan first. If the plan's commands change later in this session, run the record step again. If Node is missing, say that `run` will stop at the preview until Node is available.
+
 If the phase's repo isn't this session's working directory, the user will run it in a separate session. Write a **handover prompt** from [templates.md](references/templates.md) at the end of the phase plan, and print it in a single fenced block that the user can copy and paste. Otherwise end with: "Run `/phased-shipping:run N` when ready."
 
 ## Routing table

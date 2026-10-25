@@ -89,13 +89,23 @@ Say it in the preview whichever way it went, and carry on. The guard is an extra
 
 ## Preview, then stop
 
-Report:
+First, bind the preview to the plan's commands. The record folder is `${CLAUDE_PLUGIN_DATA}`, and `<plan>` is the phase plan file:
+1. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --check planned --data "${CLAUDE_PLUGIN_DATA}"`.
+   - Exit 0: carry on.
+   - Exit 3: add a **Commands changed since planning** block to the preview, with the diff it printed. This is a warning, not a stop: the user may have edited the plan on purpose, and the commands are shown verbatim below.
+   - Exit 4: add the note "no planning record (plan made elsewhere or before 0.5.0)". It is not a stop. Gate 1's rule for an untrusted plan still applies.
+   - Exit 2: the plan has no `## Commands` section, or its heading is ambiguous. Stop: gate 1 is not met.
+   - Any other exit code (the script can't run, a usage or I/O error): stop and show the output. Don't skip this step.
+2. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --record previewed --data "${CLAUDE_PLUGIN_DATA}"`. It prints `recorded previewed <12 hex>`, then the recorded `## Commands` section. The commands you show in the report are that printed section, copied verbatim. Don't use an earlier read of the plan. If it doesn't print `recorded previewed`, stop: approve can't be bound. This record is what approve is checked against.
+
+Then report:
 - what changed;
 - a gates table: baseline, then each check, then the **Guard** row;
 - preview or screenshot paths;
 - calibrated estimate against time so far;
 - models used;
-- every command the shipper will run on approve, verbatim, in order (deploy, prod check, rollback), with the plan file path.
+- every command the shipper will run on approve: the section printed by the `--record previewed` step, verbatim, with the plan file path and `Commands hash: <12 hex>`;
+- the **Commands changed since planning** block or the no-planning-record note, if either applies.
 
 End with:
 > Reply `/phased-shipping:run approve` to run the commands listed above: commit, deploy and the prod check, with an automatic rollback if the prod check fails.
@@ -104,13 +114,21 @@ Then end the turn. Never deploy in the same turn as the build.
 
 ## On `approve`
 
+- **First, check that the commands are the ones the user saw.** Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --check previewed --data "${CLAUDE_PLUGIN_DATA}"`. The plan is the one the preview named.
+  - Exit 0: it prints `match <12 hex>` and the recorded section. That printed section is the only source of the commands for the brief. Don't re-read the plan file, and don't take commands from the preview turn or from memory. If it lacks a deploy, prod-check or rollback command, stop.
+  - Exit 3: hard stop. Show the diff it printed and say: "The plan's commands changed after the preview. Run `/phased-shipping:run N` again to preview the current commands." Brief nobody. There is no "re-preview now" shortcut: a fresh preview turn is the point.
+  - Exit 4: stop and say "No preview record. Run `/phased-shipping:run N` first."
+  - Exit 2: stop: the plan has no `## Commands` section, or its heading is ambiguous.
+  - Any other exit code, or no `match` line: stop and show the output.
+  - If the script can't run (Node missing), stop and say the approval can't be bound to the commands the user saw.
 - **Brief `phased-shipping:shipper`** with:
   - `APPROVED: commit`, `APPROVED: deploy` and `APPROVED: rollback-on-failure`;
-  - the plan's deploy, prod-check and rollback commands, in order;
+  - `Commands hash: <12 hex>`, for its report;
+  - the deploy, prod-check and rollback commands and the window, in order, copied verbatim from the section `--check previewed` printed;
   - the repo's commit convention and any attribution rules from CLAUDE.md;
-  - any no-deploy window.
-- **If the prod check failed,** the shipper rolls back and reports. Fix forward through builder, then checker, then a fresh `approve`, one commit per fix.
-- **Push** only on `/phased-shipping:run push`, or when the plan says push is the deploy step and the user approved it.
+  - any no-deploy window from CLAUDE.md (a window only restricts deploys; it never adds a command).
+- **If the prod check failed,** the shipper rolls back and reports. Fix forward through builder, then checker, then a fresh `approve`, one commit per fix. If the fix changes the plan's commands, run Preview steps 1 and 2 again, show the section `--record previewed` printed, and end the turn before the fresh approve.
+- **Push** only on `/phased-shipping:run push`, or when the plan says push is the deploy step and the user approved it. Run the same `--check previewed` step first, with the same stops, and pass the hash to the shipper. The commands in the brief come only from the section it printed, copied verbatim, as for approve.
 
 ## Close the phase
 

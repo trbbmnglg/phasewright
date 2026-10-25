@@ -123,7 +123,7 @@ test("the real script, run as a process: deny output, allow output, exit codes a
   assert.equal(pushDeny.stdout.trim().split("\n").length, 1, "one JSON line");
   assert.deepEqual(parsed, { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: parsed.hookSpecificOutput.permissionDecisionReason } });
   assert.match(parsed.hookSpecificOutput.permissionDecisionReason, /^git-push: /);
-  assert.equal(JSON.parse(probe.stdout).hookSpecificOutput.permissionDecisionReason, "phased-shipping guard is active for checker (v0.4.0). This was a self-test; nothing ran.");
+  assert.equal(JSON.parse(probe.stdout).hookSpecificOutput.permissionDecisionReason, "phased-shipping guard is active for checker (v0.5.0). This was a self-test; nothing ran.");
   assert.equal(shipperPush.stdout, "", "push is the shipper's job");
   assert.match(JSON.parse(shipperForce.stdout).hookSpecificOutput.permissionDecisionReason, /^shipper-force-push: /);
   for (const r of [main, other, empty, junk, psPrefix]) assert.equal(r.stdout, "");
@@ -192,8 +192,13 @@ test("guard.mjs and guard-rules.mjs agree on the role pattern", () => {
   assert.equal(ROLE_PATTERN.source, "^phased-shipping:(builder|checker|shipper|model-scout)$");
 });
 
-test("builder and checker share one rule list, and shipper has its own", () => {
-  assert.equal(RULES.builder, RULES.checker);
+test("builder and checker share their rules, the builder has two more (the plan files, the plugin files), and shipper has its own", () => {
+  assert.deepEqual(RULES.builder.slice(0, -2), RULES.checker);
+  assert.deepEqual(RULES.builder.slice(-2).map((r) => r.id), ["plan-file-write", "protected-plugin-files"]);
+  for (const id of ["plan-file-write", "protected-plugin-files"]) {
+    assert.ok(!RULES.checker.some((r) => r.id === id));
+    assert.ok(!RULES.shipper.some((r) => r.id === id));
+  }
   assert.notEqual(RULES.builder, RULES.shipper);
 });
 
@@ -297,9 +302,9 @@ test("the probe is denied for every role with the active message", () => {
   for (const role of ROLES) {
     const r = guard(bash(`${P}${role}`, PROBE_COMMAND));
     assert.equal(r.status, 0);
-    assert.equal(reasonOf(r), `phased-shipping guard is active for ${role} (v0.4.0). This was a self-test; nothing ran.`, role);
+    assert.equal(reasonOf(r), `phased-shipping guard is active for ${role} (v0.5.0). This was a self-test; nothing ran.`, role);
   }
-  assert.equal(GUARD_VERSION, "0.4.0");
+  assert.equal(GUARD_VERSION, "0.5.0");
   assert.equal(PROBE_COMMAND, "echo phased-shipping-guard-probe");
   // Trailing whitespace is fine; anything else is a different command.
   assert.ok(denied(guard(bash(`${P}checker`, `${PROBE_COMMAND}\n`))));
@@ -928,7 +933,7 @@ test("fix round 2, item 8: nothing inside .git or .husky from the shell or the f
     assert.equal(file(role, "Write", { file_path: "/x/.git/hooks/post-commit" }).rule, "protected-path");
     for (const [tool, input] of [
       ["Write", { file_path: "/x/.gitignore" }], ["Write", { file_path: "/x/.github/workflows/ci.yml" }], ["Edit", { file_path: "/x/.gitattributes" }], ["Write", { file_path: "/x/src/git.ts" }], ["Write", { file_path: "C:\\x\\.github\\x.yml" }],
-      ["Write", { file_path: "/x/docs/.gitkeep" }], ["NotebookEdit", { notebook_path: "/x/a.ipynb" }], ["Write", { file_path: "/x/PHASES.md" }],
+      ["Write", { file_path: "/x/docs/.gitkeep" }], ["NotebookEdit", { notebook_path: "/x/a.ipynb" }], ["Write", { file_path: "/x/README.md" }],
     ]) assert.equal(file(role, tool, input), null, `${role} ${tool} ${JSON.stringify(input)}`);
   }
   // A non-text path is a guard error (fails closed), like model-scout's.
@@ -1061,4 +1066,217 @@ test("fix round 3, item 6: git config --get-regexp, --name-only and --show-scope
     }
     allDenied(role, ["git config user.name zork", "git config --unset user.name", "git config --global alias.x push", "git config --get-regexp --unset alias", "git config --add x y", "git config --global --replace-all x y", "git config --edit", "git config -e", "git config --get-regexp --file x alias", "git config --global core.hooksPath /dev/null"], "git-allowlist");
   }
+});
+
+// ---------- phase 7: the builder never edits the plan files ----------
+
+const fileCall = (role, tool, path, key = "file_path", cwd = "/r") => JSON.stringify({ agent_type: `${P}${role}`, cwd, tool_name: tool, tool_input: { [key]: path } });
+
+test("phase 7, builder: Write, Edit and NotebookEdit to PHASES.md or phases/phase-*.md are denied", () => {
+  const paths = ["/r/PHASES.md", "PHASES.md", "./PHASES.md", "/r/sub/PHASES.md", "/r/docs/phases/phase-3-x.md", "/r/.plans/phases/phase-6-agent-guard.md", "phases/phase-1-a.md", "C:\\r\\docs\\phases\\phase-2-b.md", "C:\\r\\PHASES.md", "/r/PHASES.md.", "/r/Phases.MD"];
+  for (const path of paths) {
+    for (const tool of ["Write", "Edit"]) {
+      const r = guard(fileCall("builder", tool, path));
+      assert.ok(denied(r), `${tool} ${path}`);
+      assert.ok(reasonOf(r).startsWith("plan-file-write: "), reasonOf(r));
+    }
+  }
+  assert.ok(denied(guard(fileCall("builder", "NotebookEdit", "/r/PHASES.md", "notebook_path"))));
+  const both = JSON.stringify({ agent_type: `${P}builder`, tool_name: "NotebookEdit", tool_input: { file_path: "/r/a.ipynb", notebook_path: "/r/docs/phases/phase-3-x.md" } });
+  assert.ok(denied(guard(both)), "either path key");
+  assert.ok(denied(guard(JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/r/PHASES.md" } }), ["--agent", "builder"])), "--agent form");
+});
+
+test("phase 7, builder: other files that look similar are allowed", () => {
+  const paths = ["/r/src/phases/phase.ts", "/r/docs/phase-notes.md", "/r/phase-3-x.md", "/r/docs/phases/notes.md", "/r/docs/phases/phase-3-x.txt", "/r/PHASES.md.bak", "/r/MYPHASES.md", "/r/docs/phases.md/x.txt", "/r/src/a.ts"];
+  for (const path of paths) {
+    for (const tool of ["Write", "Edit"]) assert.equal(guard(fileCall("builder", tool, path)).out, null, `${tool} ${path}`);
+  }
+});
+
+test("phase 7, builder: shell writes to the plan files are denied (best effort)", () => {
+  allDenied("builder", [
+    "echo x >> PHASES.md", "echo x > PHASES.md", "echo x >>PHASES.md", "sed -i s/a/b/ .plans/phases/phase-6-agent-guard.md", "tee PHASES.md < x", "cp x docs/phases/phase-3-x.md", "mv x docs/phases/phase-3-x.md",
+    "Set-Content PHASES.md x", "Out-File PHASES.md", "cd .plans && echo x >> phases/phase-7-x.md",
+  ], "plan-file-write");
+  // The same commands are not this rule's business for the other roles.
+  for (const role of ["checker", "shipper"]) {
+    for (const c of ["echo x >> PHASES.md", "sed -i s/a/b/ .plans/phases/phase-6-agent-guard.md", "cp x docs/phases/phase-3-x.md"]) assert.notEqual(verdict(role, c)?.rule, "plan-file-write", `${role}: ${c}`);
+  }
+});
+
+test("phase 7, builder: reading the plan files and writing similar names is allowed", () => {
+  const ok = [
+    "cat PHASES.md", "cat .plans/phases/phase-7-approval-binding.md", "grep -n Commands PHASES.md", "sed -n 1,20p PHASES.md", "sed s/a/b/ PHASES.md", "head -5 docs/phases/phase-3-x.md", "wc -l PHASES.md", "cat PHASES.md > /tmp/copy.md", "cp PHASES.md /tmp/copy.md",
+    "node scripts/lint.mjs PHASES.md", "git diff PHASES.md", "git add PHASES.md", "git log -- PHASES.md", "echo x >> docs/phase-notes.md", "echo x >> src/phases/phase.ts", "echo x > PHASES.md.bak", "echo x >> MYPHASES.md", "echo 'a > PHASES.md' > /tmp/note.txt",
+    "node \"${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs\" .plans/phases/phase-7-approval-binding.md --short",
+  ];
+  for (const c of ok) assert.equal(verdict("builder", c), null, c);
+});
+
+// ---------- phase 7, fix round 1 ----------
+
+test("fix round 1, L5: a redirect glued to a word is a plan file write; similar names stay allowed", () => {
+  allDenied("builder", ["echo x>PHASES.md", "echo x>>PHASES.md", "echo x>.plans/phases/phase-7-x.md", "git show HEAD:PHASES.md>PHASES.md", "echo x 2>PHASES.md", "cat a>docs/phases/phase-3-x.md"], "plan-file-write");
+  for (const c of ["echo x > PHASES.md.bak", "sed s/a/b/ PHASES.md > out.md", "echo x>PHASES.md.bak", "echo x>out.md", "echo x 2>&1", "cat PHASES.md>/tmp/copy.md", "echo x>docs/phase-notes.md"]) {
+    assert.equal(verdict("builder", c), null, c);
+  }
+});
+
+test("fix round 1, L6: git checkout and git restore onto a plan file are denied for the builder only", () => {
+  allDenied("builder", ["git checkout -- PHASES.md", "git checkout HEAD~1 -- .plans/phases/phase-7-x.md", "git checkout main PHASES.md", "git restore PHASES.md", "git restore --staged --worktree PHASES.md", "git restore --source=HEAD~1 docs/phases/phase-3-x.md"], "plan-file-write");
+  for (const c of ["git checkout -- src/x.ts", "git checkout main", "git restore --staged src/x.ts", "git restore PHASES.md.bak", "git add PHASES.md", "git diff PHASES.md", "git show HEAD:PHASES.md"]) assert.equal(verdict("builder", c), null, c);
+  for (const role of ["checker", "shipper"]) assert.notEqual(verdict(role, "git restore PHASES.md")?.rule, "plan-file-write", role);
+});
+
+test("fix round 1, L7: an NTFS stream suffix on a plan file name is the same file", () => {
+  for (const path of ["/r/PHASES.md::$DATA", "/r/PHASES.md:zork", "/r/docs/phases/phase-3-x.md::$DATA", "C:\\r\\PHASES.md:s"]) {
+    assert.ok(denied(guard(fileCall("builder", "Write", path))), path);
+  }
+  for (const path of ["/r/PHASES.md.bak:s", "/r/docs/phases/notes.md:s"]) assert.equal(guard(fileCall("builder", "Write", path)).out, null, path);
+});
+
+test("fix round 1, L8: the builder can't write the approval records or the plugin's data, skills and agents", () => {
+  const paths = [
+    "/h/.claude/phased-shipping/previews/0123456789ab.previewed.json", "/d/previews/0123456789AB.planned.json", "C:\\d\\previews\\0123456789ab.previewed.json", "/h/.claude/phased-shipping/anything.txt", "C:\\Users\\zork\\.CLAUDE\\Phased-Shipping\\x.json",
+    "/h/.claude/skills/ps-run/SKILL.md", "/h/.claude/skills/ps-plan/scripts/x.mjs", "/h/.claude/agents/ps-builder.md", "~/.claude/skills/ps-run/SKILL.md",
+  ];
+  for (const path of paths) {
+    for (const tool of ["Write", "Edit"]) {
+      const r = guard(fileCall("builder", tool, path));
+      assert.ok(denied(r), `${tool} ${path}`);
+      assert.ok(reasonOf(r).startsWith("protected-plugin-files: "), reasonOf(r));
+    }
+  }
+  assert.ok(denied(guard(fileCall("builder", "NotebookEdit", "/d/previews/0123456789ab.planned.json", "notebook_path"))));
+  allDenied("builder", [
+    "echo x > /d/previews/0123456789ab.previewed.json", "echo x>>/d/previews/0123456789ab.planned.json", "cp /tmp/x.json /d/previews/0123456789ab.planned.json", "rm /d/previews/0123456789ab.previewed.json",
+    "echo x >> ~/.claude/skills/ps-run/SKILL.md", "sed -i s/a/b/ ~/.claude/agents/ps-shipper.md", "echo x>~/.claude/phased-shipping/x.json", "tee ~/.claude/skills/ps-plan/SKILL.md < x",
+  ], "protected-plugin-files");
+});
+
+test("fix round 1, L8: reading those files and folders merely named previews stay allowed; other roles are not restricted", () => {
+  const paths = ["/r/previews/index.html", "/r/previews/0123.json", "/r/previews/0123456789ab.json", "/r/previews/0123456789ab.other.json", "/r/src/previews/0123456789ab.previewed.js", "/h/.claude/settings.json", "/h/.claude/skills/other-skill/SKILL.md", "/h/.claude/agents/builder.md", "/r/.claude/phased-shipping.md"];
+  for (const path of paths) assert.equal(guard(fileCall("builder", "Write", path)).out, null, path);
+  for (const c of ["cat /d/previews/0123456789ab.previewed.json", "cat ~/.claude/skills/ps-run/SKILL.md", "cp ~/.claude/skills/ps-run/SKILL.md /tmp/x.md", "ls ~/.claude/phased-shipping/previews", "echo x > /r/previews/index.html", "grep -r x ~/.claude/agents/ps-builder.md"]) {
+    assert.equal(verdict("builder", c), null, c);
+  }
+  for (const role of ["checker", "shipper"]) {
+    assert.equal(guard(fileCall(role, "Write", "/d/previews/0123456789ab.previewed.json")).out, null, role);
+    assert.notEqual(verdict(role, "echo x > /d/previews/0123456789ab.previewed.json")?.rule, "protected-plugin-files", role);
+  }
+});
+
+test("phase 7, others: the shipper, the checker, the main session and model-scout may write PHASES.md", () => {
+  for (const role of ["shipper", "checker"]) {
+    for (const path of ["/r/PHASES.md", "/r/docs/phases/phase-3-x.md"]) assert.equal(guard(fileCall(role, "Edit", path)).out, null, `${role} ${path}`);
+  }
+  // The main session and an unrelated agent are never restricted.
+  assert.equal(guard(JSON.stringify({ tool_name: "Write", tool_input: { file_path: "/r/PHASES.md" } })).out, null);
+  assert.equal(guard(JSON.stringify({ agent_type: "Explore", tool_name: "Edit", tool_input: { file_path: "/r/docs/phases/phase-3-x.md" } })).out, null);
+  assert.equal(guard(bash(undefined, "echo x >> PHASES.md")).out, null);
+  // model-scout writing <cwd>/PHASES.md stays allowed, as in phase 6.
+  assert.equal(guard(scoutFile("Write", "/r/PHASES.md", "file_path", "/r")).out, null);
+  assert.equal(guard(scoutFile("Edit", "PHASES.md", "file_path", "/r")).out, null);
+});
+
+// ---------- phase 7, fix round 2 ----------
+
+test("fix round 2, M1: the builder can't run commands-hash.mjs --record; --check, --short and plain hashing stay allowed", () => {
+  allDenied("builder", [
+    "node ~/.claude/skills/ps-run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --record previewed --data ~/.claude/phased-shipping",
+    "node plugins/phased-shipping/skills/run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --record previewed --data ~/.claude/phased-shipping",
+    "node \"${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs\" .plans/phases/phase-7-x.md --record planned --data /d",
+    "node 'C:\\x\\commands-hash.mjs' plan.md --record previewed --data /d",
+    "./commands-hash.mjs plan.md --record previewed --data /d",
+    "bash -c 'node commands-hash.mjs plan.md --record previewed --data /d'",
+  ], "protected-plugin-files");
+  for (const c of [
+    "node ~/.claude/skills/ps-run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --check planned --data ~/.claude/phased-shipping",
+    "node ~/.claude/skills/ps-run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --short",
+    "node ~/.claude/skills/ps-run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md",
+    "node plugins/phased-shipping/skills/run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --check previewed --data /d",
+    "node scripts/other.mjs plan.md --record x",
+  ]) assert.equal(verdict("builder", c), null, c);
+  for (const role of ["checker", "shipper"]) {
+    assert.notEqual(verdict(role, "node commands-hash.mjs plan.md --record previewed --data /d")?.rule, "protected-plugin-files", role);
+  }
+});
+
+test("fix round 2, M1: node -e text that writes into previews or the plugin's data folder is denied", () => {
+  allDenied("builder", [
+    "node -e \"require('fs').writeFileSync('/d/previews/0123456789ab.previewed.json','{}')\"",
+    "node --eval \"require('fs').writeFileSync(p + '/previews/x.json', '{}')\"",
+    "node -pe \"x('/h/.claude/phased-shipping/previews/a.json')\"",
+    "node -e \"x('C:\\\\h\\\\.claude\\\\phased-shipping\\\\previews\\\\a.json')\"",
+  ], "protected-plugin-files");
+  for (const c of ["node -e \"console.log(1)\"", "node -e \"console.log('previews')\"", "node -e \"require('fs').readFileSync('x.txt')\"", "node scripts/previews.mjs"]) assert.equal(verdict("builder", c), null, c);
+});
+
+test("fix round 2, M2: the builder can't write the installed phased-shipping plugin folders; reading stays allowed", () => {
+  const paths = [
+    "/h/.claude/plugins/cache/mkt/phased-shipping/1.0.0/skills/run/scripts/commands-hash.mjs", "/h/.claude/plugins/cache/mkt/phased-shipping/1.0.0/hooks/guard-rules.mjs", "/h/.claude/plugins/marketplaces/x/phased-shipping/y",
+    "C:\\Users\\zork\\.claude\\plugins\\cache\\mkt\\phased-shipping\\1.0.0\\hooks\\guard.mjs", "/h/.CLAUDE/Plugins/Data/phased-shipping-mkt/x.json", "~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/skills/run/SKILL.md",
+  ];
+  for (const path of paths) {
+    for (const tool of ["Write", "Edit"]) {
+      const r = guard(fileCall("builder", tool, path));
+      assert.ok(denied(r), `${tool} ${path}`);
+      assert.ok(reasonOf(r).startsWith("protected-plugin-files: "), reasonOf(r));
+    }
+  }
+  allDenied("builder", [
+    "echo x > ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/skills/run/scripts/commands-hash.mjs", "echo x >> ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/hooks/guard-rules.mjs", "echo x > ~/.claude/plugins/marketplaces/x/phased-shipping/y",
+    "cp /tmp/x ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/hooks/guard.mjs", "rm -r ~/.claude/plugins/cache/mkt/phased-shipping", "sed -i s/a/b/ ~/.claude/plugins/marketplaces/x/phased-shipping/y",
+  ], "protected-plugin-files");
+  for (const path of ["/h/.claude/plugins/cache/mkt/other-plugin/1.0.0/x.mjs", "/h/.claude/plugins/installed.json", "/r/plugins/phased-shipping/hooks/guard.mjs", "/h/.claude/plugins/cache/mkt/other/phased.js"]) assert.equal(guard(fileCall("builder", "Write", path)).out, null, path);
+  for (const c of ["cat ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/hooks/guard-rules.mjs", "cp ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/README.md /tmp/x.md", "ls ~/.claude/plugins/marketplaces/x/phased-shipping", "grep -r x ~/.claude/plugins/cache/mkt/phased-shipping"]) {
+    assert.equal(verdict("builder", c), null, c);
+  }
+  for (const role of ["checker", "shipper"]) assert.equal(guard(fileCall(role, "Write", "/h/.claude/plugins/cache/mkt/phased-shipping/1.0.0/x.mjs")).out, null, role);
+});
+
+test("fix round 2, L1: dot segments, doubled slashes and a trailing /. don't hide a plan or protected file", () => {
+  const denyPaths = [
+    "C:/r/PHASES.md/.", "C:\\r\\PHASES.md\\.", "C:/r/.plans/phases/./phase-7-x.md", "C:/r/.plans/phases//phase-7-x.md", "C:/r/.plans/phases/x/../phase-7-x.md", "/r/.plans//phases/phase-7-x.md", "/r/x/../PHASES.md", "/r/PHASES.md/",
+  ];
+  for (const path of denyPaths) {
+    for (const tool of ["Write", "Edit"]) {
+      const r = guard(fileCall("builder", tool, path));
+      assert.ok(denied(r), `${tool} ${path}`);
+      assert.ok(reasonOf(r).startsWith("plan-file-write: "), reasonOf(r));
+    }
+  }
+  for (const path of ["~/.claude/x/../phased-shipping/hooks/guard-rules.mjs", "~/.claude/./phased-shipping/x", "~/.claude/skills/./ps-run/SKILL.md", "/h/.claude//skills/ps-plan/SKILL.md", "/h/.claude/agents/./ps-builder.md", "/d/x/../previews/0123456789ab.planned.json"]) {
+    const r = guard(fileCall("builder", "Write", path));
+    assert.ok(denied(r), path);
+    assert.ok(reasonOf(r).startsWith("protected-plugin-files: "), reasonOf(r));
+  }
+  for (const path of ["/r/src/a.ts", "/r/docs/phases/./notes.md", "/r/src/../src/b.ts", "C:/r/src/./app.ts", "/r/PHASES.md/../x.txt", "~/.claude/./settings.json"]) assert.equal(guard(fileCall("builder", "Write", path)).out, null, path);
+  allDenied("builder", ["echo x >> C:/r/PHASES.md/.", "echo x >> .plans/phases/./phase-7-x.md", "echo x >> .plans/phases//phase-7-x.md", "echo x >> .plans/phases/x/../phase-7-x.md", "echo x>PHASES.md/.", "echo x >> 'PHASES.md/.'", "sed -i s/a/b/ ./x/../PHASES.md"], "plan-file-write");
+  allDenied("builder", ["echo x > ~/.claude/x/../phased-shipping/hooks/guard-rules.mjs", "echo x > ~/.claude/./phased-shipping/x", "echo x >> ~/.claude/skills/./ps-run/SKILL.md", "rm ~/.claude//skills/ps-plan/SKILL.md"], "protected-plugin-files");
+  for (const c of ["echo x >> src/./a.ts", "cat PHASES.md/..", "echo x > docs/../out.md"]) assert.equal(verdict("builder", c), null, c);
+});
+
+test("fix round 2, L2: cp, mv, install -t and a phases folder as the destination; rsync, git apply and git mv", () => {
+  allDenied("builder", [
+    "cp -t .plans/phases /tmp/phase-7-x.md", "cp --target-directory=.plans/phases /tmp/phase-7-x.md", "cp --target-directory .plans/phases /tmp/phase-7-x.md", "mv -t docs/phases /tmp/phase-3-x.md", "install -t .plans/phases /tmp/phase-7-x.md",
+    "install -D -t .plans/phases/ x/phase-7-x.md", "cp -vt phases x/phase-1-a.md", "cp -tphases x/phase-1-a.md", "cp --target-dir=.plans/phases /tmp/phase-7-x.md",
+    "cp /tmp/phase-7-x.md .plans/phases", "cp /tmp/phase-7-x.md .plans/phases/", "mv /tmp/phase-7-x.md phases", "install /tmp/phase-7-x.md docs/phases",
+    "rsync -a /tmp/x.md PHASES.md", "rsync -a /tmp/phase-7-x.md .plans/phases/phase-7-x.md", "rsync -a /tmp/phase-7-x.md .plans/phases/", "rsync PHASES.md /tmp/old.md",
+    "git apply PHASES.md", "git apply .plans/phases/phase-7-x.md", "git mv /tmp/x.md PHASES.md", "git mv phase-7-x.md .plans/phases", "git mv x.md .plans/phases/phase-7-x.md", "git mv PHASES.md old.md",
+  ], "plan-file-write");
+  allDenied("builder", ["cp -t ~/.claude/skills/ps-run /tmp/SKILL.md", "cp --target-directory=~/.claude/agents /tmp/ps-builder.md", "rsync -a /tmp/x/ ~/.claude/phased-shipping/", "git apply ~/.claude/phased-shipping/x.patch", "mv -t /d/previews /tmp/0123456789ab.planned.json"], "protected-plugin-files");
+  for (const c of [
+    "cp PHASES.md /tmp/", "cp -t /tmp PHASES.md", "cp -t docs/phases /tmp/notes.md", "cp /tmp/notes.md docs/phases", "cp /tmp/phase-7-x.md docs/", "mv -t docs /tmp/phase-7-x.md", "install -t docs /tmp/a.md", "cp -t .plans/phases-old /tmp/phase-7-x.md",
+    "rsync -a src/ dist/", "git apply fix.patch", "git mv src/a.ts src/b.ts", "git apply --check fix.patch", "cp phase-7-x.md /tmp/copy.md",
+  ]) assert.equal(verdict("builder", c), null, c);
+  for (const role of ["checker", "shipper"]) {
+    for (const c of ["cp -t .plans/phases /tmp/phase-7-x.md", "rsync -a /tmp/x.md PHASES.md"]) assert.notEqual(verdict(role, c)?.rule, "plan-file-write", `${role}: ${c}`);
+  }
+});
+
+test("fix round 2: git restore --staged alone only unstages and is allowed; with --worktree it is denied", () => {
+  for (const c of ["git restore --staged PHASES.md", "git restore -S PHASES.md", "git restore --staged .plans/phases/phase-7-x.md", "git restore --source=HEAD~1 --staged PHASES.md", "git restore --stage PHASES.md"]) assert.equal(verdict("builder", c), null, c);
+  allDenied("builder", ["git restore --staged --worktree PHASES.md", "git restore -SW PHASES.md", "git restore -S -W PHASES.md", "git restore --staged --work PHASES.md", "git restore PHASES.md", "git restore -W PHASES.md", "git restore --worktree PHASES.md", "git checkout -- PHASES.md"], "plan-file-write");
 });

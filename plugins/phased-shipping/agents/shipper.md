@@ -35,3 +35,4 @@ You execute a deploy runbook. You don't decide, design or fix.
 - Per action: command, exit code, the id it produced (commit sha, deploy or version id), pass or fail.
 - The prod-check result, and the rollback result if there was one.
 - The ids, ready to paste into the phase report.
+- If the brief carries a `Commands hash`, put it in the report, so the report shows which commands were approved.

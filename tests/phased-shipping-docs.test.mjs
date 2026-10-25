@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.4.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.5.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -161,4 +161,101 @@ test("the checker runs the probe first when the brief has it, and it is never a 
   assert.match(checker, /Guard probe: blocked \(active\)/);
   assert.match(checker, /Guard probe: ran \(not active\)/);
   assert.match(checker, /not a failure either way/);
+});
+
+test("phase 7: run records the preview, checks it on approve and push, and a mismatch is a hard stop", () => {
+  const run = text("skills", "run", "SKILL.md");
+  assert.match(run, /commands-hash\.mjs" "<plan>" --check planned --data/);
+  assert.match(run, /commands-hash\.mjs" "<plan>" --record previewed --data/);
+  assert.match(run, /commands-hash\.mjs" "<plan>" --check previewed --data/);
+  assert.doesNotMatch(run, /commands-hash\.mjs" <plan>/, "the plan path is always quoted");
+  assert.match(run, /Commands changed since planning/);
+  assert.match(run, /no planning record \(plan made elsewhere or before 0\.5\.0\)/);
+  assert.match(run, /Exit 3: hard stop/);
+  assert.match(run, /Run `\/phased-shipping:run N` again to preview the current commands/);
+  assert.match(run, /No preview record\. Run `\/phased-shipping:run N` first/);
+  assert.match(run, /Commands hash: <12 hex>/);
+  assert.match(run, /Run the same `--check previewed` step first/);
+  // The check comes before the shipper is briefed.
+  const approve = run.slice(run.indexOf("## On `approve`"));
+  assert.ok(approve.indexOf("--check previewed") < approve.indexOf("Brief `phased-shipping:shipper`"));
+  // The preview records before it ends the turn.
+  assert.ok(run.indexOf("--record previewed") < run.indexOf("Reply `/phased-shipping:run approve`"));
+});
+
+test("phase 7 fix round 1: the commands shown and the commands briefed are the section the script printed", () => {
+  const run = text("skills", "run", "SKILL.md");
+  const approve = run.slice(run.indexOf("## On `approve`"));
+  const preview = run.slice(run.indexOf("## Preview, then stop"), run.indexOf("## On `approve`"));
+  // H1: one source of the commands, in the preview and in the brief.
+  assert.match(preview, /It prints `recorded previewed <12 hex>`, then the recorded `## Commands` section\. The commands you show in the report are that printed section, copied verbatim\. Don't use an earlier read of the plan\./);
+  assert.match(preview, /the section printed by the `--record previewed` step, verbatim, with the plan file path and `Commands hash: <12 hex>`/);
+  assert.match(approve, /it prints `match <12 hex>` and the recorded section\. That printed section is the only source of the commands for the brief\. Don't re-read the plan file, and don't take commands from the preview turn or from memory\. If it lacks a deploy, prod-check or rollback command, stop\./);
+  assert.match(approve, /the deploy, prod-check and rollback commands and the window, in order, copied verbatim from the section `--check previewed` printed;/);
+  assert.match(approve, /The commands in the brief come only from the section it printed, copied verbatim, as for approve\./, "push path");
+  assert.ok(run.includes("only source of the commands"));
+  // L3: a failure of the script is a stop, never a skipped step.
+  assert.match(approve, /Any other exit code, or no `match` line: stop and show the output\./);
+  assert.match(preview, /If it doesn't print `recorded previewed`, stop: approve can't be bound\./);
+  assert.match(preview, /Any other exit code \(the script can't run, a usage or I\/O error\): stop and show the output\. Don't skip this step\./);
+  // L10: a fix-forward that changes the commands needs a new preview.
+  // Fix round 2, L4: the fix-forward re-runs Preview steps 1 and 2 and ends the turn.
+  assert.match(approve, /If the fix changes the plan's commands, run Preview steps 1 and 2 again, show the section `--record previewed` printed, and end the turn before the fresh approve\./);
+  assert.doesNotMatch(approve, /re-record `previewed` in a preview turn/);
+});
+
+test("phase 7 fix round 2: no override for a hash script that can't run, plan says run stops, the brief window adds no command", () => {
+  const run = text("skills", "run", "SKILL.md");
+  const approve = run.slice(run.indexOf("## On `approve`"));
+  // L3: a hash script that can't run is a stop with no "proceed anyway".
+  assert.match(approve, /If the script can't run \(Node missing\), stop and say the approval can't be bound to the commands the user saw\.\n/);
+  assert.doesNotMatch(approve, /Only the user's explicit "proceed anyway" overrides this/);
+  const plan = text("skills", "plan", "SKILL.md");
+  assert.match(plan, /If Node is missing, say that `run` will stop at the preview until Node is available\./);
+  assert.doesNotMatch(plan, /approval won't be bound to the commands/);
+  // L5: a no-deploy window only restricts deploys.
+  assert.match(run, /any no-deploy window from CLAUDE\.md \(a window only restricts deploys; it never adds a command\)/);
+});
+
+test("phase 7 fix round 2: README and CHANGELOG say exactly what is protected and what is not", () => {
+  const readme = text("README.md");
+  const section = readme.slice(readme.indexOf("## How approval works"), readme.indexOf("## Requirements"));
+  for (const doc of [section, text("CHANGELOG.md").slice(text("CHANGELOG.md").indexOf("## 0.5.0"), text("CHANGELOG.md").indexOf("## 0.4.0"))]) {
+    assert.match(doc, /\.claude\/plugins\/cache/);
+    assert.match(doc, /installed plugin folders for phased-shipping/);
+    assert.match(doc, /`commands-hash\.mjs`/);
+    assert.match(doc, /`--record`/);
+    assert.match(doc, /`git restore --staged`/);
+  }
+  assert.match(section, /`previews\/<key>\.planned\.json` and `\.previewed\.json`/);
+  assert.match(section, /can still forge a record by running the script from its own `node -e`/);
+  assert.match(section, /nor `git stash pop`, a whole-folder `git checkout`, subshell or brace-group redirects, `>\|`, other in-place editors, or scripts/);
+  assert.match(section, /The record key is path-based/);
+  assert.match(section, /A `previewed` record is not used up: an `approve` in a later session still matches an old preview of an unchanged plan/);
+  assert.match(section, /fix-forward round that changes the plan's commands needs a new preview/);
+  assert.equal(text("CHANGELOG.md").split("## 0.5.0").length, 2, "one 0.5.0 block");
+});
+
+test("phase 7: plan records `planned` and adds the Commands hash line; the shipper reports the hash", () => {
+  const plan = text("skills", "plan", "SKILL.md");
+  assert.match(plan, /commands-hash\.mjs" "<phase plan path>" --record planned --data/);
+  assert.doesNotMatch(plan, /commands-hash\.mjs" <phase plan path>/, "the plan path is always quoted");
+  assert.match(plan, /If it doesn't print `recorded planned`, stop and show the output/);
+  assert.match(plan, /\*\*Commands hash:\*\* <12 hex> \(planned\)/);
+  assert.match(text("skills", "plan", "references", "templates.md"), /^\*\*Commands hash:\*\* <12 hex> \(planned\)$/m);
+  assert.match(text("agents", "shipper.md"), /If the brief carries a `Commands hash`, put it in the report/);
+});
+
+test("phase 7: the changelog has a 0.5.0 entry above 0.4.0, and the README is honest about what the binding stops", () => {
+  const log = text("CHANGELOG.md");
+  const at = log.indexOf("## 0.5.0");
+  assert.ok(at >= 0 && at < log.indexOf("## 0.4.0"));
+  for (const heading of ["### Added", "### Changed"]) assert.ok(log.indexOf(heading, at) > at, heading);
+  assert.match(log.slice(at, log.indexOf("## 0.4.0")), /does not protect against a malicious local process/);
+  const readme = text("README.md");
+  assert.match(readme, /^## How approval works$/m);
+  assert.match(readme, /accidental and model-made drift/);
+  assert.match(readme, /does not protect against a malicious local process that can rewrite both the plan and the record/);
+  assert.match(readme, /to preview the current commands/);
+  assert.match(readme, /best effort|reads literal paths in the common write forms only/);
 });

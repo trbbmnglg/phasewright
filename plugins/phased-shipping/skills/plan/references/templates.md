@@ -46,6 +46,7 @@ Status as of <YYYY-MM-DD>. Current phase: N.
 **Models:** plan <alias (effort)> · build <alias (effort)>, runs as <main | builder> · checks and ship <alias (effort)> · review <standard | security>
 **Kind:** <ui | backend | data | infra | docs | mixed> · **Priority:** P# · **Urgency:** <Now | Soon | Later> · **Est.:** <raw> h → <calibrated> h build + <M> min review · **Migration:** <none | id>
 **Timestamps:** started <ISO> · previewed <ISO> · approved <ISO> · shipped <ISO>
+**Commands hash:** <12 hex> (planned)
 
 ## Context
 What was asked. What reading the code found (defects and gaps, not only missing features).

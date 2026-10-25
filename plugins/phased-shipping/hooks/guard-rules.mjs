@@ -13,7 +13,7 @@
 import { posix } from "node:path";
 import { splitCommands } from "./lib/shell.mjs";
 
-export const GUARD_VERSION = "0.4.0";
+export const GUARD_VERSION = "0.5.0";
 export const PROBE_COMMAND = "echo phased-shipping-guard-probe";
 export const ROLES = ["builder", "checker", "shipper", "model-scout"];
 export const ROLE_PATTERN = /^phased-shipping:(builder|checker|shipper|model-scout)$/;
@@ -671,7 +671,145 @@ const SHIP_RULES = [
   NET_WRITE,
 ];
 
-export const RULES = { builder: BUILD_RULES, checker: BUILD_RULES, shipper: SHIP_RULES };
+// ---------- plan files: builder only ----------
+
+// The approval binding (commands-hash.mjs) compares the plan's "## Commands" section at preview with the
+// one at approve. The builder works before the preview, so it never edits the plan files: PHASES.md, or
+// a phase-*.md inside a folder named `phases`. The shell rule is best effort: it reads literal paths in
+// the common write forms, not a path built from a variable, a glob, or a cd followed by a bare file name.
+const PLAN_FILE_REASON = "The builder doesn't edit the plan files (PHASES.md, or phase-*.md inside a folder named phases): the approval is bound to the commands the user saw at preview. Report what should change in the plan and let the main session edit it.";
+const slashes = (p) => String(p).replace(/\\/g, "/");
+// Slashes made forward, `.` and `..` segments and doubled slashes resolved, a trailing slash (or `/.`) dropped;
+// a quote left at the end of a shell word stays. Drive letters are plain text here, so C:/r keeps working.
+const norm = (p) => {
+  const m = /^([\s\S]*?)(['"]*)$/.exec(slashes(p));
+  return posix.normalize(m[1]).replace(/\/+$/, "") + m[2];
+};
+const PLAN_FILE_WORD = /(^|[\\/<>='"])(PHASES\.md|phases[\\/]phase-[^\\/\s'"]*\.md)['"]?[. ]*$/i;
+const planFileWord = (w) => PLAN_FILE_WORD.test(String(w)) || PLAN_FILE_WORD.test(norm(w));
+// A file tool's path: PHASES.md, or phase-*.md whose folder is named phases (any case, trailing dots and spaces ignored).
+export const isPlanFilePath = (p) => {
+  const parts = norm(p).split("/");
+  const name = (parts.pop() ?? "").replace(/(\.md)[. ]*:.*$/i, "$1").replace(/[. ]+$/, "").toLowerCase(); // an NTFS stream suffix (PHASES.md::$DATA) is the same file
+  if (name === "phases.md") return true;
+  return /^phase-.*\.md$/.test(name) && (parts.pop() ?? "").replace(/[. ]+$/, "").toLowerCase() === "phases";
+};
+const REDIRECT_START = /^\d*(>>?|&>>?|>\|)/;
+const REDIRECT_ONLY = /^\d*(>>?|&>>?|>\|)$/;
+const shortInPlace = (args) => args.some((a) => /^-[A-Za-z]*i/.test(a));
+const PS_WRITERS =new Set(["set-content", "add-content", "out-file", "clear-content", "sc", "ac"]);
+// The shell write forms for the files `word` names: a redirect (also one glued to another word, where the
+// part after the last > is the target), tee, in-place sed and perl, mv, rm, truncate, shred, cp, install,
+// ln onto it, dd of=, and the PowerShell writers. A quoted literal like echo "a>PHASES.md" is denied too.
+// The sources and the destination folder or file of cp, mv, install, ln, rsync and git mv: a -t, -tDIR,
+// --target-directory DIR or --target-directory=DIR names the destination; otherwise it is the last word.
+const baseName = (p) => norm(p).split("/").pop() ?? "";
+function transfer(args) {
+  const sources = [];
+  let dir;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--") { sources.push(...args.slice(i + 1)); break; }
+    if (a.startsWith("--")) {
+      if (abbr(a, "target-directory")) dir = a.includes("=") ? a.slice(a.indexOf("=") + 1) : args[++i];
+    } else if (/^-[A-Za-z]*t$/.test(a)) dir = args[++i];
+    else if (/^-t./.test(a)) dir = a.slice(2);
+    else if (!a.startsWith("-") || a === "-") sources.push(a);
+  }
+  if (dir === undefined) dir = sources.pop();
+  return { sources, dir };
+}
+// Copying or moving into a folder: the destination is <dir>/<basename of each source>. `only` limits which
+// source names count (the plan files need phase-*.md; PHASES.md copied into a folder is left alone).
+const intoDir = (args, word, only) => {
+  const { sources, dir } = transfer(args);
+  if (dir === undefined) return false;
+  return word(dir) || sources.some((s) => (!only || only(baseName(s))) && word(`${dir}/${baseName(s)}`));
+};
+const TRANSFER = new Set(["cp", "mv", "install", "ln", "rsync"]);
+const writesTo = (c, word, only) => {
+  const args = c.args;
+  if (TRANSFER.has(c.program) && intoDir(args, word, only)) return true;
+  if (c.program === "git" && c.args[0] === "mv" && intoDir(args.slice(1), word, only)) return true;
+  // > file, >> file, 2> file, &> file, >|file, x>file, with or without a space after the operator.
+  for (let i = 0; i < args.length; i++) {
+    if (REDIRECT_ONLY.test(args[i])) { if (i + 1 < args.length && word(args[i + 1])) return true; }
+    else if (REDIRECT_START.test(args[i]) && word(args[i])) return true;
+    else if (args[i].includes(">") && word(args[i].slice(args[i].lastIndexOf(">") + 1))) return true;
+  }
+  const named = args.some(word);
+  if (!named) return false;
+  switch (c.program) {
+    case "tee": return true;
+    case "sed": return shortInPlace(args) || lf(args, "in-place");
+    case "perl": return shortInPlace(args);
+    case "mv": case "rm": case "truncate": case "shred": return true;
+    case "cp": case "install": case "ln": return word(transfer(args).dir ?? ""); // onto it: the last word is the target (or the -t value)
+    case "rsync": return true; // any argument that names it, source or target
+    case "git": return args[0] === "apply" || args[0] === "mv"; // a patch can't be read, so any such argument is refused
+    case "dd": return args.some((a) => /^of=/i.test(a) && word(a.slice(3)));
+    default: return PS_WRITERS.has(c.program);
+  }
+};
+// git checkout and git restore bring a file back from the index or a commit: onto a plan file that is a write.
+// `git restore --staged` alone only unstages (it leaves the file as it is), so it is not one.
+const gitRestoresPlanFile = (c) => {
+  if (c.program !== "git" || (c.args[0] !== "checkout" && c.args[0] !== "restore")) return false;
+  const rest = c.args.slice(1);
+  const staged = shortFlag(rest, "S") || lf(rest, "staged");
+  const worktree = shortFlag(rest, "W") || lf(rest, "worktree");
+  if (staged && !worktree) return false;
+  return rest.some(planFileWord);
+};
+const planFileWrite = (c) => writesTo(c, planFileWord, (name) => /^phase-.*\.md$/i.test(name)) || gitRestoresPlanFile(c);
+const PLAN_FILE_RULE = rule("plan-file-write", "the builder doesn't write PHASES.md or phases/phase-*.md",
+  PLAN_FILE_REASON,
+  ["echo x >> PHASES.md", "echo x > PHASES.md", "echo x >.plans/phases/phase-7-x.md", "echo x 2> PHASES.md", "printf x | tee PHASES.md", "cat y | tee -a docs/phases/phase-3-x.md",
+    "echo x>PHASES.md", "echo x>>PHASES.md", "echo x>.plans/phases/phase-7-x.md", "git show HEAD:PHASES.md>PHASES.md", "git checkout -- PHASES.md", "git checkout HEAD~1 -- .plans/phases/phase-7-x.md", "git restore PHASES.md", "git restore --source=HEAD~1 docs/phases/phase-3-x.md",
+    "sed -i s/a/b/ .plans/phases/phase-6-agent-guard.md", "sed -i.bak s/a/b/ PHASES.md", "sed -ni s/a/b/p PHASES.md", "sed --in-place s/a/b/ PHASES.md", "perl -pi -e s/a/b/ PHASES.md",
+    "mv x.md docs/phases/phase-1-a.md", "mv PHASES.md /tmp/old.md", "cp /tmp/x.md PHASES.md", "cp /tmp/x.md .plans/phases/phase-2-b.md", "cp x.md docs/phases/phase-4-d.md", "install -m 644 x.md PHASES.md",
+    "rm .plans/phases/phase-3-c.md", "truncate -s 0 PHASES.md", "dd if=/tmp/x of=PHASES.md", "Set-Content PHASES.md x", "set-content -Path docs/phases/phase-3-x.md -Value y", "Out-File -FilePath PHASES.md", "Add-Content PHASES.md x",
+    "cd x && echo y >> \"docs/phases/phase-5-e.md\"", "bash -c 'echo x >> PHASES.md'", "echo x >>PHASES.md", "echo x >> ./PHASES.md", "echo x >> sub/Phases.MD", "echo x >> 'PHASES.md'",
+    "echo x >> C:/r/PHASES.md/.", "echo x >> .plans/phases/./phase-7-x.md", "echo x >> .plans/phases//phase-7-x.md", "echo x >> .plans/phases/x/../phase-7-x.md",
+    "cp -t .plans/phases /tmp/phase-7-x.md", "cp --target-directory=.plans/phases /tmp/phase-7-x.md", "cp --target-directory .plans/phases /tmp/phase-7-x.md", "mv -t docs/phases /tmp/phase-3-x.md", "install -t .plans/phases /tmp/phase-7-x.md", "install -D -t .plans/phases/ x/phase-7-x.md",
+    "cp /tmp/phase-7-x.md .plans/phases", "cp /tmp/phase-7-x.md .plans/phases/", "mv /tmp/phase-7-x.md phases",
+    "rsync -a /tmp/x.md PHASES.md", "rsync -a /tmp/phase-7-x.md .plans/phases/phase-7-x.md", "rsync -a /tmp/phase-7-x.md .plans/phases/", "git apply PHASES.md", "git mv /tmp/x.md PHASES.md", "git mv phase-7-x.md .plans/phases", "git mv x.md .plans/phases/phase-7-x.md"],
+  planFileWrite);
+
+// The approval records (<data>/previews/<12 hex>.planned.json and .previewed.json) and the plugin's own
+// data and installed copies are what the binding trusts, so the builder never writes them either. Reading
+// stays allowed. A folder that is merely named `previews` is fine. Same best-effort reach as the plan files.
+const PLUGIN_FILE_REASON = "The builder doesn't write the approval records (previews/<key>.planned.json and .previewed.json), the plugin's data folder (.claude/phased-shipping/), the installed copies of its skills and agents (.claude/skills/ps-run, .claude/skills/ps-plan, .claude/agents/ps-*), or the phased-shipping plugin install folders (.claude/plugins/cache, marketplaces and data), and it doesn't run commands-hash.mjs with --record (only the run skill records approval fingerprints): the approval binding depends on them. Report what should change and let the main session do it.";
+const PLUGIN_FILE_WORD = /(^|[\\/<>='"])(previews\/[0-9a-f]{12}\.(planned|previewed)\.json['"]?[. ]*$|\.claude\/(phased-shipping|skills\/ps-(run|plan))(\/|['"]?[. ]*$)|\.claude\/agents\/ps-|\.claude\/plugins\/(cache|marketplaces|data)\/[^'" ]*phased-shipping)/i;
+const pluginFileWord = (w) => PLUGIN_FILE_WORD.test(slashes(w)) || PLUGIN_FILE_WORD.test(norm(w));
+// Recording an approval fingerprint is the run skill's step: the builder may hash (--short) or --check, never --record.
+const HASH_SCRIPT = /(^|[\\/])commands-hash\.mjs['"]?$/i;
+const recordsApproval = (c) => {
+  const words = [c.program, ...c.args];
+  return words.some((w) => HASH_SCRIPT.test(String(w))) && c.args.some((a) => a === "--record" || /^--record=/.test(a));
+};
+// node -e / --eval / -p / --print text that writes into a previews folder or the plugin's data folder.
+const NODE_PROGRAM = /^(node|nodejs|node\.exe)$/i;
+const forgesRecord = (c) => {
+  if (!NODE_PROGRAM.test(c.program) || !c.args.some((a) => /^-[A-Za-z]*[ep]$/.test(a) || /^--(eval|print)(=|$)/.test(a))) return false;
+  const text = slashes(c.args.join(" "));
+  return /previews/i.test(text) && /(write(File|Stream|Sync)|\.claude\/phased-shipping)/i.test(text);
+};
+const PLUGIN_FILE_RULE = rule("protected-plugin-files", "the builder doesn't write the approval records, the plugin's own data, skills, agents and install folders, or run commands-hash.mjs --record",
+  PLUGIN_FILE_REASON,
+  ["echo x > /h/data/previews/0123456789ab.previewed.json", "echo x>>/h/data/previews/0123456789ab.planned.json", "rm /h/data/previews/0123456789ab.previewed.json", "cp /tmp/x.json /h/data/previews/0123456789ab.planned.json",
+    "echo x >> ~/.claude/phased-shipping/hook.mjs", "echo x > ~/.claude/phased-shipping/previews/0123456789ab.previewed.json", "echo x >> ~/.claude/skills/ps-run/SKILL.md", "tee ~/.claude/skills/ps-plan/SKILL.md < x", "sed -i s/a/b/ ~/.claude/agents/ps-shipper.md",
+    "echo x>~/.claude/agents/ps-builder.md", "mv /tmp/x ~/.claude/skills/ps-run", "rm -r ~/.claude/skills/ps-plan",
+    "node ~/.claude/skills/ps-run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --record previewed --data ~/.claude/phased-shipping",
+    "node plugins/phased-shipping/skills/run/scripts/commands-hash.mjs .plans/phases/phase-7-x.md --record previewed --data ~/.claude/phased-shipping",
+    "node -e \"require('fs').writeSync(3,'{}','/d/previews/0123456789ab.previewed.json')\"", "node --eval \"x('/h/.claude/phased-shipping/previews/a.json')\"",
+    "echo x >> ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/skills/run/scripts/commands-hash.mjs", "echo x > ~/.claude/plugins/marketplaces/x/phased-shipping/y", "cp /tmp/x ~/.claude/plugins/cache/mkt/phased-shipping/1.0.0/hooks/guard-rules.mjs",
+    "echo x > ~/.claude/x/../phased-shipping/hooks/guard-rules.mjs", "echo x > ~/.claude/./phased-shipping/x", "echo x >> ~/.claude/skills/./ps-run/SKILL.md", "cp -t ~/.claude/skills/ps-run /tmp/SKILL.md", "rsync -a /tmp/x/ ~/.claude/phased-shipping/", "git apply ~/.claude/phased-shipping/x.patch"],
+  (c) => writesTo(c, pluginFileWord) || recordsApproval(c) || forgesRecord(c));
+
+const BUILDER_RULES = [...BUILD_RULES, PLAN_FILE_RULE, PLUGIN_FILE_RULE];
+
+export const RULES = { builder: BUILDER_RULES, checker: BUILD_RULES, shipper: SHIP_RULES };
 
 // model-scout has no shell. It may write only PHASES.md in the project folder.
 export const SCOUT_RULES = {
@@ -679,8 +817,7 @@ export const SCOUT_RULES = {
   path: { id: "scout-phases-only", description: "writes only <cwd>/PHASES.md (never inside .claude)", reason: "model-scout may change nothing but PHASES.md in the project folder.", samples: ["/x/README.md", "/x/src/app.ts", "/x/PHASES.md.bak", "/x/phases.md", "/x/sub/PHASES.md", "/y/PHASES.md", "/x/../y/PHASES.md", "/x/.claude/PHASES.md", "/x/.claude/agents/ps-builder.md", "sub/../../PHASES.md"] },
 };
 
-const slashes = (p) => String(p).replace(/\\/g, "/");
-const normalized = (p) => posix.normalize(slashes(p)).replace(/^([A-Za-z]):/, (_, d) => `${d.toLowerCase()}:`);
+const normalized =(p) => posix.normalize(slashes(p)).replace(/^([A-Za-z]):/, (_, d) => `${d.toLowerCase()}:`);
 // True when `path` is <cwd>/PHASES.md, with no .claude folder anywhere in it. No cwd means no.
 function scoutMayWrite(path, cwd) {
   if (typeof cwd !== "string" || cwd === "") return false;
@@ -722,6 +859,10 @@ export function decide(role, toolName, toolInput, cwd) {
     const paths = [input.file_path, input.notebook_path].filter((p) => p !== undefined);
     if (paths.some((p) => typeof p !== "string")) throw new TypeError("the file path is not text");
     if (paths.some((p) => PROTECTED_PATH.test(p))) return { rule: "protected-path", reason: PROTECTED_REASON };
+    // The builder works before the preview and never edits the plan files (see PLAN_FILE_RULE).
+    if (role === "builder" && paths.some(isPlanFilePath)) return { rule: PLAN_FILE_RULE.id, reason: PLAN_FILE_REASON };
+    // Nor the approval records or the plugin's own data and installed files (see PLUGIN_FILE_RULE).
+    if (role === "builder" && paths.some(pluginFileWord)) return { rule: PLUGIN_FILE_RULE.id, reason: PLUGIN_FILE_REASON };
   }
   return null;
 }
