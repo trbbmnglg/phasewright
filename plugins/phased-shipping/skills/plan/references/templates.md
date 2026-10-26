@@ -25,6 +25,7 @@ Status as of <YYYY-MM-DD>. Current phase: N.
 - Differs from project convention: <none | what and why>
 
 ## Roadmap
+<!-- phased-shipping:roadmap v1 -->
 | # | Phase | Kind | Priority | Urgency | Est. (raw → cal.) | Plan | Build | Runs as | Checks and ship | Review | Cost | Blocked by | Status | Commit / deploy | Actual |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | ... | backend | P0 | Now | 1 h → 1.3 h | sonnet (medium) | sonnet (medium) | builder | haiku (low) | standard | $ | none | planned | | |
@@ -35,6 +36,8 @@ Status as of <YYYY-MM-DD>. Current phase: N.
 ## Close steps
 <optional: steps the run skill follows after every phase, for example "update the issue board" or "post a status note". Delete the section if there are none.>
 ```
+
+The marker line directly above the roadmap table makes it a standard table ([the format](../../roadmap/references/format.md)). Status is one of `planned`, `in progress`, `shipped` or `parked`; a skipped phase is `parked`, with a note.
 
 `run` follows `## Close steps` as the last step of closing a phase. If the file didn't come from the plan skill in this session or from the user's own repo history, `run` shows the steps and waits for the user's OK first.
 

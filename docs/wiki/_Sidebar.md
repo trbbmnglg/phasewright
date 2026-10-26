@@ -13,6 +13,7 @@
 - [Free resources](Free-resources)
 - [The guard](The-guard)
 - [Approval check](Approval-check)
+- [Roadmap standard](Roadmap-standard)
 - [Phase history and estimates](Phase-history-and-estimates)
 - [Library skills and agents](Library-skills-and-agents)
 - [Security policy](Security-policy)

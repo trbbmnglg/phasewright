@@ -38,6 +38,7 @@ export const FEATURE_PAGES = [
   { page: "Free-resources", title: "Free resources" },
   { page: "The-guard", title: "The guard" },
   { page: "Approval-check", title: "Approval check" },
+  { page: "Roadmap-standard", title: "Roadmap standard" },
   { page: "Phase-history-and-estimates", title: "Phase history and estimates" },
   { page: "Library-skills-and-agents", title: "Library skills and agents" },
   { page: "Security-policy", title: "Security policy" },

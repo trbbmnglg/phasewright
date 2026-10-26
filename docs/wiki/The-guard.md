@@ -25,7 +25,7 @@ It needs no setup beyond installing the plugin ([Install](https://github.com/trb
 
 - Plugin version 0.4.0 added the guard hook, the guard probe and the personal-copy install ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
 - Version 0.5.0 added two builder-only rules that protect `PHASES.md`, the `phase-*.md` plan files and the approval records ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). See [Approval check](Approval-check).
-- Versions 0.6.0 to 0.6.3 changed no guard rule; the guard version is kept equal to the plugin version ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
+- Versions 0.6.0 to 0.7.0 changed no guard rule; the guard version is kept equal to the plugin version ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
 - These are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
 
 ## Limits

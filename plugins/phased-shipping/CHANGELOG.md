@@ -2,6 +2,19 @@
 
 Newest first.
 
+## 0.7.0
+
+### Added
+- The roadmap format, version 1 (described in `skills/roadmap/references/format.md`). A roadmap table is a standard table when the line above its header is `<!-- phased-shipping:roadmap v1 -->`; it needs the columns `#`, `Phase` and `Status`, and `Status` is one of `planned`, `in progress`, `shipped` or `parked`. A table without the marker is legacy: it is read as well as possible and reported with a notice, never rejected.
+- `skills/roadmap/scripts/roadmap.mjs`, one script with no dependencies and four commands: `read` (JSON), `check` (a report with line numbers and exit codes), `standardize` (a plan that writes nothing; with `--write` it makes a backup next to the file, refuses to overwrite one, and writes through a `.tmp` file) and `set` (one row of one standard table, atomic). `--root` makes it refuse a file outside the project folder. Line endings and the last-newline state are kept, and lines outside the chosen tables are never touched. It prints only the file's base name.
+- The `/phased-shipping:roadmap` skill (`check` and `standardize`), owner-invoked only. It never runs `--write` without asking you first.
+- A `v` field (schema version, a positive integer) on every history record. `record` adds `v: 1` when it is missing; `stats` and the loader ignore it, so older records read as before.
+- Two evals: `roadmap-check-is-read-only` and `roadmap-standardize-needs-yes`. They have not been run against a model yet.
+
+### Changed
+- The plan template shows the marker line above the roadmap table, and the plan skill runs `check` on the roadmap it writes. The run skill marks a phase `in progress` and, at close, `shipped` with the commit and the hours, using `set`; a legacy roadmap is left alone and the old manual update is the fallback. Gate 8 now reads "shipped or parked (skipped)": a skipped phase is `parked`, with a note.
+- The guard version is 0.7.0, kept equal to the plugin version. No guard rule changed.
+
 ## 0.6.3
 
 ### Changed

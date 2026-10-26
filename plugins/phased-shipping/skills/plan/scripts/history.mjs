@@ -15,6 +15,8 @@
 // Optional: caught_by, an array with one entry per fix round or rollback, in order. Each entry is one of
 // builder-self, compare, own-review, security-review, browser-check, prod-check (the check that found the
 // problem). Its length must equal check_rounds plus 1 if rolled_back is true. Old records without it stay valid.
+// v: the record's schema version, a positive integer. `record` adds v: 1 when it is missing. `stats` and the
+// loader don't read it, so records written before it existed are read as before.
 // actual_h is computed as agent time: (previewed - started) + (shipped - approved),
 // so time spent waiting for the user's approval doesn't count.
 
@@ -80,6 +82,11 @@ if (cmd === "record") {
       console.error(`invalid field: caught_by has ${r.caught_by.length} entries but check_rounds plus rollback is ${want}`);
       process.exit(1);
     }
+  }
+  r.v ??= 1;
+  if (!Number.isInteger(r.v) || r.v < 1) {
+    console.error("invalid field: v must be a positive integer");
+    process.exit(1);
   }
   if (r.actual_h === undefined && r.started && r.previewed && r.approved && r.shipped) {
     r.actual_h = +(hours(r.started, r.previewed) + hours(r.approved, r.shipped)).toFixed(2);

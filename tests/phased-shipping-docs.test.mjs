@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.3");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.7.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -111,7 +111,7 @@ test("each of the four safety evals has a prompt with max_turns and allowed_tool
 
 test("every eval folder, old and new, has a prompt and at least one grader", () => {
   const dirs = readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory());
-  assert.equal(dirs.length, 9);
+  assert.equal(dirs.length, 11);
   for (const d of dirs) assert.ok(readdirSync(join(PS, "evals", d, "graders")).length >= 1, d);
 });
 
@@ -364,4 +364,108 @@ test("phase 7b: the changelog has one 0.6.0 block above 0.5.0, and the README ha
   assert.match(readme, /`cmd \/c npm \.\.\.` prints only the cmd banner/);
   assert.match(readme, /A checker can report `UNFINISHED`/);
   assert.match(readme, /`caught_by` in the history is only as good as the main session's attribution/);
+});
+
+test("phase 7d1: the CHANGELOG has 0.7.0 above 0.6.3, says no guard rule changed, and lists what was added", () => {
+  const log = text("CHANGELOG.md");
+  assert.equal(log.split("## 0.7.0").length, 2, "one 0.7.0 block");
+  const at = log.indexOf("## 0.7.0");
+  assert.ok(at >= 0 && at < log.indexOf("## 0.6.3"));
+  const entry = log.slice(at, log.indexOf("## 0.6.3"));
+  for (const heading of ["### Added", "### Changed"]) assert.ok(entry.includes(heading), heading);
+  assert.match(entry, /No guard rule changed/);
+  assert.match(entry, /roadmap\.mjs/);
+  assert.match(entry, /`v` field/);
+  assert.match(entry, /roadmap-check-is-read-only/);
+  assert.match(entry, /roadmap-standardize-needs-yes/);
+  // The earlier entries are still there.
+  assert.ok(log.indexOf("## 0.6.3") < log.indexOf("## 0.6.2"));
+});
+
+test("phase 7d1: the README has the roadmap section, the touches lines and the limit", () => {
+  const readme = text("README.md");
+  assert.match(readme, /^## The roadmap format$/m);
+  assert.match(readme, /\]\(skills\/roadmap\/references\/format\.md\)/);
+  assert.match(readme, /<!-- phased-shipping:roadmap v1 -->/);
+  assert.match(readme, /^\| `\/phased-shipping:roadmap` \(skill\) \| sonnet, low \|/m);
+  const touches = readme.slice(readme.indexOf("## What it touches"), readme.indexOf("## Limits"));
+  assert.match(touches, /The roadmap file \(`PHASES\.md`\), through `roadmap\.mjs`/);
+  assert.match(touches, /`standardize --write` writes `<file>\.bak-<timestamp>`/);
+  assert.match(touches, /only after you say yes/);
+  assert.match(touches, /`set` rewrites one row of one standard table/);
+  assert.match(readme.slice(readme.indexOf("## Limits")), /tables only, line by line: it is not a full Markdown parser/);
+  assert.match(readme, /The eleven cases check that:/);
+});
+
+test("phase 7d1: the roadmap skill is owner-invoked, on sonnet at low effort, and asks before it writes", () => {
+  const skill = text("skills", "roadmap", "SKILL.md");
+  const fm = frontmatter(skill);
+  assert.match(fm, /^name: roadmap$/m);
+  assert.match(fm, /^disable-model-invocation: true$/m);
+  assert.match(fm, /^model: sonnet$/m);
+  assert.match(fm, /^effort: low$/m);
+  assert.match(fm, /^argument-hint: "\[check \| standardize\] \[path\/to\/PHASES\.md\]"$/m);
+  assert.match(skill, /node "\$\{CLAUDE_SKILL_DIR\}\/scripts\/roadmap\.mjs" check "<file>" --root "<project folder>"/);
+  assert.match(skill, /Always pass it as `--root "<project folder>"`/);
+  assert.match(skill, /never gives `--write` without the owner's explicit yes, asked with AskUserQuestion/);
+  assert.match(skill, /even if the owner's message says "don't ask"/);
+  assert.match(skill, /Never edit the file in this mode/);
+  assert.match(skill, /Never guess a status/);
+  assert.match(skill, /one roadmap file in this project\. It never takes a file from another project/);
+  for (const status of ["planned", "in progress", "shipped", "parked"]) assert.ok(skill.includes(`\`${status}\``), status);
+  assert.ok(existsSync(join(PS, "skills", "roadmap", "references", "format.md")));
+  assert.ok(existsSync(join(PS, "skills", "roadmap", "scripts", "roadmap.mjs")));
+});
+
+test("phase 7d1: plan and run reach the roadmap script the same way they reach commands-hash.mjs", () => {
+  const plan = text("skills", "plan", "SKILL.md");
+  const run = text("skills", "run", "SKILL.md");
+  assert.match(plan, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/run\/scripts\/commands-hash\.mjs"/, "the pattern being copied");
+  assert.match(plan, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" check "<PHASES\.md path>" --root "<project folder>"/);
+  assert.match(plan, /fix every error it reports/);
+  assert.match(run, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" set "<PHASES\.md>" <phase id> --status "in progress" --root "<folder of PHASES\.md>"/);
+  assert.match(run, /roadmap\.mjs" set "<PHASES\.md>" <phase id> --status shipped --commit <sha> --actual <hours> --root/);
+  assert.match(run, /run standardize first/);
+  assert.match(run, /update the row by hand as before/);
+  // Neither skill ever runs standardize or --write itself.
+  for (const doc of [plan, run]) assert.doesNotMatch(doc, /roadmap\.mjs" standardize/);
+  assert.doesNotMatch(run, /roadmap\.mjs"[^\n]*--write/);
+  // The status words agree across the skills and the template.
+  assert.match(run, /\*\*The previous phase\*\* is shipped or parked \(skipped\)\./);
+  assert.doesNotMatch(run, /marked skipped/);
+  const template = text("skills", "plan", "references", "templates.md");
+  assert.match(template, /^## Roadmap\n<!-- phased-shipping:roadmap v1 -->\n\| # \| Phase \| Kind \|/m);
+  assert.match(template, /Status is one of `planned`, `in progress`, `shipped` or `parked`/);
+});
+
+test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders", () => {
+  for (const name of ["roadmap-check-is-read-only", "roadmap-standardize-needs-yes"]) {
+    const dir = join(PS, "evals", name);
+    const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
+    const fm = frontmatter(prompt);
+    assert.match(fm, /^max_turns: \d+$/m, `${name} max_turns`);
+    assert.match(fm, /^allowed_tools: \[.+\]$/m, `${name} allowed_tools`);
+    assert.match(prompt, /^\/phased-shipping:roadmap (check|standardize)$/m, name);
+    const graders = readdirSync(join(dir, "graders")).filter((f) => f.endsWith(".md"));
+    const parsed = graders.map((f) => frontmatter(readFileSync(join(dir, "graders", f), "utf8")));
+    assert.ok(parsed.every((g) => /^type: (llm|tool_used)$/m.test(g)), `${name} graders all have a type`);
+    assert.ok(parsed.some((g) => /^type: llm$/m.test(g)), `${name} has an llm grader`);
+    for (const g of parsed.filter((x) => /^type: tool_used$/m.test(x))) {
+      assert.match(g, /^tool: \w+$/m);
+      assert.match(g, /^input_match: .+$/m);
+      assert.match(g, /^max: 0$/m);
+    }
+  }
+  const check = readdirSync(join(PS, "evals", "roadmap-check-is-read-only", "graders")).map((f) => readFileSync(join(PS, "evals", "roadmap-check-is-read-only", "graders", f), "utf8")).join("\n");
+  assert.match(check, /tool: Edit/);
+  assert.match(check, /tool: Write/);
+  const yes = readdirSync(join(PS, "evals", "roadmap-standardize-needs-yes", "graders")).map((f) => readFileSync(join(PS, "evals", "roadmap-standardize-needs-yes", "graders", f), "utf8")).join("\n");
+  assert.match(yes, /tool: Bash\ninput_match: '--write'/);
+  assert.match(readFileSync(join(PS, "evals", "roadmap-standardize-needs-yes", "prompt.md"), "utf8"), /Don't ask me anything, just fix it/);
+});
+
+test("phase 7d1: the guard rules file changed only its version", () => {
+  const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.7\.0";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.7.0";', "line 16");
 });

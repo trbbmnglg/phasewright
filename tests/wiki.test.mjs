@@ -276,3 +276,17 @@ test("--reset-history with both flags leaves one commit by the repository's iden
 test("the feature pages listed in the script all exist", () => {
   for (const f of FEATURE_PAGES) assert.ok(existsSync(join(WIKI, `${f.page}.md`)), f.page);
 });
+
+test("the roadmap standard page is in the feature list, has the five feature headings, and is linked from Home and the sidebar", () => {
+  assert.ok(FEATURE_PAGES.some((f) => f.page === "Roadmap-standard" && f.title === "Roadmap standard"));
+  const page = read(WIKI, "Roadmap-standard.md");
+  for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) {
+    assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
+  }
+  assert.ok(read(WIKI, "Home.md").includes("(Roadmap-standard)"));
+  assert.ok(read(WIKI, "_Sidebar.md").includes("[Roadmap standard](Roadmap-standard)"));
+  const version = JSON.parse(readFileSync(join(ROOT, "plugins", "phased-shipping", ".claude-plugin", "plugin.json"), "utf8")).version;
+  assert.ok(page.includes(`Plugin version ${version}`), "the page names the plugin version that shipped it");
+  assert.ok(read(WIKI, "The-guard.md").includes(`Versions 0.6.0 to ${version} changed no guard rule`));
+  assert.ok(read(WIKI, "Phased-shipping.md").includes(`| ${version} | [v1.1.0]`), "the version table has a row for the current version");
+});

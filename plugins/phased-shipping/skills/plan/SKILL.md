@@ -57,7 +57,7 @@ Read only what you need to estimate: README, manifests, the files the goal touch
 - **Cost:** relative `$` `$$` `$$$`.
 - **Blocked by:** phases or outside inputs.
 
-Order by priority, then urgency. Ship `Now` items first and alone. Write the table to `PHASES.md` using [templates.md](references/templates.md). Then ask the user to confirm or reorder, with AskUserQuestion.
+Order by priority, then urgency. Ship `Now` items first and alone. Write the table to `PHASES.md` using [templates.md](references/templates.md), with the marker line above it and Status set to `planned`. Then run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" check "<PHASES.md path>" --root "<project folder>"` and fix every error it reports (a legacy notice is fine, and only the owner runs `standardize`). Then ask the user to confirm or reorder, with AskUserQuestion.
 
 ## 4. Phase plan (just in time)
 

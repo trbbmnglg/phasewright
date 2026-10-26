@@ -61,7 +61,7 @@ test("a record without tokens is saved as before, with no tokens field added", (
   assert.equal(r.status, 0, r.err);
   const [saved] = lines(file);
   assert.equal("tokens" in saved, false);
-  assert.deepEqual(saved, base());
+  assert.deepEqual(saved, { ...base(), v: 1 }, "the only addition is the schema version");
   rmSync(dir, { recursive: true });
 });
 
@@ -261,5 +261,38 @@ test("stats counts each check, says how many phases recorded caught_by, and show
   assert.equal(r.status, 0);
   assert.match(r.out, /^Caught by \(phases with caught_by recorded: 3 of 4; 1 needed no fix\): builder-self 0, compare 0, own-review 1, security-review 2, browser-check 0, prod-check 1$/m);
   assert.match(r.out, /^Conditional compare needs 15 phases with caught_by recorded \(3 so far\)$/m);
+  rmSync(dir, { recursive: true });
+});
+
+test("record adds v: 1, keeps a given v, and rejects a v that is not a positive integer", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  assert.equal(record(file, base()).status, 0);
+  assert.equal(lines(file)[0].v, 1);
+  assert.equal(record(file, base({ phase: 2, v: 1 })).status, 0);
+  assert.equal(lines(file)[1].v, 1);
+  assert.equal(record(file, base({ phase: 3, v: 2 })).status, 0);
+  assert.equal(lines(file)[2].v, 2);
+  for (const v of [0, "1", 1.5, -1, true, [], {}]) {
+    const r = record(file, base({ phase: 9, v }));
+    assert.equal(r.status, 1, JSON.stringify(v));
+    assert.equal(r.err.trim(), "invalid field: v must be a positive integer", JSON.stringify(v));
+  }
+  assert.equal(lines(file).length, 3, "a rejected record is not written");
+  rmSync(dir, { recursive: true });
+});
+
+test("a history file with old lines (no v) gives the same stats as before, and mixed lines read the same", () => {
+  const dir = tmp();
+  const file = join(dir, "history.jsonl");
+  writeFileSync(file, FIXTURE);
+  assert.equal(node("stats", file).out, EXPECTED_STATS);
+  // The same records with v on every line, and on some lines only, give the same text.
+  const withV = FIXTURE.split("\n").filter(Boolean).map((l) => JSON.stringify({ ...JSON.parse(l), v: 1 })).join("\n") + "\n";
+  writeFileSync(file, withV);
+  assert.equal(node("stats", file).out, EXPECTED_STATS);
+  const some = FIXTURE.split("\n").filter(Boolean).map((l, i) => (i === 1 ? JSON.stringify({ ...JSON.parse(l), v: 1 }) : l)).join("\n") + "\n";
+  writeFileSync(file, some);
+  assert.equal(node("stats", file).out, EXPECTED_STATS);
   rmSync(dir, { recursive: true });
 });

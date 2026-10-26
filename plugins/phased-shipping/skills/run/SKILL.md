@@ -46,7 +46,9 @@ Record timestamps in the phase plan: `started` when you begin, `previewed` at th
 
    If the plan is below a floor, stop and ask the user to re-plan or to say "proceed anyway".
 7. **A clean tree** on the expected branch (`git status --short --branch`), in the repo the phase changes. If the phase creates that repo, apply this gate as soon as it's scaffolded.
-8. **The previous phase** is shipped or marked skipped.
+8. **The previous phase** is shipped or parked (skipped).
+
+**Mark it started.** Once the gates pass and `started` is recorded, run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set "<PHASES.md>" <phase id> --status "in progress" --root "<folder of PHASES.md>"`. If it says the roadmap is legacy ("run standardize first"), tell the user once and carry on: don't edit the roadmap by hand. Any other failure is shown and doesn't stop the phase, because the roadmap row is bookkeeping and not a gate.
 
 ## Rules for every brief and agent result
 
@@ -147,7 +149,7 @@ Then end the turn. Never deploy in the same turn as the build.
 ## Close the phase
 
 1. Append the phase report to the plan file.
-2. Update the phase's row in `PHASES.md`.
+2. Update the phase's row in `PHASES.md`: run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set "<PHASES.md>" <phase id> --status shipped --commit <sha> --actual <hours> --root "<folder of PHASES.md>"`. If the table has no `Commit / deploy` or `Actual` column, `set` says so and changes nothing: run it again with only the flags the table has, and put the rest in the phase report. If the roadmap is legacy ("run standardize first"), update the row by hand as before: set its status to shipped (a skipped phase is `parked`, with a note) and fill in the commit and the actual hours.
 3. Record the outcome: write the JSON to a temporary file with the file-writing tool, then run
    `node "${CLAUDE_SKILL_DIR}/../plan/scripts/history.mjs" record "${CLAUDE_PLUGIN_DATA}/history.jsonl" --from <temp-file>`
    The JSON holds:

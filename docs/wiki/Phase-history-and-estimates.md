@@ -11,6 +11,7 @@ Optional fields on a record, from [the CHANGELOG](https://github.com/trbbmnglg/p
 - `tokens`: the agent tokens per phase (builder, checker, shipper and model scout).
 - `guard`: whether the guard hook was active in that run, from the checker's probe. See [The guard](The-guard).
 - `caught_by`: which check caught each fix round or rollback, in order.
+- `v`: the record's schema version, a positive integer. `record` adds `v: 1` when it is missing, and `stats` ignores it, so older records read as before.
 
 ## How to use it
 
@@ -27,6 +28,7 @@ node history.mjs stats <history.jsonl>
 - Plugin version 0.3.0 added token recording to the history record ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
 - Version 0.4.0 added the `guard` field.
 - Version 0.6.0 added `caught_by`.
+- Version 0.7.0 added `v`.
 - These versions are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
 - Tests: [history.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/history.test.mjs).
 
