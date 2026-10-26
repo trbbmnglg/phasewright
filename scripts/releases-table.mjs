@@ -11,7 +11,8 @@ export const START = "<!-- releases:start -->";
 export const END = "<!-- releases:end -->";
 
 const GOLD = (name) => `$\\color{#D4AF37}{\\textbf{${name}}}$`;
-const cell = (s) => String(s).replace(/\|/g, "\\|");
+// GFM table cells: \| is a pipe and \\ is a backslash, so escape the backslash first, then the pipe.
+export const cell = (s) => String(s).replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 
 // The table as text lines, without the markers. The one entry with accent "gold" renders its name in gold.
 export function renderTable(releases) {

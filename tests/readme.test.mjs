@@ -49,9 +49,15 @@ test("the headings are exactly the agreed list, in order, with their levels", ()
   assert.equal(headingsOf(readme).filter((h) => h.level === 1).length, 0, "the H1 is the logo line only");
 });
 
+// Removes HTML tags, repeating until the text stops changing so that no tag can be rebuilt from the pieces left behind.
+const stripTags = (s, replacement = "") => {
+  let out = s;
+  for (let prev = null; out !== prev;) { prev = out; out = out.replace(/<[^>]*>/g, replacement); }
+  return out;
+};
+
 // Words outside HTML tags and URLs. A link counts as its text; tokens with no letter or digit are not words.
-const words = (md) => outsideFences(md)
-  .replace(/<[^>]*>/g, " ")
+const words = (md) => stripTags(outsideFences(md), " ")
   .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
   .replace(/https?:\/\/\S+/g, " ")
   .split(/\s+/)
@@ -164,7 +170,7 @@ test("no rename wording, no listed local term, and no numbers in prose that woul
       assert.ok(!re.test(readme), "a local denylist term is in the README");
     }
   }
-  const prose = outsideFences(readme).replace(/<[^>]*>/g, "");
+  const prose = stripTags(outsideFences(readme));
   assert.doesNotMatch(prose, /\b\d[\d,]*\s+(tests?|tokens?|checks|evals?)\b/i, "a count in prose will drift");
   assert.doesNotMatch(readme, /@[\w.-]+\.[a-z]{2,}\b/i, "no email address");
   assert.ok(readme.trimEnd().endsWith("MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg)."));

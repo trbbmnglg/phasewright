@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  deriveAuthor, wikiUrl, renderReleases, renderSidebar, validatePages, releasePageName, FEATURE_PAGES,
+  deriveAuthor, wikiUrl, renderReleases, renderSidebar, validatePages, releasePageName, FEATURE_PAGES, escapeRe, REPO_URL,
 } from "../scripts/publish-wiki.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -119,6 +119,34 @@ test("a stray file name fails", () => {
   rmSync(join(d, "notes.txt"));
   writeFileSync(join(d, "Scratch.md"), "# x\n");
   fails(d, /Scratch\.md: not an allowed page name/);
+});
+
+test("publish-wiki.mjs imports cell from releases-table.mjs and defines none of its own", () => {
+  const src = readFileSync(SCRIPT, "utf8");
+  assert.match(src, /import \{[^}]*\bcell\b[^}]*\} from "\.\/releases-table\.mjs";/);
+  assert.doesNotMatch(src, /(const|let|var|function)\s+cell\b/);
+  const table = readFileSync(join(ROOT, "scripts", "releases-table.mjs"), "utf8");
+  assert.doesNotMatch(table, /publish-wiki/, "no import cycle");
+});
+
+test("escapeRe escapes every special character, so the text matches itself and a near miss does not", () => {
+  const all = ".*+?^${}()|[]\\/-";
+  assert.equal(new RegExp("^" + escapeRe(all) + "$").test(all), true);
+  for (const ch of all) assert.equal(new RegExp("^" + escapeRe(ch) + "$").test(ch), true, `matches ${ch} itself`);
+  assert.equal(new RegExp("^" + escapeRe("a.b") + "$").test("axb"), false, "a dot is not a wildcard");
+  assert.equal(new RegExp("^" + escapeRe("a|b") + "$").test("a"), false, "a pipe is not an alternation");
+  assert.equal(new RegExp("^" + escapeRe(all) + "$").test(all.slice(0, -1) + "x"), false);
+  assert.equal(escapeRe("plain 123"), "plain 123");
+  const url = new RegExp(`^${escapeRe(REPO_URL)}/(blob|tree)/`);
+  assert.ok(url.test(`${REPO_URL}/blob/main/README.md`));
+  assert.ok(url.test(`${REPO_URL}/tree/main/docs`));
+  assert.equal(url.test(REPO_URL.replace("github.com", "githubXcom") + "/blob/main/README.md"), false);
+});
+
+test("the link validator still accepts the repository's own blob and tree links", () => {
+  const d = pagesCopy();
+  appendFileSync(join(d, "Home.md"), `\n[a](${REPO_URL}/blob/main/README.md) [b](${REPO_URL}/tree/main/docs)\n`);
+  assert.deepEqual(problems(d), []);
 });
 
 test("a broken wiki link fails", () => {

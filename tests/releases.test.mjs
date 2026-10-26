@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { renderTable, START, END } from "../scripts/releases-table.mjs";
+import { renderTable, cell, START, END } from "../scripts/releases-table.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p) => readFileSync(join(ROOT, ...p), "utf8");
@@ -57,6 +57,53 @@ test("the README table equals the table rendered from releases.json, with the go
   const row = between().split("\n").find((l) => l.includes(gold));
   assert.ok(row.startsWith("| v1.4.0 |"), "gold form is on the v1.4.0 row");
   assert.equal((between().match(/\\color/g) ?? []).length, 1);
+});
+
+// Test-side reading of a GFM table cell, scanned left to right: \\ is a backslash, \| is a pipe, anything else is itself.
+const unescapeCell = (s) => {
+  let out = "";
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === "\\" && (s[i + 1] === "\\" || s[i + 1] === "|")) { out += s[i + 1]; i++; } else out += s[i];
+  }
+  return out;
+};
+// Splits a table row on the pipes that are not escaped, the way a Markdown renderer does.
+const splitRow = (line) => {
+  const cells = [];
+  let cur = "";
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === "\\" && i + 1 < line.length) { cur += line[i] + line[i + 1]; i++; }
+    else if (line[i] === "|") { cells.push(cur); cur = ""; }
+    else cur += line[i];
+  }
+  cells.push(cur);
+  return cells.slice(1); // text before the first pipe is empty
+};
+
+test("cell escapes the backslash first and then the pipe, so the text reads back unchanged and a pipe never splits a cell", () => {
+  const B = "\\";
+  const values = ["", "plain", "a|b", `a${B}b`, `a${B}|b`, `a${B}${B}|b`, `x${B}`, "|", B, B + B, `|${B}|`];
+  for (const v of values) {
+    const out = cell(v);
+    assert.equal(unescapeCell(out), v, `round trip of ${JSON.stringify(v)}`);
+    const row = `| ${cell("first")} | ${out} | ${cell("last")} |`;
+    const got = splitRow(row);
+    assert.equal(got.length, 4, `cells in the row for ${JSON.stringify(v)}`);
+    assert.equal(unescapeCell(got[1].trim()), v, `the middle cell of ${JSON.stringify(v)}`);
+  }
+  assert.equal(cell(`a${B}|b`), `a${B}${B}${B}|b`, "backslash escaped first, then the pipe");
+  assert.equal(cell(123), "123", "a number is turned into text");
+});
+
+test("renderTable escapes cells and still renders the gold name as the exact expected string", () => {
+  const rows = renderTable([
+    { version: "v9.9.9", name: "Gattaran", accent: "gold", status: "shipped", summary: "plain" },
+    { version: "v9.9.8", name: "a|b", accent: "none", status: "shipped", summary: "x\\y|z" },
+    { version: "v9.9.7", name: "p\\q", accent: "gold", status: "shipped", summary: "s" },
+  ]).split("\n");
+  assert.equal(rows[2], "| v9.9.9 | $\\color{#D4AF37}{\\textbf{Gattaran}}$ | shipped | plain |");
+  assert.equal(rows[3], "| v9.9.8 | a\\|b | shipped | x\\\\y\\|z |");
+  assert.equal(rows[4], "| v9.9.7 | $\\color{#D4AF37}{\\textbf{p\\\\q}}$ | shipped | s |");
 });
 
 const workflow = read(".github", "workflows", "release.yml");

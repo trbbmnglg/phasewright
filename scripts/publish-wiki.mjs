@@ -21,6 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { cell } from "./releases-table.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
@@ -54,11 +55,12 @@ const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 // Links that leave the repository but are still allowed: the profile, the repository and its private-report form.
 const EXTRA_URLS = new Set([`https://github.com/${OWNER}`, REPO_URL, `${REPO_URL}/security/advisories/new`]);
 
+// Escapes every regex special character (and the slash and the hyphen) so the text matches itself.
+export const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&");
 const readText = (file) => readFileSync(file, "utf8").replace(/\r\n/g, "\n");
 const loadReleases = (root = ROOT) => JSON.parse(readFileSync(join(root, "releases.json"), "utf8")).releases;
 const shown = (releases) => releases.filter((r) => r.status !== "planned");
 const outsideFences = (md) => md.replace(/^```[^\n]*\n[\s\S]*?^```[^\n]*\n?/gm, "");
-const cell = (s) => String(s).replace(/\|/g, "\\|");
 
 // GitHub's heading anchor: lower case, markup and punctuation dropped, spaces to hyphens.
 const slug = (heading) => heading.toLowerCase().replace(/`/g, "").replace(/[^\p{L}\p{N} _-]/gu, "").replace(/ /g, "-");
@@ -154,7 +156,7 @@ export function validatePages(dir, options = {}) {
   for (const need of [...FIXED_PAGES, ...featureNames]) if (!pages.has(need)) err(`${need}.md`, "page is missing");
   for (const r of shown(releases)) if (!pages.has(releasePageName(r))) err(`${releasePageName(r)}.md`, `${r.version} is ${r.status} and needs a page`);
 
-  const denyRes = terms.map((t) => new RegExp(`(?<![A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&")}(?![A-Za-z0-9])`, "i"));
+  const denyRes = terms.map((t) => new RegExp(`(?<![A-Za-z0-9])${escapeRe(t)}(?![A-Za-z0-9])`, "i"));
   const releaseVersions = new Set(releases.map((r) => r.version));
   const anchorCache = new Map();
 
@@ -174,7 +176,7 @@ export function validatePages(dir, options = {}) {
       const target = m[1];
       if (/^mailto:/i.test(target)) continue; // already reported above
       if (/^https?:\/\//i.test(target)) {
-        const repo = target.match(new RegExp(`^${REPO_URL.replace(/[.]/g, "\\.")}/(blob|tree)/([^/]+)/([^#]*)(?:#(.*))?$`));
+        const repo = target.match(new RegExp(`^${escapeRe(REPO_URL)}/(blob|tree)/([^/]+)/([^#]*)(?:#(.*))?$`));
         if (repo) {
           const [, kind, ref, rawPath, anchor] = repo;
           if (ref !== "main" && !releaseVersions.has(ref)) { err(f, `link to an unknown ref: ${target}`); continue; }
