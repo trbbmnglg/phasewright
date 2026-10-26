@@ -46,7 +46,7 @@ Reply /phased-shipping:run approve to run the commands listed above.
 
 Everything here is a plain Markdown file or folder you can read, copy and adapt.
 
-**Skills** (`skills/`), each a folder:
+**Skills** (`skills/`), each a folder containing a `SKILL.md`:
 
 | Skill | What it does |
 |---|---|

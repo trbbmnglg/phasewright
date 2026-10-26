@@ -3,7 +3,7 @@
 // working links and anchors, a link behind every claim, the compatibility table, the Releases markers and the wording rules.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -170,6 +170,13 @@ test("no trace of an earlier name, no listed local term, and no numbers in prose
   assert.doesNotMatch(prose, /\b\d[\d,]*\s+(tests?|tokens?|checks|evals?)\b/i, "a count in prose will drift");
   assert.doesNotMatch(readme, /@[\w.-]+\.[a-z]{2,}\b/i, "no email address");
   assert.ok(readme.trimEnd().endsWith("MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg)."));
+});
+
+test("What's inside says each skill is a folder with a SKILL.md, and every skill folder has one", () => {
+  assert.match(section(readme, "What's inside"), /each a folder containing a `SKILL\.md`/);
+  const dirs = readdirSync(join(ROOT, "skills"), { withFileTypes: true }).filter((d) => d.isDirectory());
+  assert.ok(dirs.length > 0);
+  for (const d of dirs) assert.ok(existsSync(join(ROOT, "skills", d.name, "SKILL.md")), `skills/${d.name}/SKILL.md exists`);
 });
 
 test("the excerpt of a phase at preview is present, in a code fence, and labelled as abridged", () => {
