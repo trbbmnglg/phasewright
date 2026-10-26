@@ -1,12 +1,52 @@
-# Phasewright
+<h1 align="center"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/brand/phasewright-lockup-dark.svg"><source media="(prefers-color-scheme: light)" srcset="docs/brand/phasewright-lockup-light.svg"><img alt="Phasewright" src="docs/brand/phasewright-lockup-light.svg" width="560"></picture></h1>
 
-Reusable skills, agents and plugins for AI coding assistants. Each one is a plain Markdown file or folder you can read, copy and adapt. They work in Claude Code, VS Code (GitHub Copilot) and Cursor, and in other tools that load skills from `SKILL.md` folders.
+Skills, agents and plugins that keep AI-assisted coding work small, checked and reversible.
 
-MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
+## The problem
+
+Ask an AI coding assistant for a big change and it tends to build it all in one go, skip checks, lose the plan between sessions and ship with no way back. Nobody can see what it was allowed to do. Phasewright keeps the work small, checked and reversible.
+
+## How it helps
+
+- Small phases with one deploy each, and the plan kept on disk. See the [phased-shipping README](plugins/phased-shipping/README.md).
+- A baseline before the build and a comparison after it, so only new failures block. See [What you get](plugins/phased-shipping/README.md#what-you-get).
+- A preview you approve, bound to the exact commands you saw, then a production check and an automatic rollback. See [How approval works](plugins/phased-shipping/README.md#how-approval-works).
+- The model and effort that fit each kind of task, with estimates calibrated from your own history. See [How the model is enforced](plugins/phased-shipping/README.md#how-the-model-is-enforced).
+
+## Quick start
+
+```bash
+claude plugin marketplace add trbbmnglg/phasewright
+claude plugin install phased-shipping@phasewright
+```
+
+Then ask for a feature and run the plan skill, `/phased-shipping:plan`. Other tools and single downloads are under [Install in your tool](#install-in-your-tool).
+
+## What a phase looks like
+
+Abridged from a real run of this project's own tooling:
+
+```
+Phase 7b preview
+  Gates       baseline pass (285 tests) · compare pass, 0 new failures (294 tests)
+              review standard · fix rounds 0
+  Models      builder sonnet (high) · checks haiku (low)
+  Time        0.66 h so far, 1.3 h estimated
+  Commands    1. git add -A -- library.json plugins tests
+              2. git commit -F <message file>
+              3. git push origin main
+  Hash        Commands hash: 79a48e698d6b
+  Prod check  CI green · issue closed · remote file matches · copies synced
+  Rollback    git revert --no-edit HEAD && git push origin main
+
+Reply /phased-shipping:run approve to run the commands listed above.
+```
 
 ## What's inside
 
-**Skills** (`skills/`), each a folder with a `SKILL.md`:
+Everything here is a plain Markdown file or folder you can read, copy and adapt.
+
+**Skills** (`skills/`), each a folder:
 
 | Skill | What it does |
 |---|---|
@@ -27,7 +67,7 @@ MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
 
 `library.json` is generated from these files and lists every item with its install steps per tool.
 
-## Install
+## Install in your tool
 
 ### Claude Code
 
@@ -40,7 +80,7 @@ claude plugin install free-resources@phasewright     # the free-resources plugin
 
 Or copy a skill folder into `.claude/skills/` (project) or `~/.claude/skills/` (personal), and an agent file into `.claude/agents/` or `~/.claude/agents/`.
 
-The phased-shipping plugin needs Claude Code v2.1.292 or later, because it sets effort per call; older versions run subagents at their file's effort.
+The phased-shipping plugin needs Claude Code v2.1.292 or later, because it sets effort per call. Older versions run subagents at their file's effort.
 
 ### VS Code with GitHub Copilot
 
@@ -58,17 +98,26 @@ Copy a skill folder into your tool's skills folder.
 
 Every release attaches one zip per item (`skill-planner.zip`, `agent-debugger.zip`, ...). Each zip holds the item in its own folder: unzip it into your skills or agents folder.
 
-## Compatibility
+## What works where
 
-| | Skills | Agents | Plugins |
-|---|---|---|---|
-| Claude Code | full | full | full |
-| VS Code Copilot | full | full (reads `.claude/agents`) | skills only |
-| Cursor | full | none | skills only |
+| Tool | Skills | Agents | Plugins | Tried by the maintainer |
+|---|---|---|---|---|
+| Claude Code | full | full | full | yes, on Windows |
+| VS Code with GitHub Copilot | full | full (reads `.claude/agents`) | skills only | not yet |
+| Cursor | full | none | skills only | not yet |
 
-Two caveats:
-- The Cursor marketplace files (`.cursor-plugin/`) follow Cursor's published layout, but they haven't been tested end to end. Copying skill folders is the supported path.
+- macOS is untested. The [free-resources README](plugins/free-resources/README.md#compatibility) says what was and was not tried.
+- The Cursor marketplace files (`.cursor-plugin/`) follow Cursor's published layout, but they are untested end to end. Copying skill folders is the supported path.
 - Settings such as `model:` and `disable-model-invocation:` are Claude Code and Copilot features. Tools that don't know them ignore them.
+
+## What it will not do
+
+- It is not a sandbox. The guard is an extra layer on top of the agents' own rules, and it has known gaps: see [The guard](plugins/phased-shipping/README.md#the-guard) and [Limits](plugins/phased-shipping/README.md#limits).
+- It never commits, pushes or deploys without your approval: see [How approval works](plugins/phased-shipping/README.md#how-approval-works).
+- It never closes your processes. `free-resources` only reports: see [What this runs on your machine](plugins/free-resources/README.md#what-this-runs-on-your-machine).
+- It sends none of your files anywhere. The one network use is a web search for current model guidance: see [What it touches](plugins/phased-shipping/README.md#what-it-touches).
+- The plugins do not run in Copilot or Cursor, only the skills do: see [Compatibility](plugins/free-resources/README.md#compatibility).
+- Releases are not signed and have no build provenance yet: see [SECURITY.md](SECURITY.md#how-releases-are-built).
 
 ## Releases
 
@@ -91,6 +140,10 @@ Releases are numbered by version and named. The version is the git tag.
 | v1.10.0 | Tuguegarao | planned | Parked work and ideas that are not scheduled. |
 <!-- releases:end -->
 
+## Security
+
+To report a vulnerability, or to see how releases are built, read [SECURITY.md](SECURITY.md).
+
 ## Develop
 
 ```bash
@@ -101,3 +154,7 @@ npm run manifest   # regenerate library.json after changing an item
 - **Each skill** needs `name` (the folder name), `description` (max 1024 characters), `license: MIT` and a `metadata` block (`title`, `tags`, `featured`, `order`, `version`). Quote any description that contains `: ` or double quotes.
 - **The lint** also scans every file for emails, phone numbers, keys, machine paths and any term listed in a local `scripts/denylist.local.txt` (git-ignored).
 - **Releases:** push a tag like `v1.0.1`. The release workflow verifies the repo, zips every item and attaches the zips and `library.json`.
+
+## License
+
+MIT licensed. Made by [trbbmnglg](https://github.com/trbbmnglg).
