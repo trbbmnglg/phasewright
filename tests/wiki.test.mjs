@@ -16,8 +16,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WIKI = join(ROOT, "docs", "wiki");
 const SCRIPT = join(ROOT, "scripts", "publish-wiki.mjs");
 const releases = JSON.parse(readFileSync(join(ROOT, "releases.json"), "utf8")).releases;
-// Built at run time so the earlier id never appears as one string in the repo.
-const STALE_ID = ["agent", "library"].join("-");
 const NOREPLY = "users.noreply.github.com";
 
 const scratch = [];
@@ -97,7 +95,6 @@ test("the pages make no claim that drifts or that the plugins cannot keep", () =
     const prose = text.replace(/^```[^\n]*\n[\s\S]*?^```[^\n]*\n?/gm, "");
     assert.doesNotMatch(prose, /\b\d[\d,]*\s+(tests?|tokens?|checks|evals?)\b/i, `${f}: a count in prose will drift`);
     assert.doesNotMatch(text, /nothing leaves|nothing is sent|sends nothing|never leaves/i, `${f}: the model scout runs a web search`);
-    assert.ok(!text.toLowerCase().includes(STALE_ID), `${f}: earlier id`);
   }
   assert.match(read(WIKI, "_Footer.md"), /Local-first: your files stay on your machine\./);
 });
@@ -152,7 +149,7 @@ test("an email address or a mailto link fails", () => {
 });
 
 test("a forbidden word fails, without printing a denylist term", () => {
-  for (const word of ["Formerly", "was renamed", STALE_ID, "the real name"]) {
+  for (const word of ["Formerly", "was renamed", "the real name"]) {
     const d = pagesCopy();
     appendFileSync(join(d, "Home.md"), `\n${word}\n`);
     fails(d, /Home\.md: forbidden word/);

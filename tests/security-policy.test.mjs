@@ -11,8 +11,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p) => readFileSync(join(ROOT, ...p), "utf8");
 const policy = () => read("SECURITY.md");
 const section = (md, h) => (md.split(/^## /m).find((s) => s.startsWith(h)) ?? "");
-// Built at run time so the earlier id never appears as one string in the repo.
-const STALE_ID = ["agent", "library"].join("-");
 
 test("SECURITY.md is at the root and nothing shadows it", () => {
   assert.ok(existsSync(join(ROOT, "SECURITY.md")));
@@ -39,7 +37,6 @@ test("it links private reporting and a no-email fallback, and has no email", () 
 
 test("it makes no promise one maintainer can't keep and uses no forbidden words", () => {
   const md = policy();
-  assert.ok(!md.toLowerCase().includes(STALE_ID), "the earlier id must not appear");
   for (const re of [/\bPGP\b/, /bug bounty/i,
     /\b\d+\s*(hours?|hrs?)\b/i, /24\/7/, /\bwe guarantee\b|\bguaranteed\b/i]) {
     assert.doesNotMatch(md, re);

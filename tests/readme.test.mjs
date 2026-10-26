@@ -12,8 +12,6 @@ import { START, END, renderTable } from "../scripts/releases-table.mjs";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (...p) => readFileSync(join(ROOT, ...p), "utf8").replace(/\r\n/g, "\n");
 const readme = read("README.md");
-// Built at run time so the earlier id never appears as one string in the repo.
-const STALE_ID = ["agent", "library"].join("-");
 
 // The README without fenced code blocks (the fences and what is inside them).
 const outsideFences = (md) => md.replace(/^```[^\n]*\n[\s\S]*?^```[^\n]*\n?/gm, "");
@@ -152,9 +150,9 @@ test("the Releases markers are intact, the table equals the one rendered from re
   assert.equal(r.status, 0, r.stderr);
 });
 
-test("no trace of an earlier name, no listed local term, and no numbers in prose that would drift", () => {
+test("no rename wording, no listed local term, and no numbers in prose that would drift", () => {
   const lower = readme.toLowerCase();
-  for (const w of ["formerly", "renamed", STALE_ID]) assert.ok(!lower.includes(w), `the README contains "${w}"`);
+  for (const w of ["formerly", "renamed"]) assert.ok(!lower.includes(w), `the README contains "${w}"`);
   const deny = join(ROOT, "scripts", "denylist.local.txt");
   if (existsSync(deny)) {
     const terms = readFileSync(deny, "utf8").split(/\r?\n/).map((s) => s.trim()).filter((s) => s && !s.startsWith("#"));

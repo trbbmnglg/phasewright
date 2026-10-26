@@ -47,9 +47,8 @@ export const RELEASE_HEADINGS = ["## Status", "## What shipped", "## Notes"];
 export const GENERATED_PAGES = ["Releases", "_Sidebar"];
 const FIXED_PAGES = ["Home", "Releases", "_Sidebar", "_Footer"];
 
-// Words no page may contain. The earlier id is built at run time so it never sits in this file as one string.
-const STALE_ID = ["agent", "library"].join("-");
-const FORBIDDEN = ["formerly", "renamed", STALE_ID, "real name"];
+// Words no page may contain. Terms from the local list are checked separately, below.
+const FORBIDDEN = ["formerly", "renamed", "real name"];
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 // Links that leave the repository but are still allowed: the profile, the repository and its private-report form.
 const EXTRA_URLS = new Set([`https://github.com/${OWNER}`, REPO_URL, `${REPO_URL}/security/advisories/new`]);

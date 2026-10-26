@@ -43,9 +43,8 @@ test("releases.json: versions, names, statuses and dates are well formed", () =>
   assert.equal(accented[0].accent, "gold");
 });
 
-test("releases.json and the README Releases section carry no stale wording", () => {
-  const stale = ["agent", "library"].join("-");
-  const words = ["renamed", "formerly", stale];
+test("releases.json and the README Releases section carry no rename wording", () => {
+  const words = ["renamed", "formerly"];
   for (const [label, body] of [["releases.json", releasesText], ["README Releases section", releasesSection()]]) {
     for (const w of words) assert.ok(!body.toLowerCase().includes(w), `${label} contains "${w}"`);
   }
