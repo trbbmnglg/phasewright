@@ -18,6 +18,7 @@
 // Commit messages are read as data and never put into a shell command.
 
 import { execFileSync } from "node:child_process";
+import { commitShas } from "./board-range.mjs";
 
 const args = process.argv.slice(2);
 const opt = (name, fallback) => { const i = args.indexOf(`--${name}`); return i >= 0 ? args[i + 1] : fallback; };
@@ -38,9 +39,7 @@ const git = (...a) => execFileSync("git", a, { encoding: "utf8" });
 function commits() {
   if (opt("message")) return [{ sha: opt("sha", "0000000"), message: opt("message").replace(/\\n/g, "\n") }];
   const range = opt("range") || (process.env.BEFORE && process.env.AFTER ? `${process.env.BEFORE}..${process.env.AFTER}` : "HEAD~1..HEAD");
-  const firstPush = /^0+\.\./.test(range);           // a brand-new branch has no "before": read its latest commit
-  const list = git("log", "--format=%H", ...(firstPush ? ["-1", range.split("..")[1]] : [range])).split("\n").filter(Boolean);
-  return list.reverse().map((sha) => ({ sha, message: git("log", "-1", "--format=%B", sha) }));
+  return commitShas(range, git).map((sha) => ({ sha, message: git("log", "-1", "--format=%B", sha) }));
 }
 
 function parse(message) {
