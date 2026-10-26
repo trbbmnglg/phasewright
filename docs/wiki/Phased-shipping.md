@@ -2,7 +2,7 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.6.2 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.6.3 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
@@ -48,6 +48,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.5.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Approval bound to the commands you saw at the preview. |
 | 0.6.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | `caught_by` in the phase history, a rule for long commands, a rule for a missing shell. |
 | 0.6.1, 0.6.2 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The checker times each command and reads the exit code and duration from one line. |
+| 0.6.3 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The README's Limits say what has been seen of the guard in real runs; documentation only. |
 
 ## Limits
 

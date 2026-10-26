@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.2");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.6.3");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -140,8 +140,11 @@ test("the README describes the guard, its cost and its limits, and no longer say
   assert.match(readme, /allowManagedHooksOnly/);
   assert.match(readme, /It is not a sandbox/);
   assert.match(readme, /lists are not exhaustive/);
-  assert.match(readme, /Not yet seen firing in a real run/);
+  assert.match(readme, /Seen firing in real runs, on one setup/);
+  assert.match(readme, /not been checked on macOS/);
   assert.match(readme, /sample payloads/);
+  assert.doesNotMatch(readme, /Not yet seen firing in a real run/);
+  assert.doesNotMatch(readme, /Hooks can't run on the machine this was built on/);
 });
 
 test("run starts the checker with the probe, shows a Guard row that warns, and records guard", () => {
@@ -325,6 +328,15 @@ test("phase 7g: the checker reports durations and captures exit codes; the READM
   assert.doesNotMatch(readme, /The agents don't read the clock\. /);
   const log = text("CHANGELOG.md");
   assert.ok(log.indexOf("## 0.6.2") >= 0 && log.indexOf("## 0.6.2") < log.indexOf("## 0.6.0"));
+});
+
+test("phase 7k: the CHANGELOG has 0.6.3 above 0.6.2 and says it is documentation only", () => {
+  const log = text("CHANGELOG.md");
+  const at = log.indexOf("## 0.6.3");
+  assert.ok(at >= 0 && at < log.indexOf("## 0.6.2"));
+  const entry = log.slice(at, log.indexOf("## 0.6.2"));
+  assert.match(entry, /No guard rule changed/);
+  assert.match(entry, /Documentation only/);
 });
 
 test("phase 7b: the eval run-no-shell-not-verified has a prompt and at least two graders with a typed llm grader", () => {

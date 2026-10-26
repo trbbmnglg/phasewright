@@ -102,6 +102,13 @@ test("the pages make no claim that drifts or that the plugins cannot keep", () =
   assert.match(read(WIKI, "_Footer.md"), /Local-first: your files stay on your machine\./);
 });
 
+test("the page versions follow plugin.json, and no page says the guard has not been seen firing", () => {
+  const version = JSON.parse(readFileSync(join(ROOT, "plugins", "phased-shipping", ".claude-plugin", "plugin.json"), "utf8")).version;
+  assert.ok(read(WIKI, "Phased-shipping.md").includes(`The current plugin version is ${version}`));
+  assert.ok(read(WIKI, "Release-1.1.0-Baggao.md").includes(`plugin version ${version}`));
+  for (const f of readdirSync(WIKI)) assert.doesNotMatch(read(WIKI, f), /(has not|not yet) been seen firing/i, f);
+});
+
 // ── each rule fails on a broken copy ────────────────────────────────────────
 const fails = (dir, pattern, options) => {
   const found = problems(dir, options);

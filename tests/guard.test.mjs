@@ -123,7 +123,7 @@ test("the real script, run as a process: deny output, allow output, exit codes a
   assert.equal(pushDeny.stdout.trim().split("\n").length, 1, "one JSON line");
   assert.deepEqual(parsed, { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: parsed.hookSpecificOutput.permissionDecisionReason } });
   assert.match(parsed.hookSpecificOutput.permissionDecisionReason, /^git-push: /);
-  assert.equal(JSON.parse(probe.stdout).hookSpecificOutput.permissionDecisionReason, "phased-shipping guard is active for checker (v0.6.2). This was a self-test; nothing ran.");
+  assert.equal(JSON.parse(probe.stdout).hookSpecificOutput.permissionDecisionReason, "phased-shipping guard is active for checker (v0.6.3). This was a self-test; nothing ran.");
   assert.equal(shipperPush.stdout, "", "push is the shipper's job");
   assert.match(JSON.parse(shipperForce.stdout).hookSpecificOutput.permissionDecisionReason, /^shipper-force-push: /);
   for (const r of [main, other, empty, junk, psPrefix]) assert.equal(r.stdout, "");
@@ -302,9 +302,9 @@ test("the probe is denied for every role with the active message", () => {
   for (const role of ROLES) {
     const r = guard(bash(`${P}${role}`, PROBE_COMMAND));
     assert.equal(r.status, 0);
-    assert.equal(reasonOf(r), `phased-shipping guard is active for ${role} (v0.6.2). This was a self-test; nothing ran.`, role);
+    assert.equal(reasonOf(r), `phased-shipping guard is active for ${role} (v0.6.3). This was a self-test; nothing ran.`, role);
   }
-  assert.equal(GUARD_VERSION, "0.6.2");
+  assert.equal(GUARD_VERSION, "0.6.3");
   assert.equal(PROBE_COMMAND, "echo phased-shipping-guard-probe");
   // Trailing whitespace is fine; anything else is a different command.
   assert.ok(denied(guard(bash(`${P}checker`, `${PROBE_COMMAND}\n`))));

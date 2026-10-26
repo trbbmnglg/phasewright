@@ -25,7 +25,7 @@ It needs no setup beyond installing the plugin ([Install](https://github.com/trb
 
 - Plugin version 0.4.0 added the guard hook, the guard probe and the personal-copy install ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
 - Version 0.5.0 added two builder-only rules that protect `PHASES.md`, the `phase-*.md` plan files and the approval records ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). See [Approval check](Approval-check).
-- Versions 0.6.0 to 0.6.2 changed no guard rule; the guard version is kept equal to the plugin version ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
+- Versions 0.6.0 to 0.6.3 changed no guard rule; the guard version is kept equal to the plugin version ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
 - These are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
 
 ## Limits
@@ -35,6 +35,7 @@ It needs no setup beyond installing the plugin ([Install](https://github.com/trb
 - **It needs node.** If `node` is not on the PATH, the plugin's hook cannot start and Claude Code lets the call go ahead; the personal copies block instead, on v2.1.295 or later.
 - **The lists are not exhaustive.** The publish and deploy lists are denylists, so a tool or flag that is not listed gets through. It is an extra layer on top of the agents' own rules and `run`'s gates.
 - **It over-denies on purpose.** An unclear form is denied, and a false deny costs the agent one retry.
+- **Seen firing on one setup only.** The probe was blocked, and one shipper command outside its git list was denied, in this project's own runs on Windows with Claude Code 2.1.310; other platforms and versions are unchecked ([Limits](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#limits)).
 - **It adds a delay to every call** in every session where the plugin is enabled, because each call starts one node process ([What it touches](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#what-it-touches)).
 
 ## Source

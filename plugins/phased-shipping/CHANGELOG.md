@@ -2,6 +2,12 @@
 
 Newest first.
 
+## 0.6.3
+
+### Changed
+- The README's Limits no longer say the guard has never been seen firing in a real run. They now say what was seen (the self-test probe blocked at the start of recent runs, and one shipper command outside its git list denied, on one Windows setup with Claude Code 2.1.310) and what has not been checked (other platforms and Claude Code versions).
+- The guard version is 0.6.3, kept equal to the plugin version. No guard rule changed. Documentation only.
+
 ## 0.6.2
 
 ### Changed
