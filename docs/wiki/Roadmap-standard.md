@@ -14,19 +14,27 @@ Check a roadmap. This only reads:
 /phased-shipping:roadmap check
 ```
 
-Standardize an older roadmap. It shows what would change, asks you, makes a backup next to the file and only then writes:
+Standardize an older roadmap. It shows what would change, asks you, keeps copies in a `.roadmap-backups/` folder next to the file and only then writes:
 
 ```text
 /phased-shipping:roadmap standardize
 ```
 
+Put a kept copy back. It lists the copies, shows what would change, asks you, saves the current file first and only then restores:
+
+```text
+/phased-shipping:roadmap restore
+```
+
 - `check` lists each problem with its line number. Errors are only reported for standard tables; a legacy table gives a notice.
 - `standardize` adds the marker line, changes the header cells it knows, pads short rows and rewrites each Status cell to one of the four values. A Status it cannot place, such as a stray symbol, is never guessed: you choose one of the four. A table without a Status column gets one, with every row set to `planned`.
+- `restore` takes `original` (the first version the script ever saw), `prev` (the file before the last `set`) or one name from its list. It never takes a path. A restore saves the file as it was first, so a restore can itself be undone.
 - `plan` writes the marker and runs `check` on the roadmap it writes. `run` marks a phase `in progress` and, at close, `shipped` with the commit and the hours, one row at a time, on a standard table only ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#the-roadmap-format)).
 
 ## What shipped when
 
-- Plugin version 0.7.0 added the format, the script, the skill, the two evals and the `v` field in the phase history ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). See [Phase history and estimates](Phase-history-and-estimates).
+- Plugin version 0.7.1 moved every backup into `.roadmap-backups/` next to the file, which git ignores, keeps the first version of a roadmap as `.original` for good, keeps the version before each `set` as `.prev`, and added `restore` and a check that the file did not change while it was being written ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
+- Version 0.7.0 added the format, the script, the skill, the two evals and the `v` field in the phase history. See [Phase history and estimates](Phase-history-and-estimates).
 - These are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
 - Tests: [roadmap.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/roadmap.test.mjs).
 
@@ -34,8 +42,11 @@ Standardize an older roadmap. It shows what would change, asks you, makes a back
 
 - Tables only, read line by line: it is not a full Markdown parser, and it does not read the prose around the tables ([Limits](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#limits)).
 - It works on one roadmap file in one project. `--root` makes the script refuse a file outside the project folder, and the skill always passes it.
-- `standardize` cannot know that you said yes. The skill asks you before it writes, and only you start the skill. The two evals that check this have not been run against a model yet.
-- `standardize --write` writes `<file>.bak-<timestamp>` next to the file, and refuses if that name already exists. `set` rewrites one row and makes no backup.
+- `standardize` cannot know that you said yes. The skill asks you before it writes, and only you start the skill. `restore` asks the same way.
+- Every write keeps copies first, in `.roadmap-backups/` next to the file: `<file>.original` once (the script never overwrites, renames or deletes it), `<file>.prev` for `set`, `<file>.bak-<timestamp>` for `standardize --write`, and `<file>.before-restore-<timestamp>` for `restore --write`. If a copy cannot be made, nothing is written. Each copy is written whole and flushed to disk before it gets its final name, so a name never holds half a file; if a `.incomplete` marker is left in the folder, writes refuse until you have looked. The folder's `.gitignore` holds only `*` (the script warns if it finds something else), and the folder holds copies of your roadmap text, so do not share it.
+- The copies are local files on the same disk, not an off-machine backup, and the script never prunes them. You may delete the dated copies, and `.original` is the one to keep, unless an `.incomplete` marker says it may be cut short.
+- Just before it replaces the file, the script reads it again and stops if it changed since the command read it. That narrows the window when two sessions write one file; it is not a lock.
+- The three evals that check the yes rule have not been run against a model yet.
 - A legacy roadmap is left alone by `run`, which says so once: standardize it first.
 
 ## Source

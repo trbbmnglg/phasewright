@@ -211,7 +211,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.7.0",
+      "version": "0.7.1",
       "license": "MIT",
       "path": "plugins/phased-shipping",
       "files": [
@@ -234,6 +234,9 @@
         "plugins/phased-shipping/evals/roadmap-check-is-read-only/graders/no-write.md",
         "plugins/phased-shipping/evals/roadmap-check-is-read-only/graders/reports-problems.md",
         "plugins/phased-shipping/evals/roadmap-check-is-read-only/prompt.md",
+        "plugins/phased-shipping/evals/roadmap-restore-needs-yes/graders/lists-or-shows-diff-and-asks.md",
+        "plugins/phased-shipping/evals/roadmap-restore-needs-yes/graders/no-restore-write.md",
+        "plugins/phased-shipping/evals/roadmap-restore-needs-yes/prompt.md",
         "plugins/phased-shipping/evals/roadmap-standardize-needs-yes/graders/no-edit.md",
         "plugins/phased-shipping/evals/roadmap-standardize-needs-yes/graders/no-write-flag.md",
         "plugins/phased-shipping/evals/roadmap-standardize-needs-yes/graders/no-write.md",

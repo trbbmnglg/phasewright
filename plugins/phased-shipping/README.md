@@ -8,7 +8,7 @@ A Claude Code plugin for shipping work in small phases, with one deploy per phas
 |---|---|---|
 | `/phased-shipping:plan` (skill) | opus, high | Sizes the work: trivial (skip), small (one phase) or large (roadmap). The roadmap has priority, urgency, a calibrated estimate, and model and effort per task type (plan, build, tests, browser checks, review, commit, deploy). It writes one detailed phase plan at a time. Claude can invoke it on its own. |
 | `/phased-shipping:run` (skill) | sonnet, medium | Runs one phase: gates, a baseline, the build, checks against the baseline, and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. It records the outcome to the phase history. Manual only. |
-| `/phased-shipping:roadmap` (skill) | sonnet, low | Checks a project's roadmap file against the roadmap format, or standardizes an older roadmap into it. `check` only reads. `standardize` prints a diff and writes only after you say yes, with a backup next to the file. Manual only. |
+| `/phased-shipping:roadmap` (skill) | sonnet, low | Checks a project's roadmap file against the roadmap format, or standardizes an older roadmap into it, or puts a kept copy back. `check` only reads. `standardize` and `restore` print a diff and write only after you say yes, with copies kept first in `.roadmap-backups/` next to the file. Manual only. |
 | `model-scout` (agent) | sonnet, medium | Combines three sources: which models you can use, current official guidance, and how each model actually did in your phase history. Refreshes on first use, a provider change, a retirement within 60 days, or after 30 days. |
 | `builder` (agent) | per phase plan | Implements one approved plan. Never commits or deploys. |
 | `checker` (agent) | haiku, low | Runs typecheck, lint, tests, build and browser checks, first as a baseline and then compared against it. Only new failures block. Results come from exit codes. |
@@ -81,7 +81,7 @@ A project keeps its roadmap as Markdown tables in `PHASES.md`. The roadmap forma
 
 - A table is a **standard** table when the line above its header is exactly `<!-- phased-shipping:roadmap v1 -->`. It needs the columns `#`, `Phase` and `Status`; `Status` is one of `planned`, `in progress`, `shipped` or `parked`. Other known columns are optional, and a column the reader doesn't know is ignored and kept as it is.
 - A table without the marker is **legacy**. It is read as well as possible and reported with a notice, never rejected.
-- `/phased-shipping:roadmap check` lists the problems, with line numbers, and edits nothing. `/phased-shipping:roadmap standardize` turns a legacy table into a standard one: it shows what would change, asks you, makes `<file>.bak-<timestamp>` next to the file and only then writes. A Status it can't place is never guessed: you choose.
+- `/phased-shipping:roadmap check` lists the problems, with line numbers, and edits nothing. `/phased-shipping:roadmap standardize` turns a legacy table into a standard one: it shows what would change, asks you, keeps your first version and a dated copy in `.roadmap-backups/` next to the file and only then writes. A Status it can't place is never guessed: you choose. `/phased-shipping:roadmap restore` lists the kept copies, shows what putting one back would change, asks you, saves the current file first and only then restores.
 - `plan` writes the marker and runs `check` on the roadmap it writes. `run` marks the phase `in progress` and, at close, `shipped` with the commit and the hours, one row at a time, on a standard table only. A legacy roadmap is left alone, and `run` says so once.
 - The reader is one script, `roadmap.mjs`, with no dependencies. Other tools can import its `parseRoadmap` rather than write a parser.
 
@@ -93,7 +93,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - Your project: the files named in the phase plan, plus the manifest, README and source files the planner needs to size the work.
 - Settings and environment: the `model`, `availableModels` and `effortLevel` keys of your Claude Code settings files, any model convention in `CLAUDE.md`, and the values of only these environment variables: `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL*`, `CLAUDE_CODE_EFFORT_LEVEL` and `CLAUDE_CODE_USE_*`. It never prints the rest of the environment or of those files.
 - The phase history file, and the approval records in the data folder (see How approval works).
-- The roadmap file (`PHASES.md`), through `roadmap.mjs`, for `check`, `read`, and the plan and run skills. It prints only the file's base name.
+- The roadmap file (`PHASES.md`), through `roadmap.mjs`, for `check`, `read`, and the plan and run skills. It prints only the file's base name. `restore` also lists and reads the copies in `.roadmap-backups/` next to it (and any `<file>.bak-<timestamp>` copy an earlier version left beside the file).
 - **The guard hook** reads nothing but the call it is handed (the tool name, the command or the file path, the working folder and the agent type). It runs on every Bash, PowerShell, Write, Edit and NotebookEdit call in any session where the plugin is enabled, your main session included, where it allows at once. Each call starts one node process. Measured on the allow path (a main-session payload, 30 runs, on a busy Windows laptop): median 1341 ms, p95 2667 ms. An empty node script on the same laptop took a median of 1298 ms, so about 40 ms is the guard's own work and the rest is node starting, which varies a lot by machine. Expect a delay on every Bash, PowerShell, Write and Edit call, in every session where the plugin is enabled. It writes no files and makes no network calls.
 
 **Files it writes**
@@ -102,7 +102,9 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - The checker's baseline file and its logs or screenshots, at the paths the brief names.
 - The phase history, `history.jsonl`: `${CLAUDE_PLUGIN_DATA}/history.jsonl` for a plugin install, `~/.claude/phased-shipping/history.jsonl` for personal copies. A phase record is one line with the estimate, agent time, build model and effort, fix rounds, prod outcome and, from 0.3.0, the agent tokens per phase. It holds no code and no project text beyond the project name.
 - A temporary JSON file that holds the record while the history script appends it.
-- The roadmap file, in two ways. `standardize --write` writes `<file>.bak-<timestamp>` (a copy of the file as it was) and then the file itself, through a `.tmp` file, and only after you say yes. `set` rewrites one row of one standard table, the same way, with no backup. No other file is created. Lines outside the chosen tables are never touched, and `--root` makes the script refuse a file outside the project folder.
+- The roadmap file, in three ways, always through a temp file in the backup folder (`.roadmap-backups/<file>.tmp`) and a rename. The file keeps its own permissions. `standardize --write` rewrites the tables you chose, and `restore --write` puts a kept copy back, both only after you say yes. `set` rewrites one row of one standard table.
+- The backup folder, `.roadmap-backups/`, next to the roadmap file. It holds copies of your roadmap text, so don't share it. Its `.gitignore` is a single line, `*`, so git never lists or commits anything in it. Before the first write of any kind the script keeps `<file>.original`: the file as the script first saw it. It is created once, and the script never overwrites, renames or deletes it. `set` also keeps `<file>.prev` (the file as it was before that `set`, replaced each time). `standardize --write` keeps `<file>.bak-<timestamp>`. `restore --write` keeps `<file>.before-restore-<timestamp>`, so a restore can itself be undone. If any of these copies cannot be made, nothing is written to the roadmap and the script exits 1. Each copy is written whole under a temporary name, flushed to disk, and only then given its final name, so a name never holds half a file; where the disk cannot do that (FAT and some network drives), a `<copy>.incomplete` marker is made first and removed last, and a marker left behind makes every later write refuse until you have looked: you compare `<file>.original` with the roadmap, delete it too if it is shorter, different or you are unsure (it is made again from the current roadmap), and then delete the marker. For any other marker you delete the copy it names, then the marker. Copies are readable by you only where the system has file permissions. If the folder's `.gitignore` holds something other than `*`, the script warns and goes on; if it is a folder or a link it refuses. The script never deletes the dated copies; you may delete them, and `.original` is the one to keep, unless an `.incomplete` marker says it may be cut short.
+- No other file is created. Lines outside the chosen tables are never touched, and `--root` makes the script refuse a file outside the project folder.
 - Approval records: `<data folder>/previews/<key>.planned.json` and `<key>.previewed.json`, written by `commands-hash.mjs`. Each holds the hash, the text of the plan's `## Commands` section, the plan path and a timestamp. The script writes nothing else and makes no network calls.
 - Personal copies only: the guard scripts under `~/.claude/phased-shipping/hooks/` and the `hooks:` block in each `ps-*` agent file. `sync-personal.mjs` writes both, marks them as generated, and removes only what it marked.
 - Your source files, but only through the builder, and only to implement the approved plan.
@@ -112,7 +114,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - The plan's baseline and verify commands, through the checker. The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
 - The plan's commit, deploy, prod-check and rollback commands, through the shipper, and only after `/phased-shipping:run approve`. A push needs `/phased-shipping:run push` or a plan whose deploy step is the push, and your approval.
 - The history script (`history.mjs`), with `stats` and `record`.
-- The roadmap script (`roadmap.mjs`), with `read`, `check`, `standardize` and `set`. It uses no network.
+- The roadmap script (`roadmap.mjs`), with `read`, `check`, `standardize`, `set` and `restore`. It uses no network.
 - The approval script (`commands-hash.mjs`), to hash the plan's commands and record or check them.
 - The guard probe, `echo phased-shipping-guard-probe`, through the checker. It prints a word and changes nothing.
 
@@ -152,7 +154,7 @@ When an agent stops at its limit, `run` stops too. It reports what was done and 
 
 A checker can report `UNFINISHED` or `TIMED OUT` for a command that was still running after its bounded wait (10 minutes, or 5 reads of a background output file). That is not a pass: `run` runs the command itself in the foreground and marks the row "(re-run in main)". The long-command rule is a prompt change, so a model can still ignore it.
 
-The roadmap reader works on tables only, line by line: it is not a full Markdown parser, and it doesn't read the prose around the tables. It takes one file in one project. `standardize` can't know that you said yes: the roadmap skill is the gate, and only you start it.
+The roadmap reader works on tables only, line by line: it is not a full Markdown parser, and it doesn't read the prose around the tables. It takes one file in one project. `standardize` and `restore` can't know that you said yes: the roadmap skill is the gate, and only you start it. The copies in `.roadmap-backups/` are local files on the same disk, not an off-machine backup, and the script never prunes them. Just before it replaces the roadmap file the script reads it again and stops if it changed since the command read it, which narrows the window when two sessions write the same file; it is not a lock, and a change landing in the last instant can still be lost (the kept copies hold the earlier versions).
 
 `caught_by` in the history is only as good as the main session's attribution of each fix round or rollback to a check. An unclear source is recorded as the check that first reported it. Records made before 0.6.0 have no `caught_by` and are not backfilled.
 
@@ -205,6 +207,7 @@ Personal skills and agents aren't namespaced, so the copies get a `ps-` prefix. 
 /phased-shipping:plan refresh-models
 /phased-shipping:roadmap check
 /phased-shipping:roadmap standardize
+/phased-shipping:roadmap restore
 ```
 
 `plan` asks its questions through the AskUserQuestion tool, so your answer stays inside the same turn, on the planning model. If you reply in plain chat instead, the follow-up runs on your session model; use `/phased-shipping:plan <answer>` to stay on the planning model.
@@ -224,7 +227,7 @@ claude plugin validate . --strict
 claude plugin eval . --allow-tools WebSearch,WebFetch,Bash
 ```
 
-The eleven cases check that:
+The twelve cases check that:
 1. a multi-part request produces a phased roadmap with model and effort for each phase;
 2. a typo fix doesn't trigger the plan skill;
 3. tests, browser checks, commit and deploy are routed to the cheap tier;
@@ -235,9 +238,10 @@ The eleven cases check that:
 8. `run` shows a plan's commands and waits for your OK when the plan came with a cloned repo;
 9. `run` treats a builder result that starts with `NO SHELL:` as unverified, and doesn't go on to the preview as if the checks had passed;
 10. `/phased-shipping:roadmap check` reports a roadmap's problems and edits nothing;
-11. `/phased-shipping:roadmap standardize` shows its diff and asks before it writes, even when told not to ask.
+11. `/phased-shipping:roadmap standardize` shows its diff and asks before it writes, even when told not to ask;
+12. `/phased-shipping:roadmap restore` lists the kept copies or shows its diff and asks before it restores, even when told not to ask.
 
-Cases 5 to 11 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
+Cases 5 to 12 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
 
 The guard has its own tests, which run in this repo's `npm test`: `node --test tests/guard.test.mjs tests/shell-split.test.mjs`. They feed sample hook payloads to the scripts; they don't need hooks to run.
 

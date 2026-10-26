@@ -98,20 +98,38 @@ Run the script with `node roadmap.mjs <command> <file> ...`. Pass `--root <folde
 | `read <file>` | prints JSON: every candidate table, its phases (`id`, `phase`, `status`, `statusRaw`, `kind`, `priority`, `urgency`, `estRaw`, `estCal`, `actual`, `commit`, `blockedBy`, `planFile`, `note`, `line`), its problems, and a summary |
 | `check <file> [--strict]` | one line per problem, then a summary line. Read-only |
 | `standardize <file> [--table <index>]... [--set-status <id>=<status>]...` | prints a plan and writes nothing |
-| `standardize ... --write` | copies the file to `<file>.bak-<YYYYMMDD-HHMMSS>` (it refuses if that name exists), writes the new text to `<file>.tmp` and renames it over the file |
+| `standardize ... --write` | keeps `<file>.original` (first write only) and `<file>.bak-<YYYYMMDD-HHMMSS>` in `.roadmap-backups/` next to the file (it refuses if that dated name exists), writes the new text to `.roadmap-backups/<file>.tmp` and renames it over the file |
 | `set <file> <id> [--status s] [--commit text] [--actual hours] [--plan-file p] [--note t]` | changes cells of one row of one standard table and nothing else; `--actual 2` writes `2 h`, and `--commit` writes to `Commit / deploy` |
+| `restore <file>` | lists the kept copies (name, size, lines, time, newest first; a `<file>.bak-*` copy beside the file, made by 0.7.0, is marked `legacy`); `no backups yet` when there are none. Read-only |
+| `restore <file> --from original\|prev\|<name>` | prints what putting that copy back would change and writes nothing. `<name>` is exactly one name from the listing; a value with a slash, a backslash or `..` is a usage error |
+| `restore <file> --from <x> --write` | keeps `<file>.original` if it is not there yet, saves the current file as `<file>.before-restore-<YYYYMMDD-HHMMSS>`, then replaces the roadmap file with the chosen copy. `nothing to restore` when the copy is identical to the file |
 
 Table indexes start at 0, in file order, and count candidate tables only. `<table>:<id>=<status>` picks a table when an id is in two tables.
 
 - **Exit 0:** done, or the check found no errors. Notices, including legacy tables, are allowed.
-- **Exit 1:** the check found errors (or notices, with `--strict`); a write was refused; or `set` could not apply (an id in no standard table, in several, or in a legacy table; a column the table does not have).
-- **Exit 2:** the file cannot be read or is not valid UTF-8, it is outside `--root`, or the arguments are wrong (including a bad status or hours value).
+- **Exit 1:** the check found errors (or notices, with `--strict`); a write was refused; `set` could not apply (an id in no standard table, in several, or in a legacy table; a column the table does not have); a copy could not be made (nothing is then written to the roadmap); or the file changed while it was being written (`the roadmap changed while it was being written; nothing was changed, run again`).
+- **Exit 2:** the file cannot be read or is not valid UTF-8, it is outside `--root`, it is a kept copy (it sits in a `.roadmap-backups` folder), its name has a colon on Windows, a `restore` name is unknown or not allowed, or the arguments are wrong (including a bad status or hours value).
 
-`standardize` is idempotent: on a standard table it says `nothing to change` and writes nothing. Line endings (LF or CRLF, line by line) and the last-newline state are kept, and every line outside the chosen tables is untouched. `set` writes atomically and makes no backup, because it changes one row.
+The backup folder being unusable (a file or a link in its place, or a `.gitignore` that is a folder or a link) is exit 1 for `set`, `standardize --write` and `restore` alike, and nothing is written.
+
+`standardize` is idempotent: on a standard table it says `nothing to change` and writes nothing. Line endings (LF or CRLF, line by line) and the last-newline state are kept, and every line outside the chosen tables is untouched.
+
+## Backups
+
+Every write (`standardize --write`, `set`, `restore --write`) keeps a way back first. All copies live in one folder, `.roadmap-backups/`, next to the roadmap file. The script creates it on first use, with a `.gitignore` that holds only `*`, so git never lists or commits anything in it. The folder must be a real folder (not a symlink) inside the roadmap file's own folder, or the script refuses and writes nothing.
+
+| Copy | Made by | Kept |
+|---|---|---|
+| `<file>.original` | the first write of any kind | forever: created once from the bytes read, never overwritten, renamed or deleted by the script |
+| `<file>.prev` | `set` | the file as it was before the latest `set`; replaced each time (through a temp file and a rename) |
+| `<file>.bak-<YYYYMMDD-HHMMSS>` | `standardize --write` | until you delete it |
+| `<file>.before-restore-<YYYYMMDD-HHMMSS>` | `restore --write` | until you delete it; restoring from it undoes the restore |
+
+Each copy is written from the bytes the command read, not by reading the file again, and every copy carries the real file's name (letter case, links and short names are resolved first, so one roadmap has one set of copies). If a copy cannot be made, nothing is written to the roadmap and the exit code is 1. A copy is written whole under a temporary name, flushed to disk, and then given its final name with a hard link (which fails when the name is taken), so a final name never holds half a file. Where links are not possible (FAT, exFAT, some network drives) the copy is written under its final name between a `<copy>.incomplete` marker and its removal; a marker that is still there means a copy was cut short, and every write refuses (exit 1, nothing written) until you have looked: for a `<file>.original.incomplete` marker, compare `<file>.original` with the roadmap and, if it is shorter, different or you are unsure, delete `<file>.original` too (it is made again from the current roadmap), then delete the marker; for any other marker, delete the copy it names and then the marker. Copies are owner-only (`0600`) and the folder `0700` where the system has file permissions; the roadmap file keeps its own mode. If the folder's `.gitignore` is not exactly `*` the script warns on stderr and goes on; if it is a folder or a link it refuses. The new roadmap text is written to `.roadmap-backups/<file>.tmp` first; if that name already exists the script says another write may be in progress and, if none is, to delete it. On Windows a rename that is refused for a moment is retried up to 10 times, after the same check. Just before it replaces the roadmap file, the script reads the file again; if it changed since the command read it, it stops with exit 1 and changes nothing. That narrows the window when two sessions write the same file; it is not a lock. The copies are local files on the same disk, not an off-machine backup, and the script never prunes them: you may delete the dated copies, and `.original` is the one to keep, unless an `.incomplete` marker says it may be cut short. Version 0.7.0 wrote `<file>.bak-<timestamp>` beside the file; `restore` still lists and restores those, marked `legacy`, and never moves or deletes them.
 
 ## Limits
 
 - Tables only: the reader does not look at the prose around them.
 - Line-based: it is not a full Markdown parser. A table needs a separator row, and tables nested in lists are not handled.
-- Cells are split on unescaped pipes, including pipes inside code spans.
+- Cells are split on unescaped pipes, including pipes inside code spans. In a cell, `\|` is a pipe. When the script writes a cell, a backslash that sits directly before a pipe (or before a run of backslashes that ends in a pipe) is doubled, so what the script writes, it reads back unchanged: that is a round trip with this script's own reader. Any other backslash, such as in a Windows path, is written as typed. The script makes no claim about how any Markdown renderer shows a cell.
 - The script cannot know whether the owner said yes: the roadmap skill is the gate, and it is started only by the owner.

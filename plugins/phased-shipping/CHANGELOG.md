@@ -2,6 +2,29 @@
 
 Newest first.
 
+## 0.7.1
+
+### Added
+- `.original`: before the first write of any kind, `roadmap.mjs` keeps the roadmap file as it found it, as `<file>.original` in `.roadmap-backups/`. It is created once (never overwritten) and the script never renames or deletes it. A `.original` that is a directory or a symlink makes every write fail closed.
+- `.prev`: `set` now keeps the file as it was before the change as `<file>.prev` in the same folder, replaced each time through a temp file and a rename. In 0.7.0 `set` kept nothing.
+- `restore`, a new command (and a third mode of the `/phased-shipping:roadmap` skill, still owner-invoked only): `restore <file>` lists the kept copies (and any `<file>.bak-*` copy that 0.7.0 left beside the file, marked `legacy`); `restore <file> --from original|prev|<name>` prints what would change and writes nothing; with `--write` it first saves the current file as `<file>.before-restore-<timestamp>`, so a restore can be undone. A name with a slash, a backslash or `..` is a usage error; there is no way to name a path.
+- The changed-while-writing check: just before each rename the script reads the roadmap file again, and if it changed since the command read it, it stops with exit 1 and changes nothing (`the roadmap changed while it was being written; nothing was changed, run again`). It narrows the window when two sessions write one file; it is not a lock.
+- Copies fail closed: if a copy cannot be made, nothing is written to the roadmap and the exit code is 1. Every copy is written from the bytes the command read, with no overwrite.
+- Copies are whole or absent: each is written under a temporary name, flushed to disk, then given its final name with a hard link, so `.original` (and the dated copies and the folder's `.gitignore`) never exist half written. Where a link is not possible (FAT, exFAT, some network drives) a `<copy>.incomplete` marker is made first and removed last; a marker left behind makes every later write refuse (exit 1, nothing written) until the owner has looked: for an `.original` marker, compare `.original` with the roadmap and delete it too if it is shorter, different or in doubt (it is made again), then delete the marker. A failed in-place copy keeps its marker whenever anything is left at the final name.
+- On Windows a rename that is refused for a moment (a scanner or indexer holding the file) is retried up to 10 times, each time after the same changed-while-writing check.
+- File modes: on systems that have them the roadmap file keeps its own mode, copies are `0600` and the backup folder `0700`.
+- A BOM in front of the marker on the first line of the file is allowed.
+- A skill eval, `roadmap-restore-needs-yes`. It has not been run against a model yet.
+
+### Changed
+- Backups moved: `standardize --write` now writes `<file>.bak-<timestamp>` into `.roadmap-backups/` next to the roadmap file instead of beside it. The folder has a `.gitignore` that holds only `*`, so git never lists or commits anything in it. The folder must be a real folder inside the roadmap file's own folder; a symlink or a file in its place is refused. These are local copies on the same disk, not an off-machine backup, and the script never prunes them.
+- A cell that has a backslash directly before a pipe is now written so that this script reads it back exactly (the backslash is doubled), and the reader undoes that: a round trip with the script's own reader. Any other backslash, such as in a Windows path, is written and read as typed. The only text that reads differently from 0.7.0 is an odd run of three or more backslashes right before a pipe in a cell. Nothing is claimed about how a Markdown renderer shows such a cell.
+- The new roadmap text is written to `.roadmap-backups/<file>.tmp` instead of `<file>.tmp` beside the file, so nothing that git could list is ever made next to the roadmap; if that name exists the script says another write may be in progress and, if none is, to delete it.
+- Every backup name is the real file's name (letter case, links and short names are resolved), so one roadmap has one set of copies. A file that sits inside a `.roadmap-backups` folder is refused (exit 2), and so is a file name with a colon on Windows.
+- A `.gitignore` in the backup folder that is a folder or a link is refused (exit 1, nothing written); one whose content is not exactly `*` is left as it is and the script prints a warning that git may list the backups.
+- `restore` exits 1, not 2, when the backup folder cannot be used, like `set` and `standardize`. `standardize --write` and `restore --write` print the "first version kept" line when they make the `.original`, as `set` does.
+- The guard version is 0.7.1, kept equal to the plugin version. No guard rule changed.
+
 ## 0.7.0
 
 ### Added

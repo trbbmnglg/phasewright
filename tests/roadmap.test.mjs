@@ -5,11 +5,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, mkdirSync, realpathSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, mkdirSync, realpathSync, symlinkSync, utimesSync, lstatSync, chmodSync, renameSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseRoadmap, checkRoadmap, planStandardize, setPhase, mapStatus, toReadJson, STATUSES, MARKER, main } from "../plugins/phased-shipping/skills/roadmap/scripts/roadmap.mjs";
+import { parseRoadmap, checkRoadmap, planStandardize, setPhase, mapStatus, toReadJson, STATUSES, MARKER, cellOf, clean, renameWithRetry, main } from "../plugins/phased-shipping/skills/roadmap/scripts/roadmap.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
@@ -23,10 +23,13 @@ const tmp = () => { const d = mkdtempSync(join(tmpdir(), "roadmap-test-")); scra
 test.after(() => { for (const d of scratch) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 // Runs the command line in this process and collects what it prints.
+// Everything every run printed is kept, so one test at the end can check that no absolute path was ever printed.
+const TRANSCRIPT = [];
 function run(argv, extra = {}) {
   const out = [];
   const err = [];
   const code = main(argv, { out: (s) => out.push(s), err: (s) => err.push(s), ...extra });
+  TRANSCRIPT.push(...out, ...err);
   return { code, out: out.join("\n"), err: err.join("\n") };
 }
 // A project folder with a roadmap file named PHASES.md.
@@ -341,6 +344,11 @@ test("standardize plan: a header that would clash, a bad priority and a duplicat
 // ── standardize: write ──────────────────────────────────────────────────────
 const NOW = () => new Date(2026, 0, 2, 3, 4, 5);
 const BACKUP = "PHASES.md.bak-20260102-030405";
+const BDIR = ".roadmap-backups";
+const ORIGINAL = "PHASES.md.original";
+// The names in the project's backup folder (sorted), or null when the folder is not there.
+const kept = (p) => (existsSync(join(p.dir, BDIR)) && lstatSync(join(p.dir, BDIR)).isDirectory() ? readdirSync(join(p.dir, BDIR)).sort() : null);
+const keptText = (p, name) => readFileSync(join(p.dir, BDIR, name), "utf8");
 
 test("standardize --write: refuses while rows are blocked (exit 1, no backup, file unchanged)", () => {
   const p = project(MESSY);
@@ -355,10 +363,13 @@ test("standardize --write: with --set-status it makes the backup and the new fil
   const p = project(MESSY);
   const r = run(["standardize", p.file, "--root", p.dir, "--table", "0", "--table", "2", "--table", "3", "--set-status", "7=planned", "--set-status", "8=in progress", "--write"], { now: NOW });
   assert.equal(r.code, 0, r.err);
-  assert.deepEqual(readdirSync(p.dir).sort(), [BACKUP, "PHASES.md"].sort(), "the only new file is the backup (the .tmp is gone)");
-  assert.equal(readFileSync(join(p.dir, BACKUP), "utf8"), MESSY, "the backup has the original bytes");
+  assert.deepEqual(readdirSync(p.dir).sort(), [BDIR, "PHASES.md"].sort(), "the only new thing next to the file is the backup folder (the .tmp is gone)");
+  assert.deepEqual(kept(p), [".gitignore", ORIGINAL, BACKUP].sort());
+  assert.equal(keptText(p, BACKUP), MESSY, "the dated copy has the bytes the file had");
+  assert.equal(keptText(p, ORIGINAL), MESSY, "the original is the first version");
+  assert.equal(keptText(p, ".gitignore"), "*\n");
   assert.notEqual(p.read(), MESSY);
-  assert.match(r.out, new RegExp(`backup: ${BACKUP.replace(/\./g, "\\.")}`));
+  assert.ok(r.out.includes(`backup: ${BACKUP}`));
   assert.match(r.out, /wrote PHASES\.md: \d+ line\(s\) changed or added/);
   for (const text of [r.out, r.err]) {
     assert.ok(!text.includes(p.dir), "the temp folder path was printed");
@@ -366,24 +377,28 @@ test("standardize --write: with --set-status it makes the backup and the new fil
   }
 });
 
-test("standardize --write: refuses when the backup name exists, and changes nothing", () => {
+test("standardize --write: refuses when the backup name exists in the folder, and changes nothing", () => {
   const p = project(MESSY);
-  writeFileSync(join(p.dir, BACKUP), "keep me");
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, BACKUP), "keep me");
   const r = run(["standardize", p.file, "--root", p.dir, "--table", "2", "--write"], { now: NOW });
   assert.equal(r.code, 1);
   assert.match(r.err, /already exists; nothing was written/);
-  assert.equal(readFileSync(join(p.dir, BACKUP), "utf8"), "keep me");
+  assert.equal(keptText(p, BACKUP), "keep me");
   assert.equal(p.read(), MESSY);
+  assert.ok(!existsSync(join(p.dir, "PHASES.md.tmp")));
 });
 
-test("standardize --write: refuses when a .tmp file is already there, and the file stays as it was", () => {
+test("standardize --write: refuses when the temp file is already in the backup folder, and the file stays as it was", () => {
   const p = project(MESSY);
-  writeFileSync(join(p.dir, "PHASES.md.tmp"), "somebody's file");
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, "PHASES.md.tmp"), "somebody's file");
   const r = run(["standardize", p.file, "--table", "2", "--write"], { now: NOW });
   assert.equal(r.code, 1);
-  assert.match(r.err, /PHASES\.md\.tmp already exists/);
+  assert.match(r.err, /another write to PHASES\.md may be in progress; if none is, delete \.roadmap-backups\/PHASES\.md\.tmp and try again/);
   assert.equal(p.read(), MESSY);
-  assert.equal(readFileSync(join(p.dir, "PHASES.md.tmp"), "utf8"), "somebody's file");
+  assert.equal(readFileSync(join(p.dir, BDIR, "PHASES.md.tmp"), "utf8"), "somebody's file");
+  assert.deepEqual(readdirSync(p.dir).sort(), [BDIR, "PHASES.md"].sort(), "nothing was put next to the file");
 });
 
 // The messy fixture with its one unfixable long row repaired, so every table can be standardized.
@@ -402,7 +417,7 @@ test("standardize --write: round trip, check exits 0 with no notice, a second st
   assert.equal(second.code, 0);
   assert.match(second.out, /nothing to change/);
   assert.equal(p.read(), after, "nothing written");
-  assert.deepEqual(readdirSync(p.dir).sort(), [BACKUP, "PHASES.md"].sort(), "no second backup");
+  assert.deepEqual(kept(p), [".gitignore", ORIGINAL, BACKUP].sort(), "no second backup");
   const json = JSON.parse(run(["read", p.file]).out);
   assert.equal(json.summary.legacyTables, 0);
   assert.deepEqual([json.summary.planned, json.summary.inProgress, json.summary.shipped, json.summary.parked], [11, 3, 3, 1]);
@@ -435,7 +450,8 @@ test("standardize --write: LF and CRLF files keep their line endings and the las
   const got = crlf.read();
   assert.equal(got, toCrlf(expected), "the CRLF result is the LF result with CRLF endings");
   assert.equal(got.replace(/\r\n/g, "").includes("\n"), false, "no bare LF");
-  assert.equal(readFileSync(join(crlf.dir, BACKUP), "utf8"), toCrlf(FIXABLE));
+  assert.equal(keptText(crlf, BACKUP), toCrlf(FIXABLE));
+  assert.equal(keptText(crlf, ORIGINAL), toCrlf(FIXABLE));
 
   // No newline at the end of the file.
   const bare = FIXABLE.replace(/\n$/, "");
@@ -492,7 +508,7 @@ test("standardize --write: a file outside --root is refused (exit 2) and nothing
 });
 
 // ── set ─────────────────────────────────────────────────────────────────────
-test("set: changes only the one row, all other lines are identical, and no .tmp is left", () => {
+test("set: changes only the one row, all other lines are identical, and no .tmp is left (the copies are in the backup folder)", () => {
   const p = project(STANDARD);
   const r = run(["set", p.file, "3", "--status", "In Progress", "--commit", "a1b2c3d", "--actual", "1.5", "--plan-file", "plans/three.md", "--note", "a | b", "--root", p.dir]);
   assert.equal(r.code, 0, r.err);
@@ -501,7 +517,8 @@ test("set: changes only the one row, all other lines are identical, and no .tmp 
   assert.equal(now.length, was.length);
   const changed = now.map((l, i) => i).filter((i) => now[i] !== was[i]);
   assert.deepEqual(changed, [17], "only the line of id 3 changed");
-  assert.deepEqual(readdirSync(p.dir), ["PHASES.md"]);
+  assert.deepEqual(readdirSync(p.dir).sort(), [BDIR, "PHASES.md"].sort(), "only the backup folder was added next to the file");
+  assert.deepEqual(kept(p), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort());
   assert.match(r.out, /^updated PHASES\.md line 18: \| 3 \| Landing page /);
   const phase = toReadJson(parseRoadmap(p.read()), "x").tables[0].phases[2];
   assert.equal(phase.status, "in progress");
@@ -572,7 +589,7 @@ test("set: a standard table's id is found even when the same id is in a legacy t
   assert.equal(standard.rows[0].vals[2], "shipped");
 });
 
-test("set: keeps CRLF line endings and the last-newline state, and refuses an existing .tmp", () => {
+test("set: keeps CRLF line endings and the last-newline state, and refuses an existing temp file in the backup folder", () => {
   const crlf = project(toCrlf(STANDARD));
   assert.equal(run(["set", crlf.file, "2", "--status", "shipped"]).code, 0);
   assert.equal(crlf.read().replace(/\r\n/g, "").includes("\n"), false);
@@ -582,11 +599,12 @@ test("set: keeps CRLF line endings and the last-newline state, and refuses an ex
   assert.equal(bare.read().endsWith("\n"), false);
 
   const p = project(STANDARD);
-  writeFileSync(join(p.dir, "PHASES.md.tmp"), "other");
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, "PHASES.md.tmp"), "other");
   const r = run(["set", p.file, "1", "--status", "parked"]);
   assert.equal(r.code, 1);
   assert.equal(p.read(), STANDARD);
-  assert.equal(readFileSync(join(p.dir, "PHASES.md.tmp"), "utf8"), "other");
+  assert.equal(readFileSync(join(p.dir, BDIR, "PHASES.md.tmp"), "utf8"), "other");
 });
 
 // ── the command line, run as a real process ─────────────────────────────────
@@ -606,9 +624,9 @@ test("cli: exit codes and output as a real process, no absolute path is printed,
   assert.deepEqual(readdirSync(p.dir), ["PHASES.md"], "the refused write left no backup");
   const written = spawn(["standardize", p.file, "--table", "2", "--write"], elsewhere);
   assert.equal(written.code, 0, written.err);
-  const names = readdirSync(p.dir);
-  assert.equal(names.length, 2, "only the backup was added next to the file");
-  assert.ok(names.some((n) => /^PHASES\.md\.bak-\d{8}-\d{6}$/.test(n)));
+  assert.deepEqual(readdirSync(p.dir).sort(), [BDIR, "PHASES.md"].sort(), "only the backup folder was added next to the file");
+  assert.ok(kept(p).some((n) => /^PHASES\.md\.bak-\d{8}-\d{6}$/.test(n)));
+  assert.ok(kept(p).includes(ORIGINAL));
   assert.ok(!written.out.includes(p.dir));
   assert.deepEqual(readdirSync(elsewhere), [], "nothing was created in the working folder");
 });
@@ -624,10 +642,31 @@ test("the script imports only node: built-ins and never calls require or a dynam
   assert.doesNotMatch(src, /^\s*import\s+["']/m, "no side-effect imports");
 });
 
-test("the script never writes anywhere but the roadmap file's own folder: its writes name only the file, the .tmp and the backup", () => {
+test("the script never writes anywhere but the roadmap file's own folder or its backup folder: every write call names a known path variable", () => {
   const src = readFileSync(SCRIPT, "utf8");
-  const writes = [...src.matchAll(/\b(writeFileSync|copyFileSync|renameSync|rmSync)\(([^)]*)\)/g)].map((m) => `${m[1]}(${m[2]})`);
-  for (const w of writes) assert.match(w, /\btmp\b|\bpath\b|\bbackup\b|f\.path/, w);
+  const calls = [...src.matchAll(/\b(writeFileSync|openSync|copyFileSync|renameSync|rmSync|mkdirSync|unlinkSync|rmdirSync|appendFileSync|truncateSync|symlinkSync|linkSync|chmodSync|createWriteStream|cpSync)\(([^)]*)\)/g)]
+    .map((m) => ({ fn: m[1], args: m[2] }));
+  assert.ok(calls.length >= 6);
+  const allowed = {
+    writeFileSync: [/^fd, data$/],
+    openSync: [/^path, "wx", FILE_MODE$/, /^dir, "r"$/],
+    renameSync: [/^a, b$/],
+    linkSync: [/^tmp, path$/],
+    chmodSync: [/^tmp, f\.mode$/],
+    rmSync: [/^path, \{ force: true \}$/],
+    mkdirSync: [/^info\.dir, \{ mode: DIR_MODE \}$/],
+  };
+  for (const c of calls) {
+    assert.ok(allowed[c.fn]?.some((re) => re.test(c.args)), `unexpected write call ${c.fn}(${c.args})`);
+  }
+  assert.equal(calls.filter((c) => c.fn === "linkSync").length, 1, "one link call, from the publish helper");
+  // The one rename helper is called for exactly two things: the .prev copy and the roadmap file.
+  const renames = [...src.matchAll(/= renameWithRetry\((tmp, [^,]+), /g)].map((m) => m[1]);
+  assert.deepEqual(renames.sort(), ["tmp, f.path", "tmp, final"]);
+  // Every file is created exclusively; the only rename targets are the .prev copy and the roadmap file.
+  assert.doesNotMatch(src, /flag:\s*"w"/);
+  assert.doesNotMatch(src, /["']w["']|["']a["']|["']r\+["']/, "no file is opened for overwrite or append");
+  assert.ok(!/\.original/.test(calls.map((c) => c.args).join("\n")), "no write call names .original directly");
 });
 
 // ── the personal copies ─────────────────────────────────────────────────────
@@ -657,4 +696,1111 @@ test("every command accepts its flags: read --root, and a root spelled different
   assert.equal(run(["read", p.file, "--bogus"]).code, 2);
   assert.equal(run(["read", p.file, "--strict"]).code, 2, "--strict belongs to check only");
   assert.equal(run(["standardize", p.file, "--set-status=1=planned", "--root", longRoot]).code, 2, "an id that matches no chosen row is a usage error");
+});
+
+// ── cells: the writer and the reader agree (a backslash and a pipe in a cell) ──
+const ALPHABET = ["a", " ", "|", "\\"];
+function everyString(maxLen) {
+  let layer = [""];
+  const all = [""];
+  for (let n = 1; n <= maxLen; n++) {
+    layer = layer.flatMap((s) => ALPHABET.map((c) => s + c));
+    all.push(...layer);
+  }
+  return all;
+}
+const threeColumns = (middle) => `${MARKER}\n| # | Phase | Status |\n|---|---|---|\n|${cellOf("1")}|${middle}|${cellOf("planned")}|\n`;
+
+test("cells: clean(cellOf(v).trim()) gives v back for every string of a, space, | and backslash up to 6 characters", () => {
+  const strings = everyString(6);
+  assert.equal(strings.length, 1 + 4 + 16 + 64 + 256 + 1024 + 4096);
+  for (const v of strings) {
+    const got = clean(cellOf(v).trim());
+    assert.equal(got, v.trim(), JSON.stringify(v));
+    if (v === v.trim()) assert.equal(got, v, JSON.stringify(v));
+  }
+});
+
+test("cells: the explicit round-trip cases, and a row built from cellOf values always splits into the expected cells", () => {
+  const cases = ["", "a|b", "a\\b", "a\\|b", "a\\\\|b", "x\\", "|", "\\", "\\\\", "|\\|"];
+  for (const v of cases) assert.equal(clean(cellOf(v).trim()), v, JSON.stringify(v));
+  assert.equal(cellOf("a|b"), " a\\|b ");
+  assert.equal(cellOf("a\\b"), " a\\b ", "a backslash that is not before a pipe is written as it is");
+  assert.equal(cellOf("a\\|b"), " a\\\\\\|b ", "a backslash before a pipe is doubled, then the pipe is escaped");
+  for (const v of everyString(6)) {
+    const t = parseRoadmap(threeColumns(cellOf(v))).tables[0];
+    assert.equal(t.rows.length, 1, JSON.stringify(v));
+    assert.equal(t.rows[0].raw.length, 3, `the row splits into 3 cells for ${JSON.stringify(v)}`);
+    assert.equal(t.rows[0].vals[1], v.trim(), JSON.stringify(v));
+    assert.equal(t.rows[0].vals[2], "planned");
+  }
+});
+
+test("cells: the writer has a backslash replacement in the same function, and no regular expression is built from text", () => {
+  const src = readFileSync(SCRIPT, "utf8");
+  const line = src.split("\n").find((l) => l.startsWith("export const cellOf"));
+  assert.ok(line.includes('.replace(/\\\\(?=\\\\*\\|)/g, "\\\\$&")'), "cellOf puts a backslash in front of each backslash that is followed by backslashes and a pipe");
+  assert.ok(!line.includes("(?<!"), "no lookbehind is needed");
+  assert.ok(line.includes('replace(/\\|/g, "\\\\|")'), "cellOf still escapes the pipe");
+  assert.doesNotMatch(src, /new RegExp/);
+});
+
+test("cells: legacy cells read exactly as before (a Windows path, a UNC path, an escaped pipe), and set on another row leaves them byte-identical", () => {
+  assert.equal(clean("docs\\plan-2.md"), "docs\\plan-2.md");
+  assert.equal(clean(" \\\\server\\share\\x.md "), "\\\\server\\share\\x.md");
+  assert.equal(clean("a\\|b"), "a|b");
+  assert.equal(clean("a\\\\|b"), "a\\|b", "an even run before a pipe reads as it always did");
+  const text = `${MARKER}\n| # | Phase | Status | Plan file |\n|---|---|---|---|\n| 1 | one | planned | docs\\plan-2.md |\n| 2 | two | planned | \\\\server\\share\\two.md |\n| 3 | three | planned | a\\|b |\n`;
+  assert.deepEqual(parseRoadmap(text).tables[0].problems, []);
+  assert.deepEqual(parseRoadmap(text).tables[0].rows.map((r) => r.vals[3]), ["docs\\plan-2.md", "\\\\server\\share\\two.md", "a|b"]);
+  assert.equal(run(["check", writeTemp(text), "--strict"]).code, 0, "check has no complaint about the cells");
+  const p = project(text);
+  assert.equal(run(["set", p.file, "3", "--status", "shipped"]).code, 0);
+  const was = text.split("\n");
+  const now = p.read().split("\n");
+  assert.deepEqual(now.map((l, i) => i).filter((i) => now[i] !== was[i]), [5], "only the row of id 3 changed");
+  assert.equal(run(["set", p.file, "1", "--note", "x"]).code, 1, "this table has no Note column, so nothing is written");
+  // A value with a backslash and a pipe survives a set and a read.
+  assert.equal(run(["set", p.file, "2", "--plan-file", "x\\|y"]).code, 0);
+  assert.equal(toReadJson(parseRoadmap(p.read()), "x").tables[0].phases[1].planFile, "x\\|y");
+});
+
+// ── backups: the data-loss guarantees ───────────────────────────────────────
+const bytes = (path) => readFileSync(path);
+const keptBytes = (p, name) => bytes(join(p.dir, BDIR, name));
+const same = (a, b, message) => assert.ok(Buffer.from(a).equals(Buffer.from(b)), message);
+const leftovers = (p) => [...readdirSync(p.dir), ...(kept(p) ?? []).map((n) => `${BDIR}/${n}`)].filter((n) => /\.tmp/.test(n));
+const clock = (start = 5) => { let s = start; return () => new Date(2026, 0, 2, 3, 4, s++); };
+const setStatus = (p, id, status, extra = {}) => run(["set", p.file, id, "--status", status, "--root", p.dir], extra);
+const MIXED = `${STANDARD}\n## Later\n\n${table(MIN, [["L1", "later one", "done"], ["L2", "later two", "wip"]], false)}`;
+
+test("backups: the first set makes the folder, its .gitignore and the .original; standardize --write and 20 more sets leave the .original byte-identical", () => {
+  const p = project(MIXED);
+  const first = bytes(p.file);
+  const r = setStatus(p, "3", "in progress");
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(kept(p), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort());
+  assert.equal(keptText(p, ".gitignore"), "*\n");
+  same(keptBytes(p, ORIGINAL), first, "the original is the first version, byte for byte");
+  same(keptBytes(p, "PHASES.md.prev"), first, "the previous version is the first version too");
+  assert.match(r.out, /first version kept as PHASES\.md\.original/);
+  assert.equal(setStatus(p, "3", "planned").out.includes("first version kept"), false, "said once");
+  assert.equal(run(["standardize", p.file, "--root", p.dir, "--write"], { now: clock() }).code, 0);
+  same(keptBytes(p, ORIGINAL), first);
+  const statuses = ["shipped", "parked", "planned", "in progress"];
+  for (let i = 0; i < 20; i++) {
+    const before = bytes(p.file);
+    assert.equal(setStatus(p, "1", statuses[i % 4]).code, 0);
+    same(keptBytes(p, ORIGINAL), first, `after set ${i + 1}`);
+    same(keptBytes(p, "PHASES.md.prev"), before, `the previous version after set ${i + 1}`);
+  }
+  assert.equal(toReadJson(parseRoadmap(p.read()), "x").tables[0].phases[0].status, statuses[19 % 4], "the file changed as asked");
+  assert.deepEqual(parseRoadmap(p.read()).tables.map((t) => t.legacy), [false, false], "standardize did its work");
+  assert.deepEqual(leftovers(p), []);
+});
+
+test("backups: the .original is never overwritten, even when the roadmap file is replaced with something unrelated", () => {
+  const p = project(STANDARD);
+  const first = bytes(p.file);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  writeFileSync(p.file, table(MIN, [["9", "something else entirely", "planned"]]));
+  assert.equal(setStatus(p, "9", "shipped").code, 0);
+  assert.equal(run(["standardize", p.file, "--write"], { now: clock() }).code, 0);
+  same(keptBytes(p, ORIGINAL), first, "still the first version the tool ever saw");
+  assert.ok(lstatSync(join(p.dir, BDIR, ORIGINAL)).isFile());
+});
+
+test("backups: a .original that is a directory makes every write fail closed, with the roadmap byte-identical", () => {
+  for (const [file, argv] of [
+    [FIXABLE, ["standardize", "FILE", ...OVERRIDES, "--write"]],
+    [STANDARD, ["set", "FILE", "3", "--status", "parked"]],
+    [STANDARD, ["restore", "FILE", "--from", "prev", "--write"]],
+  ]) {
+    const p = project(file);
+    mkdirSync(join(p.dir, BDIR, ORIGINAL), { recursive: true });
+    writeFileSync(join(p.dir, BDIR, "PHASES.md.prev"), "an older version\n");
+    const before = bytes(p.file);
+    const r = run(argv.map((a) => (a === "FILE" ? p.file : a)), { now: clock() });
+    assert.equal(r.code, 1, `${argv[0]}: ${r.err}`);
+    assert.match(r.err, /could not keep PHASES\.md\.original \(it is not a regular file\)/);
+    same(bytes(p.file), before, `${argv[0]}: the roadmap is untouched`);
+    assert.deepEqual(leftovers(p), []);
+    assert.ok(lstatSync(join(p.dir, BDIR, ORIGINAL)).isDirectory(), "the directory is still there");
+    assert.equal(keptText(p, "PHASES.md.prev"), "an older version\n");
+  }
+});
+
+test("backups: a .original that is a symlink is refused and its target is never written (skipped where symlinks cannot be made)", (t) => {
+  const p = project(STANDARD);
+  const victim = join(tmp(), "victim.txt");
+  writeFileSync(victim, "do not touch");
+  mkdirSync(join(p.dir, BDIR));
+  try { symlinkSync(victim, join(p.dir, BDIR, ORIGINAL), "file"); } catch { t.skip("this platform did not allow a symlink"); return; }
+  const before = bytes(p.file);
+  const r = setStatus(p, "3", "parked");
+  assert.equal(r.code, 1);
+  assert.match(r.err, /PHASES\.md\.original \(it is not a regular file\)/);
+  same(bytes(p.file), before);
+  assert.equal(readFileSync(victim, "utf8"), "do not touch");
+});
+
+test("backups: .prev is the file's bytes before the most recent set after each run, and a refused set leaves it alone", () => {
+  const p = project(STANDARD);
+  for (const [id, status] of [["1", "parked"], ["2", "planned"], ["3", "in progress"], ["1", "shipped"]]) {
+    const before = bytes(p.file);
+    assert.equal(setStatus(p, id, status).code, 0);
+    same(keptBytes(p, "PHASES.md.prev"), before, `${id} to ${status}`);
+  }
+  const prev = keptBytes(p, "PHASES.md.prev");
+  const current = bytes(p.file);
+  const refused = setStatus(p, "77", "shipped");
+  assert.equal(refused.code, 1);
+  same(keptBytes(p, "PHASES.md.prev"), prev, "a refused set did not touch .prev");
+  same(bytes(p.file), current);
+  const fresh = project(STANDARD);
+  assert.equal(setStatus(fresh, "77", "shipped").code, 1);
+  assert.equal(kept(fresh), null, "a refused set creates no folder at all");
+  assert.equal(run(["set", fresh.file, "3", "--status", "done"]).code, 2);
+  assert.equal(kept(fresh), null, "nor does a usage error");
+});
+
+test("backups: fail closed when the folder cannot be used (a file in its place, a symlink or junction), the roadmap stays byte-identical, no .tmp left", (t) => {
+  for (const [file, argv] of [
+    [FIXABLE, ["standardize", "FILE", ...OVERRIDES, "--write"]],
+    [STANDARD, ["set", "FILE", "3", "--status", "parked"]],
+  ]) {
+    const p = project(file);
+    writeFileSync(join(p.dir, BDIR), "a file where the folder should be");
+    const before = bytes(p.file);
+    const r = run(argv.map((a) => (a === "FILE" ? p.file : a)), { now: clock() });
+    assert.equal(r.code, 1, `${argv[0]}: ${r.err}`);
+    assert.match(r.err, /could not use the \.roadmap-backups folder/);
+    assert.match(r.err, /nothing was written/);
+    same(bytes(p.file), before);
+    assert.equal(readFileSync(join(p.dir, BDIR), "utf8"), "a file where the folder should be");
+    assert.deepEqual(leftovers(p), []);
+    assert.equal(run(["restore", p.file, "--from", "prev", "--write"]).code, 1, "restore refuses the same folder, with exit 1 like the others");
+    assert.equal(run(["restore", p.file]).code, 1, "so does the listing");
+  }
+  // A symlinked (or junction) folder pointing elsewhere is refused and the other folder gets nothing.
+  const p = project(STANDARD);
+  const elsewhere = tmp();
+  try { symlinkSync(elsewhere, join(p.dir, BDIR), process.platform === "win32" ? "junction" : "dir"); } catch { t.skip("this platform did not allow a symlink"); return; }
+  const before = bytes(p.file);
+  const r = setStatus(p, "3", "parked");
+  assert.equal(r.code, 1, r.err);
+  same(bytes(p.file), before);
+  assert.deepEqual(readdirSync(elsewhere), [], "nothing was written through the link");
+  assert.equal(run(["standardize", writeTemp(MESSY), "--table", "2", "--write"]).code, 0, "a normal folder still works");
+});
+
+test("backups: a dated name that already exists, a temp file that already exists and a .prev that is a directory all fail closed", () => {
+  const dated = project(FIXABLE);
+  mkdirSync(join(dated.dir, BDIR));
+  writeFileSync(join(dated.dir, BDIR, "PHASES.md.bak-20260102-030405"), "mine");
+  const before = bytes(dated.file);
+  assert.equal(run(["standardize", dated.file, ...OVERRIDES, "--write"], { now: NOW }).code, 1);
+  same(bytes(dated.file), before);
+  assert.equal(keptText(dated, "PHASES.md.bak-20260102-030405"), "mine");
+
+  const tmpClash = project(STANDARD);
+  mkdirSync(join(tmpClash.dir, BDIR));
+  writeFileSync(join(tmpClash.dir, BDIR, "PHASES.md.tmp"), "someone else's");
+  assert.equal(setStatus(tmpClash, "3", "parked").code, 1);
+  same(bytes(tmpClash.file), Buffer.from(STANDARD));
+  assert.equal(readFileSync(join(tmpClash.dir, BDIR, "PHASES.md.tmp"), "utf8"), "someone else's");
+  same(keptBytes(tmpClash, ORIGINAL), Buffer.from(STANDARD), "the original is already kept; the roadmap was not changed");
+
+  const dirPrev = project(STANDARD);
+  mkdirSync(join(dirPrev.dir, BDIR, "PHASES.md.prev"), { recursive: true });
+  const r = setStatus(dirPrev, "3", "parked");
+  assert.equal(r.code, 1, r.err);
+  same(bytes(dirPrev.file), Buffer.from(STANDARD));
+  assert.deepEqual(leftovers(dirPrev), []);
+});
+
+test("backups: an existing .gitignore in the folder is never modified; a content other than '*' gets a warning, exactly '*' does not", () => {
+  const warning = /warning: \.roadmap-backups\/\.gitignore does not hold only "\*", so git may list your backups/;
+  for (const [content, warns] of [["keep\n", true], ["!*\n", true], ["", true], ["*\n", false], ["*", false], ["*\r\n", false], ["*\n*\n", true]]) {
+    const p = project(STANDARD);
+    mkdirSync(join(p.dir, BDIR));
+    writeFileSync(join(p.dir, BDIR, ".gitignore"), content);
+    const r = setStatus(p, "3", "parked");
+    assert.equal(r.code, 0, `${JSON.stringify(content)}: ${r.err}`);
+    assert.equal(keptText(p, ".gitignore"), content, "never modified");
+    assert.equal(warning.test(r.err), warns, `${JSON.stringify(content)} -> warn ${warns}: ${r.err}`);
+  }
+});
+
+test("backups: a .gitignore that is a folder or a link fails closed (exit 1, nothing written; the link part is skipped where links cannot be made)", (t) => {
+  for (const [file, argv] of [
+    [FIXABLE, ["standardize", "FILE", ...OVERRIDES, "--write"]],
+    [STANDARD, ["set", "FILE", "3", "--status", "parked"]],
+    [STANDARD, ["restore", "FILE", "--from", "prev", "--write"]],
+  ]) {
+    const p = project(file);
+    mkdirSync(join(p.dir, BDIR, ".gitignore"), { recursive: true });
+    writeFileSync(join(p.dir, BDIR, "PHASES.md.prev"), "an older version\n");
+    const before = bytes(p.file);
+    const r = run(argv.map((a) => (a === "FILE" ? p.file : a)), { now: clock() });
+    assert.equal(r.code, 1, `${argv[0]}: ${r.err}`);
+    assert.match(r.err, /\.gitignore is not a regular file\); nothing was written/);
+    same(bytes(p.file), before);
+    assert.ok(lstatSync(join(p.dir, BDIR, ".gitignore")).isDirectory());
+    assert.deepEqual(kept(p), [".gitignore", "PHASES.md.prev"], "no .original, no copy, no temp file was made");
+  }
+  const p = project(STANDARD);
+  const elsewhere = join(tmp(), "ignore.txt");
+  writeFileSync(elsewhere, "*\n");
+  mkdirSync(join(p.dir, BDIR));
+  try { symlinkSync(elsewhere, join(p.dir, BDIR, ".gitignore"), "file"); } catch { t.skip("this platform did not allow a symlink"); return; }
+  const r = setStatus(p, "3", "parked");
+  assert.equal(r.code, 1, r.err);
+  assert.match(r.err, /\.gitignore is not a regular file/);
+  assert.equal(readFileSync(elsewhere, "utf8"), "*\n");
+  same(bytes(p.file), Buffer.from(STANDARD));
+});
+
+test("backups: changed while writing - set, standardize --write and restore --write stop with the exact message and leave the injected change", () => {
+  const MESSAGE = "the roadmap changed while it was being written; nothing was changed, run again";
+  const injected = `${STANDARD}\n<!-- somebody else edited this -->\n`;
+  const noTmp = (p) => assert.deepEqual(leftovers(p), []);
+
+  // set, caught before .prev is replaced: .prev stays as it was.
+  const a = project(STANDARD);
+  assert.equal(setStatus(a, "1", "parked").code, 0);
+  const prevBefore = keptBytes(a, "PHASES.md.prev");
+  const stages = [];
+  const r1 = setStatus(a, "2", "shipped", { beforeRename: (stage) => { stages.push(stage); if (stages.length === 1) writeFileSync(a.file, injected); } });
+  assert.equal(r1.code, 1);
+  assert.equal(r1.err, MESSAGE);
+  assert.equal(a.read(), injected, "the other writer's change is still there");
+  assert.deepEqual(stages, ["prev"], "it stopped at the first check");
+  same(keptBytes(a, "PHASES.md.prev"), prevBefore, ".prev unchanged");
+  noTmp(a);
+
+  // set, caught at the last check, right before the roadmap rename.
+  const b = project(STANDARD);
+  const bStages = [];
+  const startBytes = bytes(b.file);
+  const r2 = setStatus(b, "2", "shipped", { beforeRename: (stage) => { bStages.push(stage); if (stage === "roadmap") writeFileSync(b.file, injected); } });
+  assert.equal(r2.code, 1);
+  assert.equal(r2.err, MESSAGE);
+  assert.equal(b.read(), injected);
+  assert.deepEqual(bStages, ["prev", "roadmap"]);
+  same(keptBytes(b, ORIGINAL), startBytes);
+  noTmp(b);
+
+  // standardize --write.
+  const c = project(FIXABLE);
+  const cBefore = bytes(c.file);
+  const cStages = [];
+  const r3 = run(["standardize", c.file, ...OVERRIDES, "--write"], { now: NOW, beforeRename: (stage) => { cStages.push(stage); writeFileSync(c.file, injected); } });
+  assert.equal(r3.code, 1);
+  assert.equal(r3.err, MESSAGE);
+  assert.equal(c.read(), injected);
+  assert.deepEqual(cStages, ["roadmap"]);
+  same(keptBytes(c, BACKUP), cBefore, "the dated copy holds what the command read");
+  same(keptBytes(c, ORIGINAL), cBefore);
+  noTmp(c);
+
+  // restore --write.
+  const d = project(STANDARD);
+  assert.equal(setStatus(d, "3", "parked").code, 0);
+  const dBefore = bytes(d.file);
+  const r4 = run(["restore", d.file, "--from", "original", "--write"], { now: NOW, beforeRename: () => writeFileSync(d.file, injected) });
+  assert.equal(r4.code, 1);
+  assert.equal(r4.err, MESSAGE);
+  assert.equal(d.read(), injected);
+  same(keptBytes(d, "PHASES.md.before-restore-20260102-030405"), dBefore, "the copy of the file as the command read it");
+  noTmp(d);
+});
+
+test("backups: LF and CRLF files - every copy is byte-identical to what it copied, and the new text keeps its endings", () => {
+  const crlf = toCrlf(FIXABLE);
+  const p = project(crlf);
+  assert.equal(run(["standardize", p.file, ...OVERRIDES, "--write"], { now: NOW }).code, 0);
+  same(keptBytes(p, BACKUP), Buffer.from(crlf));
+  same(keptBytes(p, ORIGINAL), Buffer.from(crlf));
+  assert.equal(p.read().replace(/\r\n/g, "").includes("\n"), false);
+  const afterStandardize = bytes(p.file);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  same(keptBytes(p, "PHASES.md.prev"), afterStandardize);
+  assert.equal(p.read().replace(/\r\n/g, "").includes("\n"), false, "no bare LF after set");
+  assert.equal(run(["restore", p.file, "--from", "original", "--write"], { now: clock() }).code, 0);
+  same(bytes(p.file), Buffer.from(crlf), "the restore gives the CRLF bytes back");
+
+  const lf = project(STANDARD);
+  assert.equal(setStatus(lf, "1", "parked").code, 0);
+  same(keptBytes(lf, ORIGINAL), Buffer.from(STANDARD));
+  assert.equal(lf.read().includes("\r"), false);
+});
+
+// ── restore ─────────────────────────────────────────────────────────────────
+function sequence() {
+  // P0 (legacy) -> standardize -> P1 -> set -> P2
+  const p = project(FIXABLE);
+  const P0 = bytes(p.file);
+  assert.equal(run(["standardize", p.file, "--root", p.dir, ...OVERRIDES, "--write"], { now: NOW }).code, 0);
+  const P1 = bytes(p.file);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  const P2 = bytes(p.file);
+  return { p, P0, P1, P2 };
+}
+const restore = (p, args, extra = {}) => run(["restore", p.file, "--root", p.dir, ...args], extra);
+
+test("restore: with no backups it says so, exits 0 and creates nothing", () => {
+  const p = project(STANDARD);
+  const r = restore(p, []);
+  assert.equal(r.code, 0);
+  assert.equal(r.out, "no backups yet");
+  assert.deepEqual(readdirSync(p.dir), ["PHASES.md"], "a listing creates no folder");
+  assert.equal(restore(p, ["--from", "original"]).code, 2);
+  assert.match(restore(p, ["--from", "original"]).err, /there is no original copy of PHASES\.md yet/);
+  assert.equal(restore(p, ["--from", "prev"]).code, 2);
+  assert.deepEqual(readdirSync(p.dir), ["PHASES.md"]);
+});
+
+test("restore: the listing shows names, sizes, line counts and times newest first, and marks legacy copies beside the file", () => {
+  const { p, P0, P1 } = sequence();
+  const legacyName = "PHASES.md.bak-20250101-000000";
+  writeFileSync(join(p.dir, legacyName), "# old\n| # | Phase |\n");
+  const when = (name, date, inFolder = true) => { utimesSync(join(p.dir, ...(inFolder ? [BDIR] : []), name), date, date); };
+  when(ORIGINAL, new Date(2026, 0, 1, 10, 0));
+  when(BACKUP, new Date(2026, 0, 2, 11, 30));
+  when("PHASES.md.prev", new Date(2026, 0, 3, 9, 5));
+  when(legacyName, new Date(2025, 0, 1, 0, 0), false);
+  const r = restore(p, []);
+  assert.equal(r.code, 0, r.err);
+  const lines = r.out.split("\n");
+  const row = (name) => lines.findIndex((l) => l.startsWith(`  ${name}  `));
+  assert.ok(row("PHASES.md.prev") >= 0 && row(BACKUP) >= 0 && row(ORIGINAL) >= 0 && row(legacyName) >= 0, r.out);
+  assert.ok(row("PHASES.md.prev") < row(BACKUP) && row(BACKUP) < row(ORIGINAL) && row(ORIGINAL) < row(legacyName), "newest first");
+  assert.ok(lines[row("PHASES.md.prev")].includes(`${P1.length} bytes`));
+  assert.ok(lines[row("PHASES.md.prev")].includes("2026-01-03 09:05"));
+  assert.ok(lines[row(ORIGINAL)].includes(`${P0.length} bytes`));
+  assert.ok(lines[row(ORIGINAL)].includes(`${P0.toString("utf8").split("\n").length - 1} line(s)`));
+  assert.ok(lines[row(BACKUP)].includes("2026-01-02 11:30"));
+  assert.ok(lines[row(legacyName)].includes("legacy"));
+  assert.ok(!lines[row(ORIGINAL)].includes("legacy"));
+  assert.ok(lines[row(legacyName)].includes("2 line(s)"));
+  assert.ok(!r.out.includes(p.dir));
+});
+
+test("restore: a plan prints the lines and writes nothing", () => {
+  const { p, P0 } = sequence();
+  const names = () => [readdirSync(p.dir).sort(), kept(p)];
+  const before = names();
+  const current = bytes(p.file);
+  const r = restore(p, ["--from", "original"]);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /restore plan for PHASES\.md from PHASES\.md\.original: nothing is written without --write/);
+  assert.ok(r.out.includes(`    + ${P0.toString("utf8").split("\n").find((l) => l.startsWith("| # | Phase | State"))}`), "the old header comes back");
+  assert.ok(r.out.includes(`    - ${MARKER}`));
+  assert.match(r.out, /summary: \d+ line\(s\) would change \(\d+ removed, \d+ added\)/);
+  same(bytes(p.file), current);
+  assert.deepEqual(names(), before);
+  assert.equal(restore(p, ["--from", "prev"]).code, 0);
+  assert.deepEqual(names(), before);
+});
+
+test("restore --write: from original, prev and a dated name each give exactly that copy's bytes; each restore saves the file first, so a second restore undoes the first", () => {
+  const { p, P0, P1, P2 } = sequence();
+  const tick = clock(10);
+  const w = (from) => restore(p, ["--from", from, "--write"], { now: tick });
+  let r = w("original");
+  assert.equal(r.code, 0, r.err);
+  same(bytes(p.file), P0);
+  assert.match(r.out, /saved PHASES\.md\.before-restore-20260102-030410 in \.roadmap-backups\/ first/);
+  assert.match(r.out, /restored PHASES\.md from PHASES\.md\.original/);
+  same(keptBytes(p, "PHASES.md.before-restore-20260102-030410"), P2, "the file as it was before the restore");
+  // undo
+  r = w("PHASES.md.before-restore-20260102-030410");
+  assert.equal(r.code, 0, r.err);
+  same(bytes(p.file), P2, "the second restore undid the first");
+  same(keptBytes(p, "PHASES.md.before-restore-20260102-030411"), P0);
+  r = w("prev");
+  assert.equal(r.code, 0, r.err);
+  same(bytes(p.file), P1);
+  r = w(BACKUP);
+  assert.equal(r.code, 0, r.err);
+  same(bytes(p.file), P0);
+  same(keptBytes(p, ORIGINAL), P0, "the original never changed");
+  same(keptBytes(p, "PHASES.md.prev"), P1, "restore does not touch .prev");
+  assert.deepEqual(leftovers(p), []);
+});
+
+test("restore --write: a byte-identical choice says nothing to restore and writes nothing", () => {
+  const p = project(STANDARD);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  const before = [readdirSync(join(p.dir, BDIR)).sort(), bytes(p.file)];
+  const r = restore(p, ["--from", "prev", "--write"], { now: clock() });
+  assert.equal(r.code, 0);
+  assert.match(r.out, /nothing to restore: PHASES\.md\.prev is identical to PHASES\.md/);
+  assert.deepEqual(readdirSync(join(p.dir, BDIR)).sort(), before[0]);
+  same(bytes(p.file), before[1]);
+});
+
+test("restore: legacy copies beside the file are listed and restorable by name", () => {
+  const p = project(MESSY);
+  const legacy = "PHASES.md.bak-20250101-000000";
+  writeFileSync(join(p.dir, legacy), STANDARD);
+  assert.match(restore(p, []).out, new RegExp(`${legacy.replace(/\./g, "\\.")}.*legacy`));
+  const r = restore(p, ["--from", legacy, "--write"], { now: NOW });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(p.read(), STANDARD);
+  same(keptBytes(p, "PHASES.md.before-restore-20260102-030405"), Buffer.from(MESSY));
+  same(keptBytes(p, ORIGINAL), Buffer.from(MESSY), "restoring counts as a write: the original is kept first");
+  assert.equal(readFileSync(join(p.dir, legacy), "utf8"), STANDARD, "the legacy copy stays where it was");
+});
+
+test("restore: names with a slash, a backslash or .. are a usage error; an unknown name, an unreadable copy and a file outside --root exit 2 and write nothing", () => {
+  const { p } = sequence();
+  const before = [readdirSync(p.dir).sort(), kept(p), bytes(p.file)];
+  const check = () => { assert.deepEqual([readdirSync(p.dir).sort(), kept(p)], before.slice(0, 2)); same(bytes(p.file), before[2]); };
+  for (const bad of ["../PHASES.md", "sub/x", "sub\\x", "..", "a..b", "/etc/passwd", "C:\\x", ""]) {
+    const r = restore(p, ["--from", bad, "--write"], { now: clock() });
+    assert.equal(r.code, 2, JSON.stringify(bad));
+    assert.match(r.err, /--from takes original, prev, or a backup name/);
+    check();
+  }
+  const unknown = restore(p, ["--from", "PHASES.md.bak-20990101-000000", "--write"]);
+  assert.equal(unknown.code, 2);
+  assert.match(unknown.err, /there is no backup named/);
+  assert.equal(restore(p, ["--from", "PHASES.md.prev.tmp-1"]).code, 2, "only listed names count");
+  assert.equal(restore(p, ["--from", ".gitignore"]).code, 2);
+  assert.equal(restore(p, ["--write"]).code, 2, "--write needs --from");
+  assert.equal(run(["restore", p.file, "--from", "prev", "--from", "original"]).code, 2);
+  check();
+  const elsewhere = tmp();
+  for (const argv of [["restore", p.file, "--root", elsewhere], ["restore", p.file, "--root", elsewhere, "--from", "original", "--write"]]) {
+    const r = run(argv);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /outside the --root folder/);
+  }
+  assert.deepEqual(readdirSync(elsewhere), []);
+  check();
+  // A copy that is not valid UTF-8 is refused before anything is written.
+  writeFileSync(join(p.dir, BDIR, "PHASES.md.prev"), Buffer.from([0x23, 0xff, 0xfe, 0x0a]));
+  const bad = restore(p, ["--from", "prev", "--write"], { now: clock() });
+  assert.equal(bad.code, 2);
+  assert.match(bad.err, /not valid UTF-8/);
+  assert.deepEqual(readdirSync(p.dir).sort(), before[0]);
+  same(bytes(p.file), before[2]);
+  assert.equal(run(["restore", join(p.dir, "gone.md")]).code, 2);
+});
+
+test("restore: a backup that is a symlink is not listed and cannot be restored (skipped where symlinks cannot be made)", (t) => {
+  const p = project(STANDARD);
+  const secret = join(tmp(), "other.md");
+  writeFileSync(secret, "not a roadmap backup\n");
+  mkdirSync(join(p.dir, BDIR));
+  try { symlinkSync(secret, join(p.dir, BDIR, "PHASES.md.prev"), "file"); } catch { t.skip("this platform did not allow a symlink"); return; }
+  assert.equal(restore(p, []).out, "no backups yet");
+  assert.equal(restore(p, ["--from", "prev", "--write"]).code, 2);
+  assert.equal(p.read(), STANDARD);
+});
+
+// ── backups, second round: atomic copies, the folder as an argument, names, modes, retries ──
+const CHANGED_MESSAGE = "the roadmap changed while it was being written; nothing was changed, run again";
+const NAMES_ONLY = (p) => [readdirSync(p.dir).sort(), kept(p)];
+// Same length, different bytes: the first "#" becomes "$".
+const flip = (b) => { const c = Buffer.from(b); c[c.indexOf(0x23)] = 0x24; return c; };
+
+test("changed while writing: an edit of the SAME length is caught for set, standardize --write and restore --write", () => {
+  const a = project(STANDARD);
+  const aBefore = bytes(a.file);
+  const aEdit = flip(aBefore);
+  assert.equal(aEdit.length, aBefore.length);
+  assert.ok(!aEdit.equals(aBefore));
+  const r1 = setStatus(a, "2", "shipped", { beforeRename: () => writeFileSync(a.file, aEdit) });
+  assert.equal(r1.code, 1);
+  assert.equal(r1.err, CHANGED_MESSAGE);
+  same(bytes(a.file), aEdit, "the other writer's bytes are still there");
+  assert.deepEqual(leftovers(a), []);
+
+  const b = project(STANDARD);
+  const bEdit = flip(bytes(b.file));
+  const r2 = setStatus(b, "2", "shipped", { beforeRename: (stage) => { if (stage === "roadmap") writeFileSync(b.file, bEdit); } });
+  assert.equal(r2.code, 1);
+  assert.equal(r2.err, CHANGED_MESSAGE);
+  same(bytes(b.file), bEdit);
+
+  const c = project(FIXABLE);
+  const cEdit = flip(bytes(c.file));
+  const r3 = run(["standardize", c.file, ...OVERRIDES, "--write"], { now: NOW, beforeRename: () => writeFileSync(c.file, cEdit) });
+  assert.equal(r3.code, 1);
+  assert.equal(r3.err, CHANGED_MESSAGE);
+  same(bytes(c.file), cEdit);
+
+  const d = project(STANDARD);
+  assert.equal(setStatus(d, "3", "parked").code, 0);
+  const dEdit = flip(bytes(d.file));
+  const r4 = run(["restore", d.file, "--from", "original", "--write"], { now: NOW, beforeRename: () => writeFileSync(d.file, dEdit) });
+  assert.equal(r4.code, 1);
+  assert.equal(r4.err, CHANGED_MESSAGE);
+  same(bytes(d.file), dEdit);
+  assert.deepEqual(leftovers(d), []);
+});
+
+test("changed while reading: the .original holds the bytes READ at the start, and the command stops, whatever the file becomes right after the read", () => {
+  const injected = `${STANDARD}\n<!-- somebody else edited this -->\n`;
+  const a = project(STANDARD);
+  const aFirst = bytes(a.file);
+  const r1 = setStatus(a, "3", "parked", { afterLoad: () => writeFileSync(a.file, injected) });
+  assert.equal(r1.code, 1);
+  assert.equal(r1.err, CHANGED_MESSAGE);
+  assert.equal(a.read(), injected);
+  same(keptBytes(a, ORIGINAL), aFirst, "set: the first-read bytes");
+
+  const b = project(FIXABLE);
+  const bFirst = bytes(b.file);
+  const r2 = run(["standardize", b.file, ...OVERRIDES, "--write"], { now: NOW, afterLoad: () => writeFileSync(b.file, injected) });
+  assert.equal(r2.code, 1);
+  assert.equal(r2.err, CHANGED_MESSAGE);
+  assert.equal(b.read(), injected);
+  same(keptBytes(b, ORIGINAL), bFirst, "standardize: the first-read bytes");
+  same(keptBytes(b, BACKUP), bFirst, "and the dated copy");
+
+  const c = project(MESSY);
+  const cFirst = bytes(c.file);
+  const legacy = "PHASES.md.bak-20250101-000000";
+  writeFileSync(join(c.dir, legacy), STANDARD);
+  const r3 = run(["restore", c.file, "--from", legacy, "--write"], { now: NOW, afterLoad: () => writeFileSync(c.file, injected) });
+  assert.equal(r3.code, 1);
+  assert.equal(r3.err, CHANGED_MESSAGE);
+  assert.equal(c.read(), injected);
+  same(keptBytes(c, ORIGINAL), cFirst, "restore: the first-read bytes");
+  same(keptBytes(c, "PHASES.md.before-restore-20260102-030405"), cFirst);
+});
+
+test("a kept copy of a roadmap cannot be given as the file: set, standardize --write and restore --write exit 2, change nothing and make no nested folder", () => {
+  for (const argv of [["set", "FILE", "1", "--status", "parked"], ["standardize", "FILE", "--write"], ["restore", "FILE", "--from", "prev", "--write"], ["restore", "FILE"]]) {
+    const p = project(STANDARD);
+    mkdirSync(join(p.dir, BDIR));
+    writeFileSync(join(p.dir, BDIR, ORIGINAL), MESSY);
+    writeFileSync(join(p.dir, BDIR, "PHASES.md.prev"), "older\n");
+    const copy = join(p.dir, BDIR, ORIGINAL);
+    const before = [NAMES_ONLY(p), bytes(copy), bytes(p.file)];
+    for (const root of [[], ["--root", p.dir]]) {
+      const r = run([...argv.map((a) => (a === "FILE" ? copy : a)), ...root], { now: clock() });
+      assert.equal(r.code, 2, `${argv[0]}: ${r.err}`);
+      assert.match(r.err, /PHASES\.md\.original is inside a \.roadmap-backups folder, which holds kept copies/);
+      assert.ok(!r.err.includes(p.dir), "no absolute path");
+    }
+    assert.deepEqual(NAMES_ONLY(p), before[0]);
+    same(bytes(copy), before[1], "the kept copy is untouched");
+    same(bytes(p.file), before[2]);
+    assert.ok(!existsSync(join(p.dir, BDIR, BDIR)), "no nested backup folder");
+  }
+  // The folder name is compared without regard to case where the file system does not tell cases apart.
+  if (process.platform === "win32") {
+    const p = project(STANDARD);
+    mkdirSync(join(p.dir, BDIR));
+    writeFileSync(join(p.dir, BDIR, "x.md"), STANDARD);
+    assert.equal(run(["set", join(p.dir, BDIR.toUpperCase(), "x.md"), "1", "--status", "parked"]).code, 2);
+  }
+});
+
+test("a .original is published whole: while its temp file exists the final name does not, and a kill before the link leaves no .original at all", () => {
+  const p = project(STANDARD);
+  const seen = [];
+  const r = setStatus(p, "3", "parked", {
+    beforeLink: (tmpPath, finalPath) => {
+      seen.push({ name: finalPath.split(/[\\/]/).pop(), tmp: existsSync(tmpPath), tmpBytes: bytes(tmpPath), final: existsSync(finalPath), tmpName: tmpPath.split(/[\\/]/).pop() });
+    },
+  });
+  assert.equal(r.code, 0, r.err);
+  assert.deepEqual(seen.map((s) => s.name), [".gitignore", ORIGINAL]);
+  for (const s of seen) {
+    assert.ok(s.tmp && !s.final, `${s.name}: the temp file exists and the final name does not yet`);
+    assert.ok(s.tmpName.startsWith(`${s.name}.tmp-${process.pid}-`), s.tmpName);
+  }
+  same(seen[1].tmpBytes, STANDARD, "the temp file already held the whole file when it was linked");
+  same(seen[0].tmpBytes, "*\n");
+  same(keptBytes(p, ORIGINAL), STANDARD);
+  assert.deepEqual(leftovers(p), [], "the temp names are gone");
+
+  // A kill (here: an exception) right before the link: the final name was never there, the roadmap is untouched.
+  const k = project(STANDARD);
+  const boom = setStatus(k, "3", "parked", { beforeLink: (_t, finalPath) => { if (finalPath.endsWith(ORIGINAL)) throw Object.assign(new Error("killed"), { code: "EKILL" }); } });
+  assert.equal(boom.code, 1);
+  assert.match(boom.err, /could not keep PHASES\.md\.original \(EKILL\)/);
+  assert.ok(!existsSync(join(k.dir, BDIR, ORIGINAL)), "no .original exists, partial or not");
+  same(bytes(k.file), Buffer.from(STANDARD));
+  // The next run simply makes it.
+  assert.equal(setStatus(k, "3", "parked").code, 0);
+  same(keptBytes(k, ORIGINAL), STANDARD);
+  assert.ok(!existsSync(join(k.dir, BDIR, `${ORIGINAL}.incomplete`)));
+});
+
+test("a .original that appears between the check and the link is kept as it is (treated as already kept), and the temp file is removed", () => {
+  const p = project(STANDARD);
+  const r = setStatus(p, "3", "parked", { beforeLink: (_t, finalPath) => { if (finalPath.endsWith(ORIGINAL)) writeFileSync(finalPath, "raced in"); } });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(keptText(p, ORIGINAL), "raced in");
+  assert.ok(!r.out.includes("first version kept"), "this run did not make it");
+  assert.deepEqual(leftovers(p), []);
+});
+
+test("where a link cannot be made, the copy is written under its final name between a marker and its removal; no marker and no temp file remain", () => {
+  for (const linkError of ["EPERM", "ENOTSUP", "EXDEV", "EINVAL", "ENOSYS"]) {
+    const p = project(STANDARD);
+    const marks = [];
+    const r = setStatus(p, "3", "parked", {
+      linkError,
+      afterMarker: (marker, finalPath) => marks.push({ name: marker.split(/[\\/]/).pop(), marker: existsSync(marker), final: existsSync(finalPath) }),
+    });
+    assert.equal(r.code, 0, `${linkError}: ${r.err}`);
+    assert.deepEqual(marks.map((m) => m.name), [".gitignore.incomplete", `${ORIGINAL}.incomplete`]);
+    for (const m of marks) assert.ok(m.marker && !m.final, `${m.name}: the marker is there before the file is`);
+    same(keptBytes(p, ORIGINAL), STANDARD);
+    assert.equal(keptText(p, ".gitignore"), "*\n");
+    assert.deepEqual(kept(p), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort(), "no marker is left");
+    assert.deepEqual(leftovers(p), []);
+  }
+  // A dated name that exists is still refused on that path, and its marker does not stay behind.
+  const q = project(FIXABLE);
+  mkdirSync(join(q.dir, BDIR));
+  writeFileSync(join(q.dir, BDIR, BACKUP), "mine");
+  const before = bytes(q.file);
+  const r = run(["standardize", q.file, ...OVERRIDES, "--write"], { now: NOW, linkError: "EPERM" });
+  assert.equal(r.code, 1);
+  assert.match(r.err, /already exists; nothing was written/);
+  assert.equal(keptText(q, BACKUP), "mine");
+  same(bytes(q.file), before);
+  assert.ok(!kept(q).some((n) => n.endsWith(".incomplete")), "the marker was removed");
+});
+
+test("a leftover .incomplete marker (an earlier copy cut short) makes every write refuse with exit 1 and nothing written; read-only commands still work", () => {
+  const markers = [`${ORIGINAL}.incomplete`, "PHASES.md.bak-20260102-030405.incomplete", "PHASES.md.before-restore-20260102-030405.incomplete", ".gitignore.incomplete"];
+  for (const marker of markers) {
+    for (const [file, argv] of [
+      [FIXABLE, ["standardize", "FILE", ...OVERRIDES, "--write"]],
+      [STANDARD, ["set", "FILE", "3", "--status", "parked"]],
+      [STANDARD, ["restore", "FILE", "--from", "prev", "--write"]],
+    ]) {
+      const p = project(file);
+      mkdirSync(join(p.dir, BDIR));
+      writeFileSync(join(p.dir, BDIR, ORIGINAL), "short");
+      writeFileSync(join(p.dir, BDIR, "PHASES.md.prev"), "older\n");
+      writeFileSync(join(p.dir, BDIR, marker), "");
+      const before = [NAMES_ONLY(p), bytes(p.file)];
+      const r = run(argv.map((a) => (a === "FILE" ? p.file : a)), { now: clock() });
+      assert.equal(r.code, 1, `${marker} ${argv[0]}: ${r.err}`);
+      assert.ok(r.err.includes(`${marker} is in the .roadmap-backups folder`), r.err);
+      if (marker === `${ORIGINAL}.incomplete`) assert.ok(r.err.includes("Compare PHASES.md.original with the roadmap; if it is shorter than the roadmap, different, or you are unsure, delete PHASES.md.original too (it is made again from the current roadmap), and only then delete the marker file; nothing was written"), r.err);
+      else assert.ok(r.err.includes(`The cut-short copy is ${marker.slice(0, -".incomplete".length)}: delete ${marker.slice(0, -".incomplete".length)} and then delete the marker file; nothing was written`), r.err);
+      assert.deepEqual(NAMES_ONLY(p), before[0], "nothing was created or removed");
+      same(bytes(p.file), before[1]);
+      assert.equal(keptText(p, ORIGINAL), "short", "the short copy is not touched either");
+      assert.equal(run(["restore", p.file]).code, 0, "listing still works");
+    }
+  }
+  // Once the owner has deleted the marker, writes go on; a marker of another roadmap file never blocks.
+  const p = project(STANDARD);
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, "Other.md.original.incomplete"), "");
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  rmSync(join(p.dir, BDIR, "Other.md.original.incomplete"));
+  writeFileSync(join(p.dir, BDIR, `${ORIGINAL}.incomplete`), "");
+  assert.equal(setStatus(p, "3", "planned").code, 1);
+  rmSync(join(p.dir, BDIR, `${ORIGINAL}.incomplete`));
+  assert.equal(setStatus(p, "3", "planned").code, 0);
+});
+
+test("a fallback publish that fails with something left at the final name keeps its marker: the next write refuses, and nothing is written", () => {
+  const p = project(STANDARD);
+  const before = bytes(p.file);
+  const r = setStatus(p, "3", "parked", {
+    linkError: "EPERM",
+    afterMarker: (_marker, finalPath) => { if (finalPath.endsWith(ORIGINAL)) writeFileSync(finalPath, "short"); },
+  });
+  assert.equal(r.code, 1, r.err);
+  assert.match(r.err, /could not keep PHASES\.md\.original/);
+  assert.ok(existsSync(join(p.dir, BDIR, `${ORIGINAL}.incomplete`)), "the marker stays");
+  assert.equal(keptText(p, ORIGINAL), "short", "the short file is untouched");
+  same(bytes(p.file), before, "the roadmap is byte-identical");
+  assert.ok(!kept(p).includes("PHASES.md.prev"), "no copy of the roadmap was made");
+  assert.deepEqual(leftovers(p), []);
+  // The next write refuses, because the marker is there.
+  const again = setStatus(p, "3", "parked");
+  assert.equal(again.code, 1);
+  assert.match(again.err, /PHASES\.md\.original\.incomplete is in the \.roadmap-backups folder/);
+  same(bytes(p.file), before);
+  assert.equal(keptText(p, ORIGINAL), "short");
+});
+
+test("the in-place publish removes its marker only when nothing is left at the final name; a name that was taken before gets no marker at all", () => {
+  // A dated name that is already there: no marker is made, so none can stay.
+  const q = project(FIXABLE);
+  mkdirSync(join(q.dir, BDIR));
+  writeFileSync(join(q.dir, BDIR, BACKUP), "mine");
+  const marks = [];
+  const r = run(["standardize", q.file, ...OVERRIDES, "--write"], { now: NOW, linkError: "EPERM", afterMarker: (m) => marks.push(m) });
+  assert.equal(r.code, 1);
+  assert.ok(!marks.some((m) => m.includes(BACKUP)), "no marker was made for a name that was taken");
+  assert.ok(!kept(q).some((n) => n.endsWith(".incomplete")));
+  // The rule is in the code: on failure the marker goes only after a look at the final name, and the look cannot throw.
+  const source = readFileSync(SCRIPT, "utf8");
+  const body = source.slice(source.indexOf("function publishInPlace"), source.indexOf("// Removes a temp file this command made"));
+  assert.match(body, /const made = createExclusive\(path, data\);\s*if \(!made\) \{ discard\(marker\); return null; \}/);
+  assert.match(body, /try \{ if \(!lstatOrNull\(path\)\) discard\(marker\); \} catch \{[^}]*\}\s*return made;/);
+  assert.equal(body.match(/discard\(marker\)/g).length, 2, "the marker is discarded after a success and after the look, nowhere else");
+});
+
+test("keepOriginal after EEXIST: a folder or a link at .original exits 1 and writes nothing; so does a file next to a .original.incomplete marker", (t) => {
+  const cases = [
+    ["a folder", (finalPath) => mkdirSync(finalPath), /it is not a regular file/],
+    ["a link", (finalPath) => symlinkSync(join(tmp(), "elsewhere.md"), finalPath, "file"), /it is not a regular file/],
+    ["a file with a marker", (finalPath) => { writeFileSync(finalPath, "short"); writeFileSync(`${finalPath}.incomplete`, ""); }, /an earlier copy of it was cut short/],
+  ];
+  for (const [label, plant, expected] of cases) {
+    const p = project(STANDARD);
+    const before = bytes(p.file);
+    let planted = true;
+    const r = setStatus(p, "3", "parked", {
+      beforeLink: (_t, finalPath) => {
+        if (!finalPath.endsWith(ORIGINAL)) return;
+        try { plant(finalPath); } catch { planted = false; }
+      },
+    });
+    if (!planted) { t.diagnostic(`${label}: this platform did not allow it`); continue; }
+    assert.equal(r.code, 1, `${label}: ${r.err}`);
+    assert.match(r.err, expected, label);
+    assert.match(r.err, /could not keep PHASES\.md\.original/);
+    same(bytes(p.file), before, `${label}: the roadmap is untouched`);
+    assert.ok(!kept(p).includes("PHASES.md.prev"), `${label}: no copy was made`);
+    assert.deepEqual(leftovers(p), [], label);
+    if (label === "a file with a marker") assert.equal(keptText(p, ORIGINAL), "short");
+  }
+});
+
+test("the recovery message names the cut-short copy: .original is compared and may be deleted too; any other marker names its own copy, not .original", () => {
+  for (const [marker, copy] of [[`${ORIGINAL}.incomplete`, ORIGINAL], [".gitignore.incomplete", ".gitignore"], ["PHASES.md.bak-20260102-030405.incomplete", "PHASES.md.bak-20260102-030405"], ["PHASES.md.before-restore-20260102-030405.incomplete", "PHASES.md.before-restore-20260102-030405"]]) {
+    for (const original of ["short", STANDARD.replace("planned", "parked")]) {
+      const p = project(STANDARD);
+      mkdirSync(join(p.dir, BDIR));
+      writeFileSync(join(p.dir, BDIR, ORIGINAL), original);
+      writeFileSync(join(p.dir, BDIR, marker), "");
+      const r = setStatus(p, "3", "parked");
+      assert.equal(r.code, 1, r.err);
+      assert.ok(r.err.includes(`${marker} is in the .roadmap-backups folder`), r.err);
+      if (copy === ORIGINAL) {
+        assert.ok(r.err.includes("if it is shorter than the roadmap, different, or you are unsure, delete PHASES.md.original too"), r.err);
+        assert.ok(r.err.includes("and only then delete the marker file"), r.err);
+      } else {
+        assert.ok(r.err.includes(`The cut-short copy is ${copy}`), r.err);
+        assert.ok(!r.err.includes(".original"), `${marker}: .original is not mentioned: ${r.err}`);
+      }
+    }
+  }
+});
+
+test("the byte order mark in the reader is written as an escape, not as an invisible character, and still works", () => {
+  const source = readFileSync(SCRIPT, "utf8");
+  const bom = String.fromCharCode(0xFEFF);
+  assert.ok(!source.includes(bom), "no literal U+FEFF in the script");
+  assert.ok(source.includes("replace(/^" + String.fromCharCode(92) + "uFEFF/"), "the escape is used");
+  const body = table(MIN, [["1", "one", "planned"]]);
+  assert.equal(parseRoadmap(bom + body).tables[0].legacy, false);
+  assert.equal(parseRoadmap(`intro\n${bom}${body}`).tables[0].legacy, true);
+});
+
+test("restore: a failure to list the backups exits 1 (like any unusable backup folder), writes nothing, and names the file by its base name", () => {
+  const p = project(STANDARD);
+  const before = bytes(p.file);
+  for (const argv of [[], ["--from", "prev"], ["--from", "prev", "--write"]]) {
+    const r = restore(p, argv, { listDir: () => { throw Object.assign(new Error("denied"), { code: "EACCES" }); } });
+    assert.equal(r.code, 1, `${argv.join(" ")}: ${r.err}`);
+    assert.equal(r.err, "cannot list the backups of PHASES.md (EACCES); nothing was written");
+  }
+  same(bytes(p.file), before);
+  assert.equal(kept(p), null, "no folder was made");
+});
+
+test("a roadmap path that cannot be resolved says 'no such file' only for a missing file; any other error gives its code", () => {
+  const missing = run(["check", join(tmp(), "missing.md")]);
+  assert.equal(missing.code, 2);
+  assert.equal(missing.err, "cannot read missing.md: no such file");
+  const source = readFileSync(SCRIPT, "utf8");
+  assert.ok(source.includes('e?.code === "ENOENT" ? `cannot read ${typed}: no such file` : `cannot read ${typed} (${codeOf(e)})`'));
+});
+
+test("a short .original that is already there is trusted as a name, never written to, and never made by this tool", () => {
+  const p = project(STANDARD);
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, ORIGINAL), "0123456789");
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  assert.equal(keptText(p, ORIGINAL), "0123456789", "never overwritten");
+  // Whatever way a run fails, no .original is left half made: this test's copies are all whole or absent.
+  for (const stage of ["prev", "roadmap"]) {
+    const q = project(STANDARD);
+    setStatus(q, "3", "parked", { beforeRename: (s) => { if (s === stage) writeFileSync(q.file, `${STANDARD}\nx\n`); } });
+    same(keptBytes(q, ORIGINAL), STANDARD, "whole");
+  }
+});
+
+test("the files are flushed before they are published or closed", () => {
+  const src = readFileSync(SCRIPT, "utf8");
+  const body = src.slice(src.indexOf("function createExclusive"), src.indexOf("function syncDir"));
+  assert.ok(body.indexOf("fsyncSync(fd)") > body.indexOf("writeFileSync(fd, data)"), "flushed after the write");
+  assert.ok(body.indexOf("fsyncSync(fd)") < body.indexOf("closeSync(fd)"), "and before the close");
+});
+
+test("every path that is not a plain regular .gitignore, or has other content, is dealt with before .original (no .original after a refusal)", () => {
+  const p = project(STANDARD);
+  mkdirSync(join(p.dir, BDIR, ".gitignore"), { recursive: true });
+  assert.equal(setStatus(p, "3", "parked").code, 1);
+  assert.ok(!existsSync(join(p.dir, BDIR, ORIGINAL)));
+  assert.ok(!existsSync(join(p.dir, BDIR, "PHASES.md.prev")));
+});
+
+test("the roadmap's temp file lives in the backup folder; nothing named .tmp is ever next to the roadmap, at any moment of set, standardize --write or restore --write", () => {
+  const watch = (p) => {
+    const seen = [];
+    const hook = (stage) => {
+      const next = readdirSync(p.dir).sort();
+      const inside = readdirSync(join(p.dir, BDIR)).sort();
+      seen.push({ stage, next, inside });
+    };
+    return { seen, hook };
+  };
+  const a = project(STANDARD);
+  const wa = watch(a);
+  assert.equal(setStatus(a, "3", "parked", { beforeRename: wa.hook }).code, 0);
+  assert.deepEqual(wa.seen.map((s) => s.stage), ["prev", "roadmap"]);
+  for (const s of wa.seen) assert.deepEqual(s.next, [BDIR, "PHASES.md"].sort(), "nothing next to the roadmap but the folder");
+  assert.ok(wa.seen[0].inside.some((n) => /^PHASES\.md\.prev\.tmp-\d+-[0-9a-f]{8}$/.test(n)), "the .prev temp name has a random part");
+  assert.ok(wa.seen[1].inside.includes("PHASES.md.tmp"), "the roadmap's temp file is in the folder");
+  assert.deepEqual(NAMES_ONLY(a)[0], [BDIR, "PHASES.md"].sort());
+
+  const b = project(FIXABLE);
+  const wb = watch(b);
+  assert.equal(run(["standardize", b.file, ...OVERRIDES, "--write"], { now: NOW, beforeRename: wb.hook }).code, 0);
+  assert.deepEqual(wb.seen.map((s) => s.stage), ["roadmap"]);
+  assert.deepEqual(wb.seen[0].next, [BDIR, "PHASES.md"].sort());
+  assert.ok(wb.seen[0].inside.includes("PHASES.md.tmp"));
+
+  const c = project(STANDARD);
+  assert.equal(setStatus(c, "3", "parked").code, 0);
+  const wc = watch(c);
+  assert.equal(run(["restore", c.file, "--from", "original", "--write"], { now: NOW, beforeRename: wc.hook }).code, 0);
+  assert.deepEqual(wc.seen[0].next, [BDIR, "PHASES.md"].sort());
+  assert.ok(wc.seen[0].inside.includes("PHASES.md.tmp"));
+  assert.deepEqual(leftovers(c), []);
+});
+
+test("a stale .prev temp name from an earlier run with the same process id does not block a set", () => {
+  const p = project(STANDARD);
+  mkdirSync(join(p.dir, BDIR));
+  writeFileSync(join(p.dir, BDIR, `PHASES.md.prev.tmp-${process.pid}`), "stale");
+  const r = setStatus(p, "3", "parked");
+  assert.equal(r.code, 0, r.err);
+  assert.equal(keptText(p, `PHASES.md.prev.tmp-${process.pid}`), "stale", "the stale file is not ours to remove");
+});
+
+test("the 'first version kept' line is printed once by set, standardize --write and restore --write, whichever makes the .original", () => {
+  const a = project(FIXABLE);
+  const r1 = run(["standardize", a.file, ...OVERRIDES, "--write"], { now: NOW });
+  assert.equal(r1.code, 0, r1.err);
+  assert.match(r1.out, /first version kept as PHASES\.md\.original in \.roadmap-backups\/ \(never overwritten\)/);
+  const r2 = run(["standardize", a.file, "--write"], { now: clock() });
+  assert.ok(!r2.out.includes("first version kept"));
+
+  const b = project(MESSY);
+  writeFileSync(join(b.dir, "PHASES.md.bak-20250101-000000"), STANDARD);
+  const r3 = run(["restore", b.file, "--from", "PHASES.md.bak-20250101-000000", "--write"], { now: clock(20) });
+  assert.equal(r3.code, 0, r3.err);
+  assert.match(r3.out, /first version kept as PHASES\.md\.original in \.roadmap-backups\/ \(never overwritten\)/);
+  const r4 = run(["restore", b.file, "--from", "original", "--write"], { now: clock() });
+  assert.equal(r4.code, 0, r4.err);
+  assert.ok(!r4.out.includes("first version kept"));
+});
+
+test("names: a differently-cased file argument and a link use the backup set of the real file name; a colon name is refused on Windows", (t) => {
+  const p = project(STANDARD);
+  if (process.platform === "win32") {
+    const r = run(["set", join(p.dir, "phases.md"), "3", "--status", "parked", "--root", p.dir]);
+    assert.equal(r.code, 0, r.err);
+    assert.match(r.out, /^updated PHASES\.md line/, "the printed name is the real one");
+    assert.deepEqual(kept(p), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort(), "one backup set, under the real name");
+    const listed = run(["restore", join(p.dir, "Phases.MD"), "--root", p.dir]);
+    assert.equal(listed.code, 0, listed.err);
+    assert.match(listed.out, /^backups of PHASES\.md /);
+    assert.ok(listed.out.includes(`  ${ORIGINAL}  `));
+    const stream = run(["set", join(p.dir, "PHASES.md:evil"), "3", "--status", "planned"]);
+    assert.equal(stream.code, 2);
+    assert.match(stream.err, /colon in a file name is an NTFS stream name/);
+    assert.deepEqual(readdirSync(p.dir).sort(), [BDIR, "PHASES.md"].sort(), "no stream and no empty file was made");
+  } else {
+    t.diagnostic("case-sensitive platform: the real-name behaviour is asserted instead of the case variant");
+    assert.equal(setStatus(p, "3", "parked").code, 0);
+    assert.deepEqual(kept(p), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort());
+  }
+  // A link: the backup names come from the file the link points to, and the link itself stays a link.
+  const q = project(STANDARD);
+  try { symlinkSync(q.file, join(q.dir, "link.md"), "file"); } catch { t.diagnostic("this platform did not allow a symlink: that part is skipped"); return; }
+  const r = run(["set", join(q.dir, "link.md"), "3", "--status", "parked"]);
+  assert.equal(r.code, 0, r.err);
+  assert.match(r.out, /^updated PHASES\.md line/);
+  assert.deepEqual(kept(q), [".gitignore", ORIGINAL, "PHASES.md.prev"].sort(), "no link.md.* copies");
+  assert.ok(lstatSync(join(q.dir, "link.md")).isSymbolicLink());
+  assert.equal(q.read().includes("| parked |") || q.read().includes("parked"), true);
+});
+
+test("modes: the roadmap keeps its mode, copies are owner-only and the folder 0700 where the system has modes; on Windows nothing throws", () => {
+  const posix = process.platform !== "win32";
+  for (const mode of [0o640, 0o600, 0o664]) {
+    const p = project(STANDARD);
+    if (posix) chmodSync(p.file, mode);
+    assert.equal(setStatus(p, "3", "parked").code, 0);
+    assert.equal(run(["standardize", p.file, "--write"], { now: clock() }).code, 0, "standardize with nothing to change");
+    assert.equal(run(["restore", p.file, "--from", "original", "--write"], { now: clock() }).code, 0);
+    if (posix) {
+      assert.equal(lstatSync(p.file).mode & 0o777, mode, "the roadmap keeps its mode");
+      assert.equal(lstatSync(join(p.dir, BDIR)).mode & 0o777, 0o700);
+      for (const n of kept(p)) assert.equal(lstatSync(join(p.dir, BDIR, n)).mode & 0o177, 0, `${n} has no group or other bits and is not executable`);
+    }
+    assert.deepEqual(leftovers(p), []);
+  }
+});
+
+test("a BOM in front of the marker on the first line is allowed: the table is standard, set works and keeps the BOM; a BOM anywhere else does not count", () => {
+  const body = table(MIN, [["1", "one", "planned"], ["2", "two", "shipped"]]);
+  const text = `﻿${body}`;
+  const parsed = parseRoadmap(text);
+  assert.equal(parsed.tables[0].legacy, false);
+  assert.equal(parsed.tables[0].markerLine, 1);
+  assert.deepEqual(parsed.tables[0].problems, []);
+  assert.equal(run(["check", writeTemp(text), "--strict"]).code, 0);
+  const p = project(text);
+  const r = setStatus(p, "1", "shipped");
+  assert.equal(r.code, 0, r.err);
+  const after = bytes(p.file);
+  assert.deepEqual([...after.subarray(0, 3)], [0xef, 0xbb, 0xbf], "the BOM is kept");
+  assert.equal(toReadJson(parseRoadmap(p.read()), "x").tables[0].phases[0].status, "shipped");
+  same(keptBytes(p, ORIGINAL), Buffer.from(text), "the .original has the BOM too");
+  // not the first line: legacy
+  assert.equal(parseRoadmap(`intro\n﻿${body}`).tables[0].legacy, true);
+  assert.equal(parseRoadmap(body).tables[0].legacy, false);
+});
+
+test("--from matches a listed name exactly: a case variant of a dated name, of original or of prev is a usage error (exit 2) and writes nothing", () => {
+  const { p } = sequence();
+  const before = [NAMES_ONLY(p), bytes(p.file)];
+  for (const bad of [BACKUP.toLowerCase(), BACKUP.replace("PHASES.md", "phases.md"), "Original", "ORIGINAL", "Prev", "PHASES.MD.ORIGINAL", "phases.md.prev"]) {
+    for (const extra of [[], ["--write"]]) {
+      const r = restore(p, ["--from", bad, ...extra], { now: clock() });
+      assert.equal(r.code, 2, `${bad} ${extra}: ${r.err}`);
+    }
+  }
+  assert.deepEqual(NAMES_ONLY(p), before[0]);
+  same(bytes(p.file), before[1]);
+  assert.equal(restore(p, ["--from", BACKUP]).code, 0, "the exact name works");
+});
+
+test("rename retry: on Windows a refused rename is retried up to 10 times after the same check, waiting 10..100 ms; elsewhere it is not retried", () => {
+  const eperm = (code = "EPERM") => Object.assign(new Error("refused"), { code });
+  // fails twice, then succeeds
+  let calls = 0;
+  const waits = [];
+  let rechecks = 0;
+  const flaky = () => { if (++calls <= 2) throw eperm(); };
+  assert.equal(renameWithRetry("a", "b", () => { rechecks++; return true; }, { rename: flaky, platform: "win32", wait: (ms) => waits.push(ms) }), null);
+  assert.equal(calls, 3);
+  assert.deepEqual(waits, [10, 20]);
+  assert.equal(rechecks, 2, "the file was checked before each retry");
+  // other codes that count
+  for (const code of ["EACCES", "EBUSY"]) {
+    let n = 0;
+    assert.equal(renameWithRetry("a", "b", () => true, { rename: () => { if (++n < 2) throw eperm(code); }, platform: "win32", wait: () => {} }), null, code);
+    assert.equal(n, 2);
+  }
+  // fails for good: 1 try + 10 retries, then the code
+  calls = 0;
+  waits.length = 0;
+  rechecks = 0;
+  const hopeless = () => { calls++; throw eperm(); };
+  assert.deepEqual(renameWithRetry("a", "b", () => { rechecks++; return true; }, { rename: hopeless, platform: "win32", wait: (ms) => waits.push(ms) }), { code: "EPERM" });
+  assert.equal(calls, 11);
+  assert.deepEqual(waits, [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+  assert.equal(rechecks, 10);
+  // the file changes: stop at once, report it, no more tries
+  calls = 0;
+  assert.deepEqual(renameWithRetry("a", "b", () => false, { rename: hopeless, platform: "win32", wait: () => {} }), { changed: true });
+  assert.equal(calls, 1);
+  // another error is not retried
+  calls = 0;
+  assert.deepEqual(renameWithRetry("a", "b", () => true, { rename: () => { calls++; throw eperm("ENOENT"); }, platform: "win32", wait: () => { throw new Error("must not wait"); } }), { code: "ENOENT" });
+  assert.equal(calls, 1);
+  // not Windows: one try
+  calls = 0;
+  assert.deepEqual(renameWithRetry("a", "b", () => { throw new Error("must not recheck"); }, { rename: hopeless, platform: "linux", wait: () => { throw new Error("must not wait"); } }), { code: "EPERM" });
+  assert.equal(calls, 1);
+});
+
+test("rename retry, through the commands: a rename refused once per target still gives a finished set; a refused-for-good rename fails closed; a change during a wait is caught", () => {
+  const failOncePerTarget = () => { const done = new Set(); return (a, b) => { if (!done.has(b)) { done.add(b); throw Object.assign(new Error("refused"), { code: "EPERM" }); } renameSync(a, b); }; };
+  const p = project(STANDARD);
+  const r = setStatus(p, "3", "parked", { rename: failOncePerTarget(), platform: "win32", wait: () => {} });
+  assert.equal(r.code, 0, r.err);
+  assert.equal(toReadJson(parseRoadmap(p.read()), "x").tables[0].phases[2].status, "parked");
+  same(keptBytes(p, "PHASES.md.prev"), STANDARD);
+  assert.deepEqual(leftovers(p), []);
+
+  const q = project(STANDARD);
+  const refused = setStatus(q, "3", "parked", { rename: () => { throw Object.assign(new Error("refused"), { code: "EBUSY" }); }, platform: "win32", wait: () => {} });
+  assert.equal(refused.code, 1);
+  assert.match(refused.err, /could not keep PHASES\.md\.prev \(EBUSY\); nothing was written\. PHASES\.md was not changed/);
+  same(bytes(q.file), Buffer.from(STANDARD));
+  assert.deepEqual(leftovers(q), []);
+
+  const s = project(STANDARD);
+  const injected = `${STANDARD}\n<!-- changed during the wait -->\n`;
+  const caught = setStatus(s, "3", "parked", { rename: () => { throw Object.assign(new Error("refused"), { code: "EPERM" }); }, platform: "win32", wait: () => writeFileSync(s.file, injected) });
+  assert.equal(caught.code, 1);
+  assert.equal(caught.err, CHANGED_MESSAGE);
+  assert.equal(s.read(), injected);
+  assert.deepEqual(leftovers(s), []);
+
+  const t = project(FIXABLE);
+  const std = run(["standardize", t.file, ...OVERRIDES, "--write"], { now: NOW, rename: () => { throw Object.assign(new Error("refused"), { code: "EACCES" }); }, platform: "win32", wait: () => {} });
+  assert.equal(std.code, 1);
+  assert.match(std.err, /could not replace PHASES\.md \(EACCES\)\. PHASES\.md was not changed/);
+  same(bytes(t.file), Buffer.from(FIXABLE));
+});
+
+// ── git ─────────────────────────────────────────────────────────────────────
+const hasGit =spawnSync("git", ["--version"], { encoding: "utf8" }).status === 0;
+test("git: the backup folder never shows up in git status and git add -A stages nothing from it", { skip: hasGit ? false : "git is not installed on this machine" }, () => {
+  const p = project(FIXABLE);
+  const git = (...args) => spawnSync("git", ["-c", "user.name=test", "-c", "user.email=nobody", "-c", "commit.gpgsign=false", ...args], { cwd: p.dir, encoding: "utf8" });
+  assert.equal(git("init", "-q").status, 0);
+  assert.equal(git("add", "PHASES.md").status, 0);
+  assert.equal(git("commit", "-q", "-m", "first").status, 0);
+  assert.equal(run(["standardize", p.file, ...OVERRIDES, "--write"], { now: NOW }).code, 0);
+  assert.equal(setStatus(p, "3", "parked").code, 0);
+  assert.ok(kept(p).length >= 4, "the folder holds the copies");
+  const status = git("status", "--porcelain");
+  assert.equal(status.status, 0);
+  assert.ok(!status.stdout.includes(BDIR), `git lists nothing from the folder: ${status.stdout}`);
+  assert.ok(status.stdout.includes("PHASES.md"), "the roadmap itself shows as modified");
+  assert.equal(git("add", "-A").status, 0);
+  const staged = git("diff", "--cached", "--name-only").stdout;
+  assert.ok(!staged.includes(BDIR), `nothing staged from the folder: ${staged}`);
+  assert.ok(staged.includes("PHASES.md"));
+  const ignored = git("status", "--porcelain", "--ignored").stdout;
+  assert.ok(ignored.includes(`!! ${BDIR}/`), `the folder is ignored: ${ignored}`);
+});
+
+// ── the whole run ───────────────────────────────────────────────────────────
+test("no message of any command above contained an absolute path to a temp folder", () => {
+  assert.ok(TRANSCRIPT.length > 100, "the transcript is not empty");
+  const dirs = scratch.flatMap((d) => { try { return [d, realpathSync.native(d)]; } catch { return [d]; } });
+  for (const line of TRANSCRIPT) {
+    for (const d of dirs) assert.ok(!line.includes(d), "a temp folder path was printed");
+    assert.doesNotMatch(line, /[A-Za-z]:[\\/](Users|Windows|Temp)|(^|\s)\/(tmp|var|home|Users)\//i);
+  }
 });
