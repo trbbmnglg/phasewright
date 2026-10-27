@@ -7,9 +7,9 @@ Skills, agents and plugins that keep AI-assisted coding work small, checked and 
 
 ## What's new
 
+- **phased-shipping 0.9.0** (2026-10-27): Dashboard data: opt-in status files at each gate, a local project list, and one merged JSON.
 - **phased-shipping 0.8.0** (2026-10-27): Onboarding: survey a project with your consent first, then standardize, adopt or start a roadmap.
 - **phased-shipping 0.7.1** (2026-10-26): Every roadmap write keeps a way back: the first version is kept for good, with undo and restore.
-- **phased-shipping 0.7.0** (2026-10-26): A roadmap standard, and a script to check, standardize and update a roadmap.
 
 Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
 <!-- whats-new:end -->
