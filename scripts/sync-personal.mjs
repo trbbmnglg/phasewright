@@ -41,10 +41,10 @@ const PLUGINS = [
   {
     name: "phased-shipping",
     prefix: "ps-",
-    components: /phased-shipping:(plan|run|roadmap|onboard|model-scout|builder|checker|shipper)\b/g,
+    components: /phased-shipping:(plan|run|roadmap|onboard|dashboard|model-scout|builder|checker|shipper)\b/g,
     // ${CLAUDE_PLUGIN_DATA} only exists for installed plugins; personal copies keep their history here.
     data: join(CLAUDE, "phased-shipping").split("\\").join("/"),
-    siblings: /\.\.\/(plan|run|roadmap|onboard)\//g,
+    siblings: /\.\.\/(plan|run|roadmap|onboard|dashboard)\//g,
   },
   { name: "free-resources", prefix: "", components: null, data: null, siblings: null },
 ].map((p) => {
