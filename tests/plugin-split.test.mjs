@@ -13,7 +13,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
 const FR = join(REPO, "plugins", "free-resources", "skills", "free-resources");
 const FIX = join(HERE, "fixtures");
-const tmp = (label) => mkdtempSync(join(tmpdir(), `${label}-`));
+// Each test removes what it made; the after hook removes whatever a failing or careless test leaves behind.
+const scratch = [];
+const tmp = (label) => { const d = mkdtempSync(join(tmpdir(), `${label}-`)); scratch.push(d); return d; };
+test.after(() => { for (const d of scratch) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
 // ---------- manifest: support level per plugin ----------
 

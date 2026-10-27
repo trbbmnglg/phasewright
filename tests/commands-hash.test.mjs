@@ -34,7 +34,10 @@ const PLAN = [
   "",
 ].join("\n");
 
-const scratch = () => mkdtempSync(join(tmpdir(), "psp7-"));
+// Most tests never remove their folder, so the after hook removes every folder this file made.
+const made = [];
+const scratch = () => { const d = mkdtempSync(join(tmpdir(), "psp7-")); made.push(d); return d; };
+test.after(() => { for (const d of made) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 const withPlan = (text, name = "phase-3-zork.md") => {
   const dir = scratch();
   const plan = join(dir, name);

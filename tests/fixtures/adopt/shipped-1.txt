@@ -1,0 +1,8 @@
+# Phase 1: Set up the project
+
+**Models:** plan opus · build sonnet
+**Kind:** infra
+**Timestamps:** started 2026-01-02T03:04:05Z · previewed 2026-01-02T04:00:00Z · approved 2026-01-02T05:00:00Z · shipped 2026-01-02T06:00:00Z
+
+## Context
+Synthetic plan file for the adopt tests.

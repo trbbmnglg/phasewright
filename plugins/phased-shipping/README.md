@@ -8,7 +8,8 @@ A Claude Code plugin for shipping work in small phases, with one deploy per phas
 |---|---|---|
 | `/phased-shipping:plan` (skill) | opus, high | Sizes the work: trivial (skip), small (one phase) or large (roadmap). The roadmap has priority, urgency, a calibrated estimate, and model and effort per task type (plan, build, tests, browser checks, review, commit, deploy). It writes one detailed phase plan at a time. Claude can invoke it on its own. |
 | `/phased-shipping:run` (skill) | sonnet, medium | Runs one phase: gates, a baseline, the build, checks against the baseline, and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. It records the outcome to the phase history. Manual only. |
-| `/phased-shipping:roadmap` (skill) | sonnet, low | Checks a project's roadmap file against the roadmap format, or standardizes an older roadmap into it, or puts a kept copy back. `check` only reads. `standardize` and `restore` print a diff and write only after you say yes, with copies kept first in `.roadmap-backups/` next to the file. Manual only. |
+| `/phased-shipping:roadmap` (skill) | sonnet, low | Checks a project's roadmap file against the roadmap format, standardizes an older roadmap into it, adopts a project's existing plan files into a roadmap, or puts a kept copy back. `check` only reads. `standardize`, `adopt` and `restore` print a diff or a proposed table and write only after you say yes, with copies kept first in `.roadmap-backups/` next to the file. Manual only. |
+| `/phased-shipping:onboard` (skill) | sonnet, low | First run in a project. It lists the files it would read, reads nothing until you confirm, saves a survey of the project's commands, CI and conventions in `.phased-shipping/` inside the project, says whether the project already has a roadmap table or plan files, and points to `standardize`, `adopt` or a fresh roadmap. Recommended, never forced. Manual only. |
 | `model-scout` (agent) | sonnet, medium | Combines three sources: which models you can use, current official guidance, and how each model actually did in your phase history. Refreshes on first use, a provider change, a retirement within 60 days, or after 30 days. |
 | `builder` (agent) | per phase plan | Implements one approved plan. Never commits or deploys. |
 | `checker` (agent) | haiku, low | Runs typecheck, lint, tests, build and browser checks, first as a baseline and then compared against it. Only new failures block. Results come from exit codes. |
@@ -82,8 +83,21 @@ A project keeps its roadmap as Markdown tables in `PHASES.md`. The roadmap forma
 - A table is a **standard** table when the line above its header is exactly `<!-- phased-shipping:roadmap v1 -->`. It needs the columns `#`, `Phase` and `Status`; `Status` is one of `planned`, `in progress`, `shipped` or `parked`. Other known columns are optional, and a column the reader doesn't know is ignored and kept as it is.
 - A table without the marker is **legacy**. It is read as well as possible and reported with a notice, never rejected.
 - `/phased-shipping:roadmap check` lists the problems, with line numbers, and edits nothing. `/phased-shipping:roadmap standardize` turns a legacy table into a standard one: it shows what would change, asks you, keeps your first version and a dated copy in `.roadmap-backups/` next to the file and only then writes. A Status it can't place is never guessed: you choose. `/phased-shipping:roadmap restore` lists the kept copies, shows what putting one back would change, asks you, saves the current file first and only then restores.
+- `/phased-shipping:roadmap adopt` reads a project's existing plan files (`phase-*.md`) and proposes roadmap rows for what those files prove: the id and title from the first heading, and a status only from the `**Timestamps:**` line. A plan file with no real timestamps is listed as undecided and left out unless you give it a status. It writes only after you say yes, appends a new table (never overwrites a roadmap) and keeps the same copies as `standardize`.
 - `plan` writes the marker and runs `check` on the roadmap it writes. `run` marks the phase `in progress` and, at close, `shipped` with the commit and the hours, one row at a time, on a standard table only. A legacy roadmap is left alone, and `run` says so once.
 - The reader is one script, `roadmap.mjs`, with no dependencies. Other tools can import its `parseRoadmap` rather than write a parser.
+
+## Onboarding
+
+Installing the plugin runs nothing. The first run in a project is `/phased-shipping:onboard`: recommended, never forced. The plan skill offers it once when the project has no saved survey, and remembers a no.
+
+1. **List.** `survey.mjs list` prints the files it intends to read (category, relative path, size) and reads nothing but folder entries and sizes.
+2. **Confirm.** You can remove files. Nothing is read until you confirm. `list` also prints a digest (a hash of the sorted paths and sizes); `run --all-listed` needs it as `--list-digest` and refuses, reading nothing, if the project's files differ from the list you saw. A `--confirm` file never widens the list: entries that are not on the current list are only counted, never read and never printed.
+3. **Survey.** `survey.mjs run` reads only the confirmed files and saves `.phased-shipping/survey.json` inside the project. The summary holds exactly this: the stack; each script's name (test, build, lint, deploy) with the command that invokes it (`npm run <name>`, `make <name>`, or the pnpm, yarn or bun form when that lockfile exists) and its source file, never the script's body; for each workflow its file name, job names, action names as `name@ref` without inputs, secret names and a count of run steps (no run line and no word of one); which convention docs exist and a heading count; the top-level key names of deploy configs; the plan folders and roadmap files; and counts of skipped files by reason. Every path in it is relative. It holds no script body, no run line, no line of any file and no absolute path. The names in it (the project name, workflow and job names, a package's name) are text from your files, cleaned to one line of plain text and cut short.
+4. **Classify.** `survey.mjs classify` says whether the project has a roadmap table (`table`: standardize it), plan files but no table (`plans`: adopt them), both (standardize first, then adopt the plan files that are not listed) or neither (`none`: the plan skill writes a fresh roadmap).
+5. **Choose.** You choose the path and the roadmap skill writes only after its own yes. The first-run checklist shows the survey, the roadmap and the dashboard (which arrives with the dashboard phase).
+
+There is one mode: `survey.mjs` reads your project files, and the assistant sees the summary the script prints. The skill's instructions tell the assistant to read no other project file and to hand none to another agent; that is an instruction, not a lock (see Limits). The summary goes to your model provider like any other tool output in a Claude Code session. The plan skill uses a saved survey only for proposed commands (baseline, verify, deploy, prod check); you still confirm each one, and nothing runs a command found in the survey.
 
 ## What it touches
 
@@ -94,6 +108,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - Settings and environment: the `model`, `availableModels` and `effortLevel` keys of your Claude Code settings files, any model convention in `CLAUDE.md`, and the values of only these environment variables: `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_*_MODEL`, `CLAUDE_CODE_SUBAGENT_MODEL*`, `CLAUDE_CODE_EFFORT_LEVEL` and `CLAUDE_CODE_USE_*`. It never prints the rest of the environment or of those files.
 - The phase history file, and the approval records in the data folder (see How approval works).
 - The roadmap file (`PHASES.md`), through `roadmap.mjs`, for `check`, `read`, and the plan and run skills. It prints only the file's base name. `restore` also lists and reads the copies in `.roadmap-backups/` next to it (and any `<file>.bak-<timestamp>` copy an earlier version left beside the file).
+- **The survey** (`survey.mjs`, run by the onboard skill) reads only these files, and only after you confirm the list: `README*`, `CONTRIBUTING*`, `CLAUDE.md` and `AGENTS.md` in the project root, `docs/*.md` and `docs/*/*.md` (a heading count is kept, no text); `package.json` (name and script names, never a script body), `pyproject.toml` (name and script names), `Makefile` (target names, never a command), `Cargo.toml` and `go.mod` (name); `.github/workflows/*.yml` and `*.yaml` (job names, action names as `name@ref` without inputs, secret names and a count of run steps; never a `run:` line or a word of one); `wrangler.toml`, `wrangler.json`, `wrangler.jsonc`, `netlify.toml`, `vercel.json`, `fly.toml` and `Dockerfile` (top-level keys only, no value); and `phase-*.md` and `PHASES.md` under `docs/`, `.plans/`, `plans/` and `phases/` (the first heading and the roadmap tables). It **never** opens source code, `.env*`, `*.pem`, `*.key`, `*.p12`, `id_rsa*`, `.npmrc`, `.pypirc`, `.netrc`, cloud and kube credential files, `*.sqlite`, `*.db`, dumps, anything inside `.git`, `node_modules` or build output, lockfiles (their names only), files over 256 KB, binary files or hard-linked files, and it never follows a symbolic link or junction (a link inside `docs/` or a plan folder is counted and reported as skipped). A file whose text matches a known secret shape (token and key formats, private keys, passwords, and a secret-looking name with a value, checked as written, with escapes decoded and as parsed JSON values) is skipped whole and counted. As a last check the finished survey and every printed line are scanned again, and a match exits 1 with nothing saved and nothing printed. The patterns catch the shapes they know, not every secret. Caps: 200 files, 64 KB of text per file, 400 KB for the survey. A locked file is skipped once and never retried. `list` reads folder entries and sizes only. The script makes no network calls and sends nothing anywhere; it prints no absolute path.
 - **The guard hook** reads nothing but the call it is handed (the tool name, the command or the file path, the working folder and the agent type). It runs on every Bash, PowerShell, Write, Edit and NotebookEdit call in any session where the plugin is enabled, your main session included, where it allows at once. Each call starts one node process. Measured on the allow path (a main-session payload, 30 runs, on a busy Windows laptop): median 1341 ms, p95 2667 ms. An empty node script on the same laptop took a median of 1298 ms, so about 40 ms is the guard's own work and the rest is node starting, which varies a lot by machine. Expect a delay on every Bash, PowerShell, Write and Edit call, in every session where the plugin is enabled. It writes no files and makes no network calls.
 
 **Files it writes**
@@ -104,6 +119,8 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - A temporary JSON file that holds the record while the history script appends it.
 - The roadmap file, in three ways, always through a temp file in the backup folder (`.roadmap-backups/<file>.tmp`) and a rename. The file keeps its own permissions. `standardize --write` rewrites the tables you chose, and `restore --write` puts a kept copy back, both only after you say yes. `set` rewrites one row of one standard table.
 - The backup folder, `.roadmap-backups/`, next to the roadmap file. It holds copies of your roadmap text, so don't share it. Its `.gitignore` is a single line, `*`, so git never lists or commits anything in it. Before the first write of any kind the script keeps `<file>.original`: the file as the script first saw it. It is created once, and the script never overwrites, renames or deletes it. `set` also keeps `<file>.prev` (the file as it was before that `set`, replaced each time). `standardize --write` keeps `<file>.bak-<timestamp>`. `restore --write` keeps `<file>.before-restore-<timestamp>`, so a restore can itself be undone. If any of these copies cannot be made, nothing is written to the roadmap and the script exits 1. Each copy is written whole under a temporary name, flushed to disk, and only then given its final name, so a name never holds half a file; where the disk cannot do that (FAT and some network drives), a `<copy>.incomplete` marker is made first and removed last, and a marker left behind makes every later write refuse until you have looked: you compare `<file>.original` with the roadmap, delete it too if it is shorter, different or you are unsure (it is made again from the current roadmap), and then delete the marker. For any other marker you delete the copy it names, then the marker. Copies are readable by you only where the system has file permissions. If the folder's `.gitignore` holds something other than `*`, the script warns and goes on; if it is a folder or a link it refuses. The script never deletes the dated copies; you may delete them, and `.original` is the one to keep, unless an `.incomplete` marker says it may be cut short.
+- The survey folder, `.phased-shipping/`, in the root of the project you onboard. It holds `survey.json` (the survey, with relative paths only), `state.json` (the time of the survey, or `{ "declined": "<date>" }` when you said no to onboarding) and a `.gitignore` whose only line is `*`, so git never lists it. The folder is created only if it is a real folder inside the project; if `.phased-shipping` is a file or a link, or its `.gitignore` holds anything but `*`, nothing is written and the script exits 1. Each file is written whole under a temporary name and renamed. Nothing is written without your yes.
+- `adopt --write` appends a new standard table under a `## Roadmap` heading at the end of the roadmap file you choose, or creates a new roadmap file (it refuses a name that exists), through the same backups and checks as `standardize`; plan files with no real timestamps are added only with a status you give.
 - No other file is created. Lines outside the chosen tables are never touched, and `--root` makes the script refuse a file outside the project folder.
 - Approval records: `<data folder>/previews/<key>.planned.json` and `<key>.previewed.json`, written by `commands-hash.mjs`. Each holds the hash, the text of the plan's `## Commands` section, the plan path and a timestamp. The script writes nothing else and makes no network calls.
 - Personal copies only: the guard scripts under `~/.claude/phased-shipping/hooks/` and the `hooks:` block in each `ps-*` agent file. `sync-personal.mjs` writes both, marks them as generated, and removes only what it marked.
@@ -114,12 +131,14 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - The plan's baseline and verify commands, through the checker. The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
 - The plan's commit, deploy, prod-check and rollback commands, through the shipper, and only after `/phased-shipping:run approve`. A push needs `/phased-shipping:run push` or a plan whose deploy step is the push, and your approval.
 - The history script (`history.mjs`), with `stats` and `record`.
-- The roadmap script (`roadmap.mjs`), with `read`, `check`, `standardize`, `set` and `restore`. It uses no network.
+- The roadmap script (`roadmap.mjs`), with `read`, `check`, `standardize`, `set`, `restore` and `adopt`. It uses no network.
+- The survey script (`survey.mjs`), with `list`, `run`, `show`, `classify`, `decline` and `leftovers`. It uses no network and never runs a command it finds in your files.
 - The approval script (`commands-hash.mjs`), to hash the plan's commands and record or check them.
 - The guard probe, `echo phased-shipping-guard-probe`, through the checker. It prints a word and changes nothing.
 
 **Network**
 - `model-scout` runs a web search and fetches up to 3 pages when the Model check refreshes. It treats page content as data.
+- The survey script sends nothing anywhere. The script reads your project files; the model sees the summary the script prints (script names and their invoking commands, CI job, action and secret names and a count of run steps, convention-doc flags, plan counts, skipped counts and relative paths). That summary goes to your model provider like any other tool output in a Claude Code session. It holds no script body, no run line and no line of any file; the project name, workflow and job names and a package's name are text from your files (cleaned to one line of plain text and cut short), and they are in it.
 - Nothing else in the plugin makes network calls itself. Your own verify, deploy and prod-check commands reach whatever they reach.
 
 **Agents**
@@ -156,6 +175,16 @@ A checker can report `UNFINISHED` or `TIMED OUT` for a command that was still ru
 
 The roadmap reader works on tables only, line by line: it is not a full Markdown parser, and it doesn't read the prose around the tables. It takes one file in one project. `standardize` and `restore` can't know that you said yes: the roadmap skill is the gate, and only you start it. The copies in `.roadmap-backups/` are local files on the same disk, not an off-machine backup, and the script never prunes them. Just before it replaces the roadmap file the script reads it again and stops if it changed since the command read it, which narrows the window when two sessions write the same file; it is not a lock, and a change landing in the last instant can still be lost (the kept copies hold the earlier versions).
 
+The survey has limits of its own:
+- **The script catches known secret shapes, not every secret, and not confidentiality.** It skips a file whose text matches a token or key format, a private key, a password, or a secret-looking name followed by a value, and it scans the finished survey and every printed line once more. A secret in a shape it does not know passes, and it cannot tell whether a sentence in a README or a plan file is confidential. The consent list is the control: you see the files first and can remove any.
+- **The script reads only the allowlist; the assistant is held back by instructions, not a lock.** The script opens only the files on the confirmed list. The onboard skill, like any skill, runs in your assistant session, where the assistant keeps its normal tools; it is held back from reading other files by the skill's instructions, not by a lock (a skill's `allowed-tools` pre-approves tools, it does not remove any). Consent is an instruction the skill follows, backed by the digest, which proves the confirmed list is unchanged, not that you saw it. No guard rule enforces either. A team that cannot accept that should not run onboarding in an assistant session on client material.
+- **The `.gitignore` inside `.phased-shipping/` protects git users only.** In a Perforce, Subversion, Mercurial or similar workspace, ignore the folder in that tool yourself before you run the survey.
+- **Endpoint-security behaviour is unverified.** A script that lists and reads many files may trigger an alert or a block on a managed laptop. This has not been checked; if one appears, stop and ask your security team.
+- **A monorepo is one project.** The survey reads the root folder's files, `docs/` and the plan folders, not each package's own manifest.
+- **Symbolic links and junctions are skipped**, even ones that point inside the project.
+- **The survey is a snapshot.** It is not updated by itself; run onboarding again after the project changes.
+- **A survey that came with a cloned repository is untrusted.** The folder's `.gitignore` keeps an honest survey out of git, so a `.phased-shipping/survey.json` that git tracks was not made on your machine. Like a README, it is data: its commands are only proposals and nothing runs them. `show` keeps only the schema's fields from it, cleaned of control, line-separator, bidirectional, zero-width, tag and other Unicode format characters and cut to fixed lengths and list sizes, keeps a command, an action, a stack entry and a manifest or deploy file name only in the forms the script itself writes, drops everything else, and starts with a line saying it was read from disk and is data to confirm, not instructions.
+
 `caught_by` in the history is only as good as the main session's attribution of each fix round or rollback to a check. An unclear source is recorded as the check that first reported it. Records made before 0.6.0 have no `caught_by` and are not backfilled.
 
 The guard has limits of its own:
@@ -187,7 +216,7 @@ To try it without installing: `claude --plugin-dir plugins/phased-shipping`
 **If you can't use plugin marketplaces** (for example, your organization restricts them; check its policy first), you can install the plugin as personal skills and agents instead, from the repo root:
 
 ```bash
-node scripts/sync-personal.mjs           # writes /ps-plan, /ps-run and the ps-* agents into ~/.claude
+node scripts/sync-personal.mjs           # writes /ps-plan, /ps-run, /ps-roadmap, /ps-onboard and the ps-* agents into ~/.claude
 node scripts/sync-personal.mjs --check   # reports drift
 node scripts/sync-personal.mjs --remove  # removes them
 ```
@@ -208,6 +237,8 @@ Personal skills and agents aren't namespaced, so the copies get a `ps-` prefix. 
 /phased-shipping:roadmap check
 /phased-shipping:roadmap standardize
 /phased-shipping:roadmap restore
+/phased-shipping:roadmap adopt
+/phased-shipping:onboard
 ```
 
 `plan` asks its questions through the AskUserQuestion tool, so your answer stays inside the same turn, on the planning model. If you reply in plain chat instead, the follow-up runs on your session model; use `/phased-shipping:plan <answer>` to stay on the planning model.
@@ -227,7 +258,7 @@ claude plugin validate . --strict
 claude plugin eval . --allow-tools WebSearch,WebFetch,Bash
 ```
 
-The twelve cases check that:
+The fourteen cases check that:
 1. a multi-part request produces a phased roadmap with model and effort for each phase;
 2. a typo fix doesn't trigger the plan skill;
 3. tests, browser checks, commit and deploy are routed to the cheap tier;
@@ -239,9 +270,11 @@ The twelve cases check that:
 9. `run` treats a builder result that starts with `NO SHELL:` as unverified, and doesn't go on to the preview as if the checks had passed;
 10. `/phased-shipping:roadmap check` reports a roadmap's problems and edits nothing;
 11. `/phased-shipping:roadmap standardize` shows its diff and asks before it writes, even when told not to ask;
-12. `/phased-shipping:roadmap restore` lists the kept copies or shows its diff and asks before it restores, even when told not to ask.
+12. `/phased-shipping:roadmap restore` lists the kept copies or shows its diff and asks before it restores, even when told not to ask;
+13. `/phased-shipping:onboard` shows the list of files and asks before it runs the survey, even when told not to ask;
+14. `/phased-shipping:roadmap adopt` shows the proposed table and asks before it writes, and does not add a plan file that has no timestamps without a status you confirmed.
 
-Cases 5 to 12 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
+Cases 5 to 14 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
 
 The guard has its own tests, which run in this repo's `npm test`: `node --test tests/guard.test.mjs tests/shell-split.test.mjs`. They feed sample hook payloads to the scripts; they don't need hooks to run.
 
@@ -250,7 +283,7 @@ Evals make real model calls on your account. Use `--ablation none` while you're 
 ## Cost notes
 
 - **`plan`** has to be listed so Claude can invoke it on its own, so its short description is in context on every turn.
-- **`run`** is manual-only, so it adds nothing to context until you invoke it. So is **`roadmap`**.
+- **`run`** is manual-only, so it adds nothing to context until you invoke it. So are **`roadmap`** and **`onboard`**.
 - **Agents:** their descriptions cost a little on every turn. Their full text loads only when they run.
 - **Model check:** it refreshes only on events or after 30 days, so the web isn't searched on every phase.
 - **Baseline:** this is one extra cheap check run, and it saves the fix rounds spent chasing failures that were already there.

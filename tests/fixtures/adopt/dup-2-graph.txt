@@ -1,0 +1,6 @@
+# Phase 2: Graph core
+
+**Timestamps:** started 2026-01-03T03:00:00Z · previewed 2026-01-03T04:00:00Z · approved 2026-01-03T05:00:00Z · shipped 2026-01-03T06:00:00Z
+
+## Context
+Synthetic. Shares its number with the code map.

@@ -1,0 +1,7 @@
+# Phase 3 (revised): Build the dashboard
+
+**Kind:** ui
+**Timestamps:** started 2026-02-01T08:00:00Z · previewed <ISO> · approved <ISO> · shipped <ISO>
+
+## Context
+Synthetic. Started, not shipped.

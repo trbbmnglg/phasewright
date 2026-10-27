@@ -254,6 +254,70 @@ test("mapStatus: a parenthetical moves to Plan file or Note, moved-to is parked,
   for (const raw of ["$$", "$", "", "   ", "maybe", "unknown (planned)", "plannedish", "planned later", undefined, null]) assert.equal(mapStatus(raw), null, String(raw));
 });
 
+test("mapStatus: the real-world forms (a date, a date with a parenthetical, bold with a plan reference, emphasis marks, the longest word)", () => {
+  const D = "2026-10-24";
+  const forms = [
+    ["shipped 2026-10-24", { status: "shipped", note: D }],
+    ["shipped 2026-10-25 (2nd attempt)", { status: "shipped", note: "2026-10-25 (2nd attempt)" }],
+    ["**shipped 2026-10-26** (plan: docs/phases/phase-x.md)", { status: "shipped", note: "2026-10-26", planFile: "docs/phases/phase-x.md" }],
+    ["**shipped**", { status: "shipped" }],
+    ["_shipped_", { status: "shipped" }],
+    ["`shipped`", { status: "shipped" }],
+    ["__Done__ (abc1234)", { status: "shipped", note: "abc1234" }],
+    ["**Shipped** 2026-10-24", { status: "shipped", note: D }],
+    ["shipped 2026-10-24T10:00:00Z", { status: "shipped", note: "2026-10-24T10:00:00Z" }],
+    ["in progress 2026-10-24", { status: "in progress", note: D }],
+    ["In Progress (plan: plans/x.md)", { status: "in progress", planFile: "plans/x.md" }],
+    ["planned (plan: plans/x.md)", { status: "planned", planFile: "plans/x.md" }],
+    ["planned plan: plans/x.md", { status: "planned", planFile: "plans/x.md" }],
+    ["shipped docs/phases/phase_x.md", { status: "shipped", planFile: "docs/phases/phase_x.md" }],
+    ["shipped 2026-10-24 plan: plans/x.md", { status: "shipped", note: D, planFile: "plans/x.md" }],
+    ["shipped 2026-10-24 (plans/x.md)", { status: "shipped", note: D, planFile: "plans/x.md" }],
+    ["completed 2026-10-24", { status: "shipped", note: D }],
+    ["on hold 2026-10-24", { status: "parked", note: D }],
+    ["to plan (later)", { status: "planned", note: "later" }],
+  ];
+  for (const [raw, want] of forms) assert.deepEqual(mapStatus(raw), want, raw);
+});
+
+test("mapStatus: confirmed, a bare number and every other word or shape stay blocked (never guessed)", () => {
+  for (const raw of ["confirmed", "**confirmed**", "confirmed 2026-10-24", "3", "3 shipped", "shipped later", "shipped on 2026-10-24", "shipped 2026-10-24abc", "in progress later",
+    "in", "shipped (", "shipped2026-10-24", "done?", "**", "_", "unknown 2026-10-24", "2026-10-24", "plan: x.md", "x.md", "blocked by 3"]) {
+    assert.equal(mapStatus(raw), null, raw);
+  }
+});
+
+test("reader: a legacy table with the real-world status forms places them, and only the unknown words stay blocked, with the exact --set-status hint", () => {
+  const text = table(["#", "Phase", "Status"], [
+    ["1", "a", "shipped 2026-10-24"], ["2", "b", "shipped 2026-10-25 (2nd attempt)"], ["3", "c", "**shipped 2026-10-26** (plan: docs/phases/phase-x.md)"],
+    ["4", "d", "confirmed"], ["5", "e", "3"], ["6", "f", "In Progress 2026-10-27"],
+  ], false);
+  const json = toReadJson(parseRoadmap(text), "x.md");
+  const t = json.tables[0];
+  assert.deepEqual(t.phases.map((p) => p.status), ["shipped", "shipped", "shipped", null, null, "in progress"]);
+  assert.equal(t.phases[2].planFile, "docs/phases/phase-x.md");
+  assert.equal(t.phases[2].note, "2026-10-26");
+  assert.equal(t.phases[1].note, "2026-10-25 (2nd attempt)");
+  assert.deepEqual(t.problems.filter((p) => p.code === "unmapped-status").map((p) => p.line), [6, 7]);
+  assert.equal(json.summary.shipped, 3);
+  const plan = planStandardize(text);
+  assert.deepEqual(plan.blocked.map((b) => [b.id, b.code]), [["4", "unmapped-status"], ["5", "unmapped-status"]]);
+  assert.ok(plan.blocked[0].hint.includes("--set-status 4=planned | --set-status \"4=in progress\" | --set-status 4=shipped | --set-status 4=parked"));
+  const done = planStandardize(text, { statusOverrides: [{ id: "4", status: "planned" }, { id: "5", status: "parked" }] });
+  assert.deepEqual(done.blocked, []);
+  const after = parseRoadmap(done.text).tables[0];
+  assert.equal(after.legacy, false);
+  assert.deepEqual(after.problems, []);
+  const cols = after.names;
+  const cell = (row, name) => after.rows[row].vals[cols.indexOf(name)];
+  assert.equal(cell(2, "Status"), "shipped");
+  assert.equal(cell(2, "Plan file"), "docs/phases/phase-x.md");
+  assert.equal(cell(2, "Note"), "2026-10-26");
+  assert.equal(cell(1, "Note"), "2026-10-25 (2nd attempt)");
+  assert.equal(cell(5, "Status"), "in progress");
+  assert.equal(planStandardize(done.text).changed, false, "a second standardize changes nothing");
+});
+
 // ── standardize: the plan ───────────────────────────────────────────────────
 test("standardize plan: writes nothing, lists the marker, renames, normalisations and the blocked rows with the exact hint", () => {
   const p = project(MESSY);
@@ -684,6 +748,26 @@ test("sync-personal: the roadmap skill is installed as ps-roadmap and the siblin
     assert.ok(text.includes("../ps-roadmap/scripts/roadmap.mjs"), `${skill} reaches the personal copy`);
     assert.doesNotMatch(text, /\.\.\/roadmap\//, `${skill} has no path to the plugin-only folder`);
   }
+});
+
+// Phase 7d1c: the onboard skill reaches its survey script the same way (there is no helper agent to install).
+test("sync-personal: the onboard skill is installed as ps-onboard, no helper agent is installed, and the plan copy reaches the rewritten survey path", () => {
+  const home = tmp();
+  const r = spawnSync(process.execPath, [join(REPO, "scripts", "sync-personal.mjs")], { encoding: "utf8", env: { ...process.env, SYNC_PERSONAL_CLAUDE_HOME: home } });
+  assert.equal(r.status, 0, r.stderr);
+  const onboard = readFileSync(join(home, "skills", "ps-onboard", "SKILL.md"), "utf8");
+  assert.match(onboard, /^name: ps-onboard$/m);
+  assert.ok(existsSync(join(home, "skills", "ps-onboard", "scripts", "survey.mjs")));
+  assert.ok(existsSync(join(home, "skills", "ps-onboard", "references", "survey.md")));
+  assert.ok(onboard.includes("../ps-roadmap/scripts/roadmap.mjs"), "the onboard copy reaches the roadmap copy");
+  assert.ok(!/surveyor/i.test(onboard), "the onboard copy names no helper agent");
+  assert.ok(!onboard.includes("phased-shipping:"), "no plugin-only component name is left in the personal copy");
+  assert.deepEqual(readdirSync(join(home, "agents")).filter((n) => n.startsWith("ps-")).sort(), ["ps-builder.md", "ps-checker.md", "ps-model-scout.md", "ps-shipper.md"], "four agents are installed, and no survey agent");
+  const plan = readFileSync(join(home, "skills", "ps-plan", "SKILL.md"), "utf8");
+  assert.ok(plan.includes("../ps-onboard/scripts/survey.mjs"), "ps-plan reaches the personal copy");
+  assert.doesNotMatch(plan, /\.\.\/onboard\//, "ps-plan has no path to the plugin-only folder");
+  const check = spawnSync(process.execPath, [join(REPO, "scripts", "sync-personal.mjs"), "--check"], { encoding: "utf8", env: { ...process.env, SYNC_PERSONAL_CLAUDE_HOME: home } });
+  assert.equal(check.status, 0, check.stdout);
 });
 
 test("every command accepts its flags: read --root, and a root spelled differently from the file's path (short and long names)", () => {
@@ -1146,7 +1230,7 @@ test("restore: legacy copies beside the file are listed and restorable by name",
   const p = project(MESSY);
   const legacy = "PHASES.md.bak-20250101-000000";
   writeFileSync(join(p.dir, legacy), STANDARD);
-  assert.match(restore(p, []).out, new RegExp(`${legacy.replace(/\./g, "\\.")}.*legacy`));
+  assert.ok(restore(p, []).out.split("\n").some((l) => l.includes(legacy) && l.includes("legacy")), "the legacy copy is listed and marked legacy");
   const r = restore(p, ["--from", legacy, "--write"], { now: NOW });
   assert.equal(r.code, 0, r.err);
   assert.equal(p.read(), STANDARD);

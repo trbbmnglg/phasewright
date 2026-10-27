@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// Reads, checks and standardizes a project's roadmap file (the tables in PHASES.md), keeps a way back for every
-// write, and restores a kept copy. No dependencies.
+// Reads, checks and standardizes a project's roadmap file (the tables in PHASES.md), adopts a project's plan files
+// into a roadmap, keeps a way back for every write, and restores a kept copy. No dependencies.
 //
 //   node roadmap.mjs read <file> [--root <dir>]
 //   node roadmap.mjs check <file> [--strict] [--root <dir>]
 //   node roadmap.mjs standardize <file> [--table <index>]... [--set-status <id>=<status>]... [--write] [--root <dir>]
 //   node roadmap.mjs set <file> <id> [--status <s>] [--commit <text>] [--actual <hours>] [--plan-file <p>] [--note <t>] [--root <dir>]
 //   node roadmap.mjs restore <file> [--from original|prev|<backup name>] [--write] [--root <dir>]
+//   node roadmap.mjs adopt <project folder> [--plans <dir>]... [--history <file>] [--project <label>]... [--no-history]
+//                          [--into <roadmap file>] [--set-status <id>=<status>]... [--write] [--root <dir>]
 //
 // The format is described in ../references/format.md. In short: a roadmap table has the columns "#" and
 // "Phase". When the nearest non-blank line above its header is exactly
@@ -22,6 +24,26 @@
 // set          changes cells of one row of one standard table and nothing else. It keeps <name>.original (first
 //              write only) and <name>.prev (the file as it was before this set) in .roadmap-backups/, then writes
 //              atomically (.roadmap-backups/<name>.tmp, then a rename).
+// adopt        reads the project's plan files (phase-*.md, up to 3 folders below docs/, .plans/, plans/ and phases/ in the
+//              project folder, plus any --plans folder; never under node_modules, .git, build output or a backup
+//              folder; symbolic links are counted and not followed) and proposes roadmap rows for what they prove.
+//              The first heading must be "# Phase <id>[ (<qualifier>)]: <title>" (else the file is reported as
+//              no-heading and left out). The **Timestamps:** line (in the first 60 lines) decides the status:
+//              shipped when "shipped" is a real time, in progress when "started" is real and "shipped" is not,
+//              otherwise UNDECIDED (also every file with no Timestamps line). An undecided file is never labelled
+//              unless --set-status <id>=<status> gives it one. Two files with one id are reported as duplicate-id
+//              and both stay undecided. Priority, Urgency, Kind and estimates stay empty; Actual and Commit /
+//              deploy come only from the history, joined by --project <label> (without --project the labels whose
+//              ids overlap are listed and the command stops; the newest record wins; --no-history skips the join).
+//              If a roadmap table already exists, a legacy one makes it refuse until it is standardized (or --into
+//              names a file), and only ids that are not already in the target are listed. Without --write it prints
+//              the proposal and writes nothing. With --write it never overwrites: it appends the rows as a new
+//              standard table under "## Roadmap" at the end of --into (the same copies and checks as standardize),
+//              or creates a new file (default PHASES.md in the project folder; --into <new name>.md) and refuses a
+//              name that exists. --into must be a regular .md file (existing or new) outside node_modules, .git, build
+//              output, .roadmap-backups and .phased-shipping. Text taken from a plan file is one line of plain text:
+//              control and bidirectional characters become spaces. Paths are printed relative to the project folder;
+//              --plans and --into paths are relative to it too. io.env is a test seam (CLAUDE_PLUGIN_DATA gives the default history.jsonl).
 // restore      without --from lists the kept copies; with --from it prints what would change and writes nothing;
 //              with --from and --write it first saves the current file as <name>.before-restore-<stamp>, then puts
 //              the chosen copy back (atomic). Legacy <name>.bak-* copies next to the file are listed and restorable.
@@ -42,27 +64,35 @@
 // the same check.
 //
 // --root <dir>: the file must resolve inside that folder, or the command exits 2. The skill always passes
-// the project folder. Without --root there is no containment check.
+// the project folder. Without --root there is no containment check. For adopt, the project folder itself must
+// resolve inside --root; --plans and --into must resolve inside the project folder (always checked).
 //
-// Exit codes: 0 done; 1 the check found problems, or a write was refused, or set could not apply, or a copy
-// failed, or the file changed while it was being written; 2 the file cannot be read, is outside --root, a backup
-// name is unknown, or the usage is wrong.
+// Exit codes: 0 done; 1 the check found problems, or a write was refused (for adopt also: a legacy table with no
+// --into, or the history labels still to be chosen with --write), or set could not apply, or a copy failed, or the
+// file changed while it was being written; 2 the file cannot be read, is outside --root, a backup name is
+// unknown, or the usage is wrong.
 //
-// Only the file's base name is ever printed, never an absolute path. The line endings (LF or CRLF, per
+// Only the file's base name is ever printed (adopt: paths relative to the project folder), never an absolute
+// path. The line endings (LF or CRLF, per
 // line) and the last-newline state of the file are kept. The only paths this script writes are the roadmap file
 // itself (replaced by a rename) and the files in the .roadmap-backups/ folder next to it, including the temp
-// file the new text is written to first.
+// file the new text is written to first, and (adopt, when the name is new) the new roadmap file, published whole
+// under a name that must not exist.
+//
+// Status cells: "shipped 2026-10-24", "shipped 2026-10-25 (2nd attempt)" and "**shipped 2026-10-26** (plan: <path>)"
+// are read (the word maps, the date goes to Note, a plan reference to Plan file); "confirmed", a bare number and any
+// other word stay blocked and are never guessed.
 //
 // Exports for tests and for other tools: parseRoadmap, checkRoadmap, planStandardize, setPhase, mapStatus,
-// STATUSES, MARKER, cellOf, clean, renameWithRetry, main. The reader is line-based and tables-only: it is not a
+// parsePlanFile, STATUSES, MARKER, cellOf, clean, renameWithRetry, main. The reader is line-based and tables-only: it is not a
 // full Markdown parser.
 
 import {
   readFileSync, renameSync, rmSync, realpathSync, mkdirSync, lstatSync, readdirSync, openSync, writeFileSync, closeSync,
-  fsyncSync, linkSync, chmodSync,
+  fsyncSync, linkSync, chmodSync, statSync,
 } from "node:fs";
 import { randomBytes } from "node:crypto";
-import { basename, dirname, join, relative, resolve, isAbsolute } from "node:path";
+import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const MARKER = "<!-- phased-shipping:roadmap v1 -->";
@@ -89,8 +119,68 @@ const STATUS_WORDS = {
 
 // ── Status mapping ──────────────────────────────────────────────────────────
 // The whole cell, trimmed and lower-cased, is looked up. "<word> (<text>)" maps by the word and moves the
-// text to Plan file (when it looks like a path to a .md file) or to Note. "moved to ..." is parked, with the
-// whole text as the note. Anything else returns null: it is never guessed.
+// text to Plan file (when it is "plan: <path>" or a path to a .md file) or to Note. "moved to ..." is parked,
+// with the whole text as the note. Real-world forms: `*`, `_` and backticks around the leading word are
+// stripped, the longest leading status word wins ("in progress" before any shorter word), and what follows the
+// word is accepted only in these shapes: a date (to Note), a date and a parenthetical, a parenthetical, "plan:
+// <path>", or a path ending .md. So "shipped 2026-10-24", "shipped 2026-10-25 (2nd attempt)" and
+// "**shipped 2026-10-26** (plan: docs/phases/phase-x.md)" map; "confirmed", a bare number, "planned later" and
+// every other word or text return null: it is never guessed.
+const WORDS_LONGEST_FIRST = Object.keys(STATUS_WORDS).sort((a, b) => b.length - a.length);
+const DATE_LED = /^(\d{4}-\d{2}-\d{2}(?:T[0-9:.]+Z?)?)(?=\s|\(|$)\s*([\s\S]*)$/;
+const PLAN_REF = /^plan:\s*(\S+)$/i;
+const MD_PATH = /^[\w./\\-]+\.md$/;
+
+// The text inside a parenthesis: a plan file reference goes to Plan file, anything else to Note.
+function innerOf(inner) {
+  const t = inner.trim();
+  if (!t) return {};
+  const ref = t.match(PLAN_REF);
+  if (ref) return { planFile: ref[1] };
+  return MD_PATH.test(t) ? { planFile: t } : { note: t };
+}
+
+// What follows the status word. Returns { planFile?, note? } (possibly empty) or null when the shape is unknown.
+function restOf(rest) {
+  const t = rest.trim();
+  if (!t) return {};
+  const paren = t.match(/^\(([\s\S]*)\)$/);
+  if (paren) return innerOf(paren[1]);
+  const d = t.match(DATE_LED);
+  if (d) {
+    const tail = d[2].trim();
+    if (!tail) return { note: d[1] };
+    const tp = tail.match(/^\(([\s\S]*)\)$/);
+    if (tp) {
+      const inner = innerOf(tp[1]);
+      if (inner.planFile) return { note: d[1], planFile: inner.planFile };
+      return { note: inner.note ? `${d[1]} (${inner.note})` : d[1] };
+    }
+    const ref = tail.match(PLAN_REF) ?? (MD_PATH.test(tail) ? [null, tail] : null);
+    return ref ? { note: d[1], planFile: ref[1] } : { note: t };
+  }
+  const ref = t.match(PLAN_REF);
+  if (ref) return { planFile: ref[1] };
+  return MD_PATH.test(t) ? { planFile: t } : null;
+}
+
+// Emphasis marks inside the text after the word: `*` and backticks go; `_` goes only at the edge of a token, so a
+// path such as phase_x.md keeps its underscore.
+const tidy = (s) => s.replace(/[*`]/g, "").replace(/(^|[\s(])_+/g, "$1").replace(/_+(?=$|[\s)])/g, "").trim();
+
+function leadingWord(text) {
+  const t = text.replace(/^[\s*_`]+/, "");
+  const lower = t.toLowerCase();
+  for (const w of WORDS_LONGEST_FIRST) {
+    if (!lower.startsWith(w)) continue;
+    const next = t[w.length];
+    if (next !== undefined && !/[\s(*_`]/.test(next)) continue;
+    const rest = restOf(tidy(t.slice(w.length)));
+    return rest ? { status: STATUS_WORDS[w], ...rest } : null;
+  }
+  return null;
+}
+
 export function mapStatus(raw) {
   const text = String(raw ?? "").trim();
   const norm = (s) => s.trim().toLowerCase().replace(/\s+/g, " ");
@@ -100,12 +190,9 @@ export function mapStatus(raw) {
   const m = text.match(/^(.+?)\s*\(([\s\S]*)\)$/);
   if (m) {
     const status = STATUS_WORDS[norm(m[1])];
-    if (!status) return null;
-    const inner = m[2].trim();
-    if (!inner) return { status };
-    return /^[\w./\\-]+\.md$/.test(inner) ? { status, planFile: inner } : { status, note: inner };
+    if (status) return { status, ...innerOf(m[2]) };
   }
-  return null;
+  return leadingWord(text);
 }
 
 // ── Lines and cells ─────────────────────────────────────────────────────────
@@ -603,6 +690,7 @@ const USAGE = [
   "       node roadmap.mjs standardize <file> [--table <index>]... [--set-status <id>=<status>]... [--write] [--root <dir>]",
   "       node roadmap.mjs set <file> <id> [--status <s>] [--commit <text>] [--actual <hours>] [--plan-file <p>] [--note <t>] [--root <dir>]",
   "       node roadmap.mjs restore <file> [--from original|prev|<backup name>] [--write] [--root <dir>]",
+  "       node roadmap.mjs adopt <project folder> [--plans <dir>]... [--history <file>] [--project <label>]... [--no-history] [--into <roadmap file>] [--set-status <id>=<status>]... [--write] [--root <dir>]",
 ];
 
 function parseArgs(argv, bool, value) {
@@ -1073,6 +1161,459 @@ function restoreCommand(f, from, write, io, out, err, now) {
   return 0;
 }
 
+// ── adopt ───────────────────────────────────────────────────────────────────
+// Reads a project's plan files (phase-*.md) and proposes roadmap rows that the files themselves prove. It reads
+// plan files and roadmap files (PHASES.md) only, under a fixed set of folders, and writes nothing without --write.
+const PLAN_BASES = ["docs", ".plans", "plans", "phases"];
+const NEVER_READ = ["node_modules", ".git", "dist", "build", ".next", "out", "target", BACKUP_DIR, ".phased-shipping"];
+const SCAN_DEPTH = 3;
+const MAX_PLAN_BYTES = 256 * 1024;
+const MAX_ROADMAP_BYTES = 2 * 1024 * 1024;
+const PLAN_NAME = /^phase-.*\.md$/i;
+const HEADING = /^#\s+Phase\s+([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\(([^)]*)\))?\s*[:-]\s*(.+)$/;
+const TS_LINE = /^\s*\*\*Timestamps:?\*\*:?\s*(.*)$/i;
+const TS_KEYS = ["started", "previewed", "approved", "shipped"];
+const TS_SCAN_LINES = 60;
+const ISO_REAL = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+const ADOPT_COLUMNS = ["#", "Phase", "Kind", "Priority", "Urgency", "Est. (raw → cal.)", "Status", "Commit / deploy", "Actual", "Plan file", "Note"];
+
+// Control, C1, line-separator, bidirectional, zero-width, tag and every other Unicode format (Cf) character.
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff\u{e0000}-\u{e007f}\p{Cf}]/u;
+const isRealTime = (v) => ISO_REAL.test(v) && !Number.isNaN(Date.parse(v));
+const neverRead = (name) => NEVER_READ.includes(name.toLowerCase());
+const insideOf = (base, p) => {
+  const rel = relative(base, p);
+  return !isAbsolute(rel) && rel.split(/[\\/]/)[0] !== "..";
+};
+const keyOf = (parts) => (WIN ? parts.join("/").toLowerCase() : parts.join("/"));
+const byText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+function naturalCompare(a, b) {
+  const pa = a.match(/\d+|\D+/g) ?? [];
+  const pb = b.match(/\d+|\D+/g) ?? [];
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    if (pa[i] === pb[i]) continue;
+    if (/^\d/.test(pa[i]) && /^\d/.test(pb[i])) {
+      const d = Number(pa[i]) - Number(pb[i]);
+      if (d) return d;
+    }
+    return byText(pa[i], pb[i]);
+  }
+  return pa.length - pb.length;
+}
+
+// Reads one plan file's text. Returns { heading, timestamps }: heading is { id, qualifier, title } or null (the
+// first heading of the file is not "# Phase <id>[ (<qualifier>)]: <title>"); timestamps is null when the file has
+// no **Timestamps:** line in its first 60 lines, else { started, previewed, approved, shipped } where each value is
+// a real ISO time or date as written, or null (a placeholder such as <ISO>, a missing key or any other text).
+export function parsePlanFile(text) {
+  const lines = String(text ?? "").replace(/^\uFEFF/, "").split(/\r?\n/);
+  const at = lines.findIndex((l) => /^\s{0,3}#{1,6}\s/.test(l));
+  const hm = at >= 0 ? lines[at].trimEnd().match(HEADING) : null;
+  const title = hm?.[3].trim();
+  const heading = hm && title ? { id: hm[1], qualifier: hm[2]?.trim() || null, title } : null;
+  let timestamps = null;
+  for (const line of lines.slice(0, TS_SCAN_LINES)) {
+    const tm = line.match(TS_LINE);
+    if (!tm) continue;
+    timestamps = { started: null, previewed: null, approved: null, shipped: null };
+    const seen = new Set();
+    for (const part of tm[1].split(/[·|;]/)) {
+      const km = part.trim().match(/^([A-Za-z]+)\s+(\S.*)$/);
+      const key = km?.[1].toLowerCase();
+      if (!key || !TS_KEYS.includes(key) || seen.has(key)) continue;
+      seen.add(key);
+      const v = km[2].trim();
+      timestamps[key] = isRealTime(v) ? v : null;
+    }
+    break;
+  }
+  return { heading, timestamps };
+}
+
+// The status a plan file proves: shipped when "shipped" is a real time; in progress when "started" is a real time
+// and "shipped" is not; otherwise nothing (undecided), including a file with no Timestamps line.
+function decideStatus(ts) {
+  if (!ts) return { status: null, why: "no Timestamps line" };
+  if (ts.shipped) return { status: "shipped", evidence: `shipped ${ts.shipped.slice(0, 10)}` };
+  if (ts.started) return { status: "in progress", evidence: `started ${ts.started.slice(0, 10)}, not shipped` };
+  return { status: null, why: "the Timestamps line has no real started or shipped time" };
+}
+
+const listDir = (abs) => {
+  try { return readdirSync(abs, { withFileTypes: true }).sort((a, b) => byText(a.name, b.name)); } catch { return null; }
+};
+
+// Walks one folder (to SCAN_DEPTH folders below it) collecting plan files and roadmap files. Symbolic links are
+// never followed: they are counted and skipped. Folders in NEVER_READ are not entered.
+function walk(realRoot, parts, depth, found) {
+  const entries = listDir(join(realRoot, ...parts));
+  if (!entries) { found.unreadable++; return; }
+  for (const e of entries) {
+    const rel = [...parts, e.name];
+    // A name with a control character (a newline, for example) could forge output lines or table rows: skipped.
+    if (CONTROL.test(e.name)) { found.odd++; continue; }
+    if (e.isSymbolicLink()) { found.links++; continue; }
+    if (e.isDirectory()) {
+      if (!neverRead(e.name) && depth < SCAN_DEPTH) walk(realRoot, rel, depth + 1, found);
+      continue;
+    }
+    if (!e.isFile()) continue;
+    if (PLAN_NAME.test(e.name)) found.plans.set(keyOf(rel), rel);
+    else if (e.name.toLowerCase() === "phases.md") found.roadmaps.set(keyOf(rel), rel);
+  }
+}
+
+function readCapped(abs, realRoot, cap) {
+  try {
+    const st = lstatSync(abs);
+    if (!st.isFile()) return { skip: "not a regular file" };
+    if (st.nlink > 1) return { skip: "hard link" };
+    if (!insideOf(realRoot, realpathSync.native(abs))) return { skip: "outside the project folder" };
+    if (st.size > cap) return { skip: "too large" };
+    const bytes = readFileSync(abs);
+    try { return { text: decoder.decode(bytes) }; } catch { return { skip: "not valid UTF-8 text" }; }
+  } catch (e) {
+    return { skip: `unreadable (${codeOf(e)})` };
+  }
+}
+
+// Ids and standard/legacy state of the roadmap tables in a text.
+function tablesOf(text) {
+  return parseRoadmap(text).tables.map((t) => {
+    const idCol = t.names.findIndex((n) => n.toLowerCase() === "#");
+    return { legacy: t.legacy, ids: t.rows.map((r) => r.vals[idCol] ?? "").filter((v) => v !== "") };
+  });
+}
+
+// The history file: one JSON object per line; a line that is not an object with a project and a phase is skipped.
+function loadHistory(path) {
+  let text;
+  try { text = readFileSync(path, "utf8"); } catch (e) { return { fail: codeOf(e) }; }
+  const records = [];
+  text.split(/\r?\n/).forEach((line, order) => {
+    if (!line.trim()) return;
+    try {
+      const r = JSON.parse(line);
+      if (r && typeof r === "object" && !Array.isArray(r) && typeof r.project === "string" && r.phase !== undefined && r.phase !== null) records.push({ r, phase: String(r.phase), order });
+    } catch { /* a bad line is skipped */ }
+  });
+  return { records };
+}
+
+const recordDate = (r) => String(typeof r.date === "string" ? r.date : typeof r.shipped === "string" ? r.shipped.slice(0, 10) : "");
+// One line of plain text from a plan or history file: every control character (ESC, BEL, newline, DEL, the C1
+// range), the line and paragraph separators, the bidirectional controls, the zero-width and tag characters and every
+// other Unicode format (Cf) character become a space, so a title cannot carry a terminal escape, a hidden link, a
+// reordering mark or invisible text into the table or the output.
+const UNSAFE_TEXT = /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff\u{e0000}-\u{e007f}\p{Cf}]+/gu;
+const oneLine = (s) => String(s).replace(UNSAFE_TEXT, " ").trim().slice(0, 200);
+const cellText = (v) => (v === "" ? " " : cellOf(v));
+const tableLines = (rows) => [
+  MARKER,
+  `|${ADOPT_COLUMNS.map((c) => cellOf(c)).join("|")}|`,
+  `|${ADOPT_COLUMNS.map(() => "---").join("|")}|`,
+  ...rows.map((r) => `|${r.map(cellText).join("|")}|`),
+];
+
+// adopt <project folder>. Returns the exit code.
+function adoptCommand(pos, opts, io, out, err, now, usage) {
+  const env = io.env ?? process.env;
+  const write = opts["--write"] === true;
+  for (const flag of ["--history", "--into"]) if (opts[flag]?.length > 1) return usage(`${flag} can be given once`);
+  const wanted = opts["--project"] ?? [];
+  if (opts["--no-history"] && (wanted.length || opts["--history"])) return usage("--no-history cannot be combined with --history or --project");
+  const overrides = [];
+  for (const v of opts["--set-status"] ?? []) {
+    const m = v.match(/^([^=:]+)=(.+)$/);
+    if (!m) return usage(`--set-status needs <id>=<status>, got "${v}"`);
+    const status = m[2].trim().toLowerCase();
+    if (!STATUSES.includes(status)) return usage(`--set-status: "${m[2]}" is not one of ${STATUSES.join(", ")}`);
+    const id = m[1].trim();
+    if (overrides.some((o) => o.id === id)) return usage(`--set-status ${id} is given twice`);
+    overrides.push({ id, status });
+  }
+
+  // The project folder, and --root as an outer limit.
+  let real;
+  try {
+    real = realpathSync.native(resolve(pos[0]));
+    if (!statSync(real).isDirectory()) throw new Error("not a folder");
+  } catch { err(`cannot use ${basename(String(pos[0]))}: it is not a readable folder; nothing was read or written`); return 2; }
+  if (opts["--root"]) {
+    let outer;
+    try { outer = realpathSync.native(resolve(opts["--root"][0])); } catch { err("cannot use --root: the folder cannot be read"); return 2; }
+    if (!insideOf(outer, real)) { err("the project folder is outside the --root folder; nothing was read or written"); return 2; }
+  }
+  const projectName = basename(real);
+
+  // Extra plan folders: inside the project, not under a folder adopt never reads.
+  const bases = [];
+  for (const p of opts["--plans"] ?? []) {
+    let r;
+    try {
+      r = realpathSync.native(resolve(real, p));
+      if (!statSync(r).isDirectory()) throw new Error("not a folder");
+    } catch { err(`cannot use --plans ${basename(p)}: it is not a readable folder; nothing was read or written`); return 2; }
+    if (!insideOf(real, r)) { err(`--plans ${basename(p)} is outside the project folder; nothing was read or written`); return 2; }
+    const parts = relative(real, r).split(sep).filter(Boolean);
+    if (parts.some(neverRead)) { err(`--plans ${basename(p)} is inside a folder adopt never reads (node_modules, .git, build output, backups); nothing was read or written`); return 2; }
+    bases.push(parts);
+  }
+
+  // The --into file: an existing file inside the project (loaded once, like every other write here) or a new name.
+  let into = null;
+  if (opts["--into"]) {
+    const typed = opts["--into"][0];
+    const abs = resolve(real, typed);
+    const shown = basename(abs).replace(UNSAFE_TEXT, "?").slice(0, 80);
+    // The roadmap file is a Markdown file (existing or new), never one in a folder adopt does not read.
+    const refuseFolder = (p) => relative(real, p).split(sep).filter(Boolean).some(neverRead);
+    if (!/\.md$/i.test(basename(abs))) { err(`--into ${shown}: the roadmap file must have a name ending .md; nothing was read or written`); return 2; }
+    let exists;
+    try { exists = lstatOrNull(abs); } catch (e) { err(`cannot use --into ${shown} (${codeOf(e)}); nothing was read or written`); return 2; }
+    if (exists) {
+      if (!exists.isFile()) { err(`--into ${shown} is not a regular file (a link or a folder cannot be the roadmap file); nothing was read or written`); return 2; }
+      let r = null;
+      try { r = realpathSync.native(abs); } catch { /* load reports it */ }
+      if (r && insideOf(real, r) && (!/\.md$/i.test(basename(r)) || refuseFolder(dirname(r)))) { err(`--into ${shown} is a Markdown file in a folder adopt never reads (node_modules, .git, build output, backups, .phased-shipping), or not a .md file; nothing was read or written`); return 2; }
+      const f = load(abs, real);
+      if (f.fail) { err(f.fail); return 2; }
+      io.afterLoad?.(f);
+      into = { abs: f.path, rel: relative(real, f.path).split(sep).join("/"), f, isNew: false };
+    } else {
+      const name = basename(abs);
+      let parent;
+      try {
+        parent = realpathSync.native(dirname(abs));
+        if (!statSync(parent).isDirectory()) throw new Error("not a folder");
+      } catch { err(`cannot use --into ${name}: its folder does not exist; nothing was read or written`); return 2; }
+      if (!insideOf(real, parent)) { err(`--into ${name} is outside the project folder; nothing was read or written`); return 2; }
+      if (!/\.md$/i.test(name) || (WIN && name.includes(":"))) { err(`--into ${name}: a new roadmap file must have a name ending .md${WIN ? " and no colon" : ""}; nothing was read or written`); return 2; }
+      if (refuseFolder(parent)) { err(`--into ${shown} is inside a folder adopt never reads (node_modules, .git, build output, ${BACKUP_DIR}, .phased-shipping); nothing was read or written`); return 2; }
+      into = { abs: join(parent, name), rel: relative(real, join(parent, name)).split(sep).join("/"), f: null, isNew: true };
+    }
+  }
+
+  // History: given, or the plugin data folder's history.jsonl when it exists.
+  let history = null;
+  if (!opts["--no-history"]) {
+    let path = opts["--history"]?.[0];
+    const given = path !== undefined;
+    if (!given && env.CLAUDE_PLUGIN_DATA) {
+      const d = join(env.CLAUDE_PLUGIN_DATA, "history.jsonl");
+      try { if (lstatOrNull(d)?.isFile()) path = d; } catch { /* no default history */ }
+    }
+    if (path !== undefined) {
+      const h = loadHistory(resolve(path));
+      if (h.fail && (given || wanted.length)) { err(`cannot read the history file ${basename(path)} (${h.fail}); nothing was read or written`); return 2; }
+      if (!h.fail) history = { records: h.records, name: basename(path) };
+    } else if (wanted.length) return usage("--project needs a history file: pass --history <file>");
+  }
+  if (history && wanted.length) {
+    for (const label of wanted) {
+      if (!history.records.some((x) => x.r.project === label)) return usage(`--project ${label}: the history file ${history.name} has no record with that project label`);
+    }
+  }
+
+  // Scan.
+  const found = { plans: new Map(), roadmaps: new Map(), links: 0, unreadable: 0, odd: 0 };
+  for (const name of PLAN_BASES) {
+    let st = null;
+    try { st = lstatOrNull(join(real, name)); } catch { found.unreadable++; }
+    if (!st) continue;
+    if (st.isSymbolicLink()) found.links++;
+    else if (st.isDirectory()) walk(real, [name], 0, found);
+  }
+  for (const parts of bases) walk(real, parts, 0, found);
+  for (const e of listDir(real) ?? []) if (e.isFile() && e.name.toLowerCase() === "phases.md") found.roadmaps.set(keyOf([e.name]), [e.name]);
+  if (into && !into.isNew && !found.roadmaps.has(keyOf(into.rel.split("/")))) found.roadmaps.set(keyOf(into.rel.split("/")), into.rel.split("/"));
+
+  const leftOut = [];
+  const roadmaps = [];
+  for (const parts of [...found.roadmaps.values()].sort((a, b) => byText(a.join("/"), b.join("/")))) {
+    const rel = parts.join("/");
+    const isInto = into && !into.isNew && keyOf(parts) === keyOf(into.rel.split("/"));
+    const text = isInto ? into.f.text : readCapped(join(real, ...parts), real, MAX_ROADMAP_BYTES);
+    if (typeof text !== "string" && text.skip) { leftOut.push({ rel, code: text.skip }); continue; }
+    const tables = tablesOf(typeof text === "string" ? text : text.text);
+    if (tables.length || isInto) roadmaps.push({ rel, tables });
+  }
+  const entries = [];
+  for (const parts of [...found.plans.values()].sort((a, b) => byText(a.join("/"), b.join("/")))) {
+    const rel = parts.join("/");
+    const got = readCapped(join(real, ...parts), real, MAX_PLAN_BYTES);
+    if (got.skip) { leftOut.push({ rel, code: got.skip }); continue; }
+    const p = parsePlanFile(got.text);
+    if (!p.heading) { leftOut.push({ rel, code: "no-heading" }); continue; }
+    entries.push({ rel, ...p.heading, ...decideStatus(p.timestamps), owner: false });
+  }
+
+  out(`adopt plan for ${projectName}${write ? " (with --write)" : ": nothing is written without --write"}`);
+  out(`scanned: ${found.plans.size} plan file(s) and ${found.roadmaps.size} roadmap file(s) under ${PLAN_BASES.join("/, ")}/ and any --plans folder`
+    + `${found.links ? `; ${found.links} symbolic link(s) not followed` : ""}${found.unreadable ? `; ${found.unreadable} folder(s) could not be read` : ""}${found.odd ? `; ${found.odd} name(s) with a control character skipped` : ""}`);
+  if (roadmaps.length) {
+    out(`roadmap files (${roadmaps.length}):`);
+    for (const r of roadmaps) {
+      const legacy = r.tables.filter((t) => t.legacy).length;
+      out(`  ${r.rel}: ${r.tables.length} table(s), ${legacy} legacy, ${r.tables.reduce((n, t) => n + t.ids.length, 0)} phase(s)`);
+    }
+  }
+  for (const l of leftOut.filter((x) => x.code !== "no-heading")) out(`  skipped ${l.rel}: ${l.code}`);
+  for (const l of leftOut.filter((x) => x.code === "no-heading")) out(`  no-heading: ${l.rel} (its first heading is not "# Phase <id>: <title>"), left out`);
+
+  // The both case: an existing roadmap table.
+  if (!into) {
+    const legacyFiles = roadmaps.filter((r) => r.tables.some((t) => t.legacy));
+    if (legacyFiles.length) {
+      err(`refusing to propose rows: ${legacyFiles.map((r) => r.rel).join(", ")} still ${legacyFiles.length === 1 ? "has" : "have"} a legacy table. Run standardize on ${legacyFiles.length === 1 ? "it" : "each of them"} first, or pass --into <roadmap file> to add the rows to that file as a new standard table (nothing is merged across files). Nothing was proposed or written`);
+      return 1;
+    }
+  }
+  const listed = new Set();
+  // With --into only that file's tables count (a new file has none); without it, every roadmap file's tables count.
+  const intoTables = into ? (into.isNew ? [] : roadmaps.find((r) => keyOf(r.rel.split("/")) === keyOf(into.rel.split("/")))?.tables ?? []) : null;
+  for (const t of intoTables ?? roadmaps.flatMap((r) => r.tables)) for (const id of t.ids) listed.add(id);
+
+  const already = entries.filter((e) => listed.has(e.id));
+  const todo = entries.filter((e) => !listed.has(e.id));
+  if (already.length) out(`already in the roadmap, not proposed again (${already.length}): ${[...new Set(already.map((e) => e.id))].sort(naturalCompare).join(", ")}`);
+  const groups = new Map();
+  for (const e of todo) groups.set(e.id, [...(groups.get(e.id) ?? []), e]);
+  for (const g of groups.values()) if (g.length > 1) for (const e of g) e.duplicate = true;
+
+  for (const o of overrides) {
+    const hits = todo.filter((e) => e.id === o.id);
+    if (!hits.length) return usage(`--set-status ${o.id}=${o.status} matches no plan file that is still to be added`);
+    if (hits.length > 1) return usage(`--set-status ${o.id}: two plan files carry the id ${o.id}; give one of them a new id in its heading first`);
+    if (hits[0].status) return usage(`--set-status ${o.id}: its plan file already proves "${hits[0].status}" (${hits[0].evidence}); --set-status only decides files that have no usable Timestamps`);
+    hits[0].status = o.status;
+    hits[0].owner = true;
+  }
+
+  // The history join, or the list of labels to choose from.
+  if (history && !wanted.length) {
+    const ids = new Set(todo.map((e) => e.id));
+    const labels = new Map();
+    for (const x of history.records) if (ids.has(x.phase)) labels.set(x.r.project, (labels.get(x.r.project) ?? new Set()).add(x.phase));
+    if (labels.size) {
+      out(`the history file ${history.name} has records that share phase ids with these plan files. It is never joined unless you choose the project label(s):`);
+      for (const [label, set] of [...labels].sort((a, b) => b[1].size - a[1].size || byText(a[0], b[0]))) out(`  ${label}: ${set.size} shared id(s)`);
+      out("choose with --project <label> (repeat it for more labels), or pass --no-history to skip the join. Nothing was proposed or written");
+      return write ? 1 : 0;
+    }
+  }
+  const pick = (id) => {
+    if (!history || !wanted.length) return null;
+    const hits = history.records.filter((x) => wanted.includes(x.r.project) && x.phase === id)
+      .sort((a, b) => byText(recordDate(a.r), recordDate(b.r)) || a.order - b.order);
+    return hits.length ? { r: hits[hits.length - 1].r, n: hits.length } : null;
+  };
+
+  const rows = [];
+  const decided = todo.filter((e) => e.status && !e.duplicate).sort((a, b) => naturalCompare(a.id, b.id) || byText(a.rel, b.rel));
+  for (const e of decided) {
+    const h = pick(e.id);
+    const actual = h && Number.isFinite(h.r.actual_h) && h.r.actual_h >= 0 ? `${h.r.actual_h} h` : "";
+    const deployRaw = h ? (typeof h.r.deploy === "string" ? h.r.deploy : typeof h.r.commit === "string" ? h.r.commit : "") : "";
+    const deploy = oneLine(deployRaw);
+    const notes = [e.owner ? "from plan file; status chosen by the owner (the file has no usable Timestamps)" : `from plan file, ${e.evidence}`];
+    if (e.qualifier) notes.push(`qualifier: ${oneLine(e.qualifier)}`);
+    if (h && (actual || deploy)) {
+      notes.push(`${[actual && "Actual", deploy && "Commit / deploy"].filter(Boolean).join(" and ")} from the history, project "${oneLine(h.r.project)}"${h.n > 1 ? `, newest of ${h.n} records` : ""}`);
+    }
+    e.row = [e.id, oneLine(e.title), "", "", "", "", e.status, deploy, actual, e.rel, notes.join("; ")];
+    rows.push(e.row);
+  }
+  const undecided = todo.filter((e) => !e.status && !e.duplicate);
+  const dups = todo.filter((e) => e.duplicate);
+
+  if (undecided.length) {
+    out(`undecided (${undecided.length}), left out unless you choose a status for each with --set-status <id>=<status>:`);
+    for (const e of undecided) out(`  ${e.id}: ${e.rel} (${e.why}) ${hintFor(e.id, "")}`);
+  }
+  if (dups.length) {
+    out(`duplicate-id (${dups.length} files), all left out until one of them gets a new id in its heading:`);
+    for (const e of dups) out(`  ${e.id}: ${e.rel}`);
+  }
+
+  // Where the rows would go.
+  let target = null;
+  let blockedName = null;
+  if (into) target = into;
+  else if (!roadmaps.length) {
+    const abs = join(real, "PHASES.md");
+    let taken = null;
+    try { taken = lstatOrNull(abs); } catch { taken = {}; }
+    if (taken) blockedName = "PHASES.md";
+    else target = { abs, rel: "PHASES.md", f: null, isNew: true };
+  }
+  if (!rows.length) {
+    out(todo.length || already.length ? "summary: nothing new to propose" : "summary: no plan files with a Phase heading were found");
+    if (write) out("nothing to write");
+    return 0;
+  }
+  out(`proposed rows (${rows.length}), as ${target ? (target.isNew ? `a new file, ${target.rel}` : `a new standard table appended under "## Roadmap" at the end of ${target.rel}`) : "a new standard table (no file chosen yet: pass --into <roadmap file>)"}:`);
+  for (const l of tableLines(rows)) out(l);
+  out(`summary: ${rows.length} row(s) proposed, ${undecided.length} undecided, ${dups.length} duplicate-id; Priority, Urgency, Kind and estimates are left empty`);
+  if (!write) return 0;
+
+  if (blockedName) {
+    err(`refusing to write: ${blockedName} already exists in the project folder, and adopt never overwrites a file. Pass --into ${blockedName} to append the rows to it, or --into <new name>.md to create another file. Nothing was written`);
+    return 1;
+  }
+  if (!target) {
+    err(`refusing to write: the project already has roadmap file(s) (${roadmaps.map((r) => r.rel).join(", ")}). Pass --into <roadmap file> to append the rows to one of them (nothing is merged across files), or --into <new name>.md to create another file. Nothing was written`);
+    return 1;
+  }
+  const verify = (text, before) => {
+    const again = parseRoadmap(text);
+    const last = again.tables[again.tables.length - 1];
+    const idCol = last ? last.names.findIndex((n) => n.toLowerCase() === "#") : -1;
+    return again.tables.length === before + 1 && !last.legacy && !last.problems.some((p) => p.level === "error")
+      && last.rows.map((r) => r.vals[idCol]).join("\n") === rows.map((r) => r[0]).join("\n");
+  };
+
+  if (target.isNew) {
+    const text = `# Phases\n\n## Roadmap\n\n${tableLines(rows).join("\n")}\n`;
+    if (!verify(text, 0)) { err("internal check failed: the new table would not pass check, so nothing is written"); return 1; }
+    const made = publishExclusive(target.abs, text, io);
+    if (made) {
+      err(made === "EEXIST"
+        ? `${basename(target.abs)} already exists, and adopt never overwrites a file; nothing was written. Pass --into ${basename(target.abs)} to append to it`
+        : `could not create ${basename(target.abs)} (${made}); nothing was written`);
+      return 1;
+    }
+    out(`created ${target.rel} with ${rows.length} row(s); no file existed under that name, so there is nothing to back up`);
+    return 0;
+  }
+
+  const f = target.f;
+  const eols = f.text.match(/\r?\n/g);
+  const eol = eols ? eols[eols.length - 1] : "\n";
+  const lead = f.text === "" ? "" : `${/\n$/.test(f.text) ? "" : eol}${eol}`;
+  const text = `${f.text}${lead}## Roadmap${eol}${eol}${tableLines(rows).join(eol)}${eol}`;
+  if (!text.startsWith(f.text) || !verify(text, parseRoadmap(f.text).tables.length)) {
+    err("internal check failed: the appended table would not pass check, so nothing is written");
+    return 1;
+  }
+  const prep = prepareBackups(f, io, err);
+  if (prep.msg) { err(prep.msg); return 1; }
+  const backup = `${f.name}.bak-${stampOf(now())}`;
+  const made = publishExclusive(join(prep.dir, backup), f.bytes, io);
+  if (made) {
+    err(made === "EEXIST"
+      ? `the backup ${backup} already exists; nothing was written. Wait a second and run again`
+      : `could not make the backup (${made}); nothing was written`);
+    return 1;
+  }
+  const failed = replaceFile(f, text, io, prep.dir);
+  if (failed) { err(failed); return 1; }
+  if (prep.madeOriginal) out(keptFirst(f));
+  out(`backup: ${backup} (in ${BACKUP_DIR}/, ignored by git; ${f.name}.original keeps your first version for good, the other copies can be deleted)`);
+  out(`wrote ${f.name}: ${rows.length} row(s) added in a new table at the end`);
+  return 0;
+}
+
 // The command line. io: { out, err, now } and the test seams { afterLoad(f) (right after the file was read),
 // beforeRename(stage), beforeLink(tmp, final), afterMarker(marker, final), linkError (a code), rename, platform,
 // wait } for tests. Returns the exit code. A failure nobody planned
@@ -1092,19 +1633,21 @@ function execute(argv, io) {
   const now = io.now ?? (() => new Date());
   const usage = (msg) => { if (msg) err(msg); for (const l of USAGE) err(l); return 2; };
   const [cmd, ...rest] = argv;
-  if (!["read", "check", "standardize", "set", "restore"].includes(cmd)) return usage(cmd ? `unknown command ${cmd}` : "");
+  if (!["read", "check", "standardize", "set", "restore", "adopt"].includes(cmd)) return usage(cmd ? `unknown command ${cmd}` : "");
   const spec = {
     read: [["--root"], []], check: [["--root"], ["--strict"]],
     standardize: [["--root", "--table", "--set-status"], ["--write"]],
     set: [["--root", "--status", "--commit", "--actual", "--plan-file", "--note"], []],
     restore: [["--root", "--from"], ["--write"]],
+    adopt: [["--root", "--plans", "--history", "--project", "--into", "--set-status"], ["--write", "--no-history"]],
   }[cmd];
   const parsed = parseArgs(rest, spec[1], spec[0]);
   if (parsed.error) return usage(parsed.error);
   const { pos, opts } = parsed;
   const wantPos = cmd === "set" ? 2 : 1;
-  if (pos.length !== wantPos) return usage(`${cmd} needs ${cmd === "set" ? "a file and an id" : "a file"}`);
+  if (pos.length !== wantPos) return usage(`${cmd} needs ${cmd === "set" ? "a file and an id" : cmd === "adopt" ? "a project folder" : "a file"}`);
   if (opts["--root"] && opts["--root"].length > 1) return usage("--root can be given once");
+  if (cmd === "adopt") return adoptCommand(pos, opts, io, out, err, now, usage);
   let from;
   if (cmd === "restore") {
     if (opts["--from"] && opts["--from"].length > 1) return usage("--from can be given once");

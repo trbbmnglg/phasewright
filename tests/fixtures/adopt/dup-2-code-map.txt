@@ -1,0 +1,3 @@
+# Phase 2 (code map): Graph core, where things live
+
+A notes file about the code. It has no Timestamps line.

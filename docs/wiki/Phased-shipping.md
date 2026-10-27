@@ -2,19 +2,20 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.7.1 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.8.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
 | `/phased-shipping:plan` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/plan/SKILL.md)) | Sizes the work as trivial (skip), small (one phase) or large (roadmap), then writes one detailed phase plan at a time. |
 | `/phased-shipping:run` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)) | Runs one phase: gates, a baseline, the build, checks against the baseline and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. |
-| `/phased-shipping:roadmap` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/roadmap/SKILL.md)) | Checks a project's roadmap file against the roadmap format, standardizes an older roadmap into it, or restores a kept copy. It writes only after you say yes, with copies kept first in `.roadmap-backups/`. See [Roadmap standard](Roadmap-standard). |
+| `/phased-shipping:roadmap` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/roadmap/SKILL.md)) | Checks a project's roadmap file against the roadmap format, standardizes an older roadmap into it, adopts existing plan files into a roadmap, or restores a kept copy. It writes only after you say yes, with copies kept first in `.roadmap-backups/`. See [Roadmap standard](Roadmap-standard). |
+| `/phased-shipping:onboard` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/onboard/SKILL.md)) | The first run in a project: lists the files it would read, reads nothing until you confirm, saves a survey of the project's commands, CI and conventions, and points to standardize, adopt or a fresh roadmap. See [Onboarding](Onboarding). |
 | `model-scout` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/model-scout.md)) | Combines which models you can use, current official guidance and how each model did in your phase history. |
 | `builder` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/builder.md)) | Implements one approved plan. Never commits or deploys. |
 | `checker` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/checker.md)) | Runs typecheck, lint, tests, build and browser checks, first as a baseline and then compared against it. Only new failures block. |
 | `shipper` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/shipper.md)) | Commits, deploys, runs the prod check and rolls back on failure, but only actions marked `APPROVED:`. |
 
-The model and effort are enforced by the plan skill's frontmatter and by `run`'s gates; see [How the model is enforced](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#how-the-model-is-enforced). Related pages: [The guard](The-guard), [Approval check](Approval-check), [Roadmap standard](Roadmap-standard), [Phase history and estimates](Phase-history-and-estimates).
+The model and effort are enforced by the plan skill's frontmatter and by `run`'s gates; see [How the model is enforced](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#how-the-model-is-enforced). Related pages: [The guard](The-guard), [Approval check](Approval-check), [Roadmap standard](Roadmap-standard), [Onboarding](Onboarding), [Phase history and estimates](Phase-history-and-estimates).
 
 ## How to use it
 
@@ -35,7 +36,7 @@ Then plan and run a phase ([Use](https://github.com/trbbmnglg/phasewright/blob/m
 /phased-shipping:run push
 ```
 
-If your organization restricts plugin marketplaces, `node scripts/sync-personal.mjs` installs personal copies with a `ps-` prefix ([sync-personal.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/sync-personal.mjs), [Install](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#install)). The README lists everything the plugin reads, writes and runs under [What it touches](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#what-it-touches).
+On a project's first run, `/phased-shipping:onboard` surveys its setup first ([Onboarding](Onboarding)). If your organization restricts plugin marketplaces, `node scripts/sync-personal.mjs` installs personal copies with a `ps-` prefix ([sync-personal.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/sync-personal.mjs), [Install](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#install)). The README lists everything the plugin reads, writes and runs under [What it touches](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#what-it-touches).
 
 ## What shipped when
 
@@ -52,6 +53,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.6.3 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The README's Limits say what has been seen of the guard in real runs; documentation only. |
 | 0.7.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The roadmap format, the `/phased-shipping:roadmap` skill and script, and a schema version on each history record. See [Roadmap standard](Roadmap-standard). |
 | 0.7.1 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Roadmap backups kept in `.roadmap-backups/`, a permanent `.original`, `set` keeps `.prev`, a new `restore` command, and a changed-while-writing check. See [Roadmap standard](Roadmap-standard). |
+| 0.8.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:onboard` skill, the survey script, `adopt` and the real-world status forms in the roadmap reader. See [Onboarding](Onboarding). |
 
 ## Limits
 

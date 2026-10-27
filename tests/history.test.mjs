@@ -12,7 +12,10 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "..", "plugins", "phased-shipping", "skills", "plan", "scripts", "history.mjs");
 
-const tmp = () => mkdtempSync(join(tmpdir(), "history-test-"));
+// Every folder is removed by the test that made it and, if an assertion fails first, by the after hook below.
+const scratch = [];
+const tmp = () => { const d = mkdtempSync(join(tmpdir(), "history-test-")); scratch.push(d); return d; };
+test.after(() => { for (const d of scratch) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 const node = (...args) => {
   const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
   return { status: r.status, out: r.stdout, err: r.stderr };

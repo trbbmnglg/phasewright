@@ -14,6 +14,7 @@
 - [The guard](The-guard)
 - [Approval check](Approval-check)
 - [Roadmap standard](Roadmap-standard)
+- [Onboarding](Onboarding)
 - [Phase history and estimates](Phase-history-and-estimates)
 - [Library skills and agents](Library-skills-and-agents)
 - [Security policy](Security-policy)
