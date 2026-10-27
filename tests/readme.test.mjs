@@ -28,7 +28,7 @@ const headingsOf = (md) => [...outsideFences(md).matchAll(/^(#{1,6}) (.+)$/gm)].
 const anchorsOf = (md) => new Set(headingsOf(md).map((h) => slug(h.text)));
 
 const EXPECTED = [
-  [2, "The problem"], [2, "How it helps"], [2, "Quick start"], [2, "What a phase looks like"], [2, "What's inside"],
+  [2, "What's new"], [2, "The problem"], [2, "How it helps"], [2, "Quick start"], [2, "What a phase looks like"], [2, "What's inside"],
   [2, "Install in your tool"], [3, "Claude Code"], [3, "VS Code with GitHub Copilot"], [3, "Cursor"],
   [3, "Other tools"], [3, "Download a single item"],
   [2, "What works where"], [2, "What it will not do"], [2, "Releases"], [2, "Security"], [2, "Develop"], [2, "License"],
@@ -63,14 +63,35 @@ const words = (md) => stripTags(outsideFences(md), " ")
   .split(/\s+/)
   .filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
-test("the first screen (tagline to the end of Quick start) is at most 250 words", () => {
-  const body = readme.replace(/^<h1[^\n]*\n/, "");
+// The generated What's new block (markers included) is measured on its own, so a release does not eat the first-screen cap.
+const WHATS_NEW_START = "<!-- whats-new:start -->";
+const WHATS_NEW_END = "<!-- whats-new:end -->";
+const withoutWhatsNew = (md) => {
+  const a = md.indexOf(WHATS_NEW_START);
+  const b = md.indexOf(WHATS_NEW_END);
+  assert.ok(a >= 0 && b > a, "the What's new markers are present");
+  return md.slice(0, a) + md.slice(b + WHATS_NEW_END.length);
+};
+
+test("the first screen (tagline to the end of Quick start, without the generated What's new block) is 60 to 250 words", () => {
+  const body = withoutWhatsNew(readme).replace(/^<h1[^\n]*\n/, "");
   const start = body.search(/\S/);
   const end = body.indexOf("\n## What a phase looks like");
   assert.ok(end > start);
   const n = words(body.slice(start, end));
   assert.ok(n <= 250, `first screen is ${n} words`);
   assert.ok(n >= 60, `first screen is ${n} words, which is too thin to say the goal`);
+});
+
+test("the generated What's new block is at most 110 words and sits between the tagline and The problem", () => {
+  const a = readme.indexOf(WHATS_NEW_START);
+  const b = readme.indexOf(WHATS_NEW_END);
+  assert.ok(a > 0 && b > a);
+  const n = words(readme.slice(a, b + WHATS_NEW_END.length));
+  assert.ok(n <= 110, `the What's new block is ${n} words`);
+  assert.ok(n >= 20, `the What's new block is ${n} words`);
+  assert.ok(b < readme.indexOf("\n## The problem"));
+  assert.ok(readme.slice(0, a).includes("Skills, agents and plugins"), "the tagline comes first");
 });
 
 test("Quick start has exactly two commands, in one code fence", () => {

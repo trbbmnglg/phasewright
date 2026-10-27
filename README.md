@@ -2,6 +2,18 @@
 
 Skills, agents and plugins that keep AI-assisted coding work small, checked and reversible.
 
+<!-- whats-new:start -->
+> **Work in progress.** Phasewright is built in the open. Release v1.1.0 (Baggao) is being built, so interfaces and file formats may still change; see [Releases](#releases).
+
+## What's new
+
+- **phased-shipping 0.8.0** (2026-10-27): Onboarding: survey a project with your consent first, then standardize, adopt or start a roadmap.
+- **phased-shipping 0.7.1** (2026-10-26): Every roadmap write keeps a way back: the first version is kept for good, with undo and restore.
+- **phased-shipping 0.7.0** (2026-10-26): A roadmap standard, and a script to check, standardize and update a roadmap.
+
+Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
+<!-- whats-new:end -->
+
 ## The problem
 
 Ask an AI coding assistant for a big change and it tends to build it all in one go, skip checks, lose the plan between sessions and ship with no way back. Nobody can see what it was allowed to do. Phasewright keeps the work small, checked and reversible.
@@ -153,6 +165,7 @@ npm run manifest   # regenerate library.json after changing an item
 
 - **Each skill** needs `name` (the folder name), `description` (max 1024 characters), `license: MIT` and a `metadata` block (`title`, `tags`, `featured`, `order`, `version`). Quote any description that contains `: ` or double quotes.
 - **The lint** also scans every file for emails, phone numbers, keys, machine paths and any term listed in a local `scripts/denylist.local.txt` (git-ignored).
+- **What's new** at the top is written from the plugin CHANGELOG: `node scripts/whats-new.mjs --write`.
 - **Releases:** push a tag like `v1.0.1`. The release workflow verifies the repo, zips every item and attaches the zips and `library.json`.
 
 ## License

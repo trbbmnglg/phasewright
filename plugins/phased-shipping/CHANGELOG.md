@@ -1,8 +1,11 @@
 # Changelog
 
-Newest first.
+Newest first. Each version starts with a `Date:` and a `Summary:` line; the README's What's new list is written from the newest three. Older entries have none.
 
 ## 0.8.0
+
+Date: 2026-10-27
+Summary: Onboarding: survey a project with your consent first, then standardize, adopt or start a roadmap.
 
 ### Added
 - The `/phased-shipping:onboard` skill (owner-invoked only; sonnet, low): the first run in a project. It says what will happen and what is never read, runs `survey list`, asks the owner which files with AskUserQuestion, runs `survey run` with the digest of the confirmed list, shows the findings and how the plan will adapt, runs `survey classify`, asks which path to take (standardize, adopt, both or fresh) and ends with a first-run checklist (survey, roadmap, dashboard shown as "arrives with the dashboard phase"). It never writes a roadmap.
@@ -20,6 +23,9 @@ Newest first.
 - No guard rule changed. The guard version is 0.8.0, kept equal to the plugin version, and the guard still has four roles (`builder`, `checker`, `shipper` and `model-scout`).
 
 ## 0.7.1
+
+Date: 2026-10-26
+Summary: Every roadmap write keeps a way back: the first version is kept for good, with undo and restore.
 
 ### Added
 - `.original`: before the first write of any kind, `roadmap.mjs` keeps the roadmap file as it found it, as `<file>.original` in `.roadmap-backups/`. It is created once (never overwritten) and the script never renames or deletes it. A `.original` that is a directory or a symlink makes every write fail closed.
@@ -43,6 +49,9 @@ Newest first.
 - The guard version is 0.7.1, kept equal to the plugin version. No guard rule changed.
 
 ## 0.7.0
+
+Date: 2026-10-26
+Summary: A roadmap standard, and a script to check, standardize and update a roadmap.
 
 ### Added
 - The roadmap format, version 1 (described in `skills/roadmap/references/format.md`). A roadmap table is a standard table when the line above its header is `<!-- phased-shipping:roadmap v1 -->`; it needs the columns `#`, `Phase` and `Status`, and `Status` is one of `planned`, `in progress`, `shipped` or `parked`. A table without the marker is legacy: it is read as well as possible and reported with a notice, never rejected.
