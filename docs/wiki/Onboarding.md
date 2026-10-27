@@ -16,7 +16,7 @@ Privacy comes first. The survey script lists the files it intends to read and re
 2. You confirm the files and remove any you do not want read. The list prints a digest; the run needs it and reads nothing if the project's files changed after the list.
 3. The script reads the confirmed files, saves the survey and prints a summary of what it found.
 4. It says whether the project has a roadmap table, plan files, both or neither, and you choose: standardize, adopt, both in order, or fresh. The roadmap skill writes only after its own yes.
-5. It ends with a checklist: survey, roadmap, and the dashboard data (turn it on with `/phased-shipping:dashboard enable`; the page arrives with the next version).
+5. It ends with a checklist: survey, roadmap, and the dashboard (which arrives with the dashboard phase).
 
 There is one mode: the script reads your files, and the assistant sees the summary it prints (script names and the commands that invoke them, CI job, action and secret names and a count of run steps, which convention docs exist, plan counts and skipped counts; no script body, no run line, no line of any file, no absolute path). The project name, workflow and job names and a package's name are text from your files, cleaned to one line of plain text and cut short, and they are in it. The skill tells the assistant to hand no project file to another agent. That summary goes to your model provider like any tool output ([What it touches](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#what-it-touches)).
 

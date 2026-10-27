@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.9.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.8.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -111,7 +111,7 @@ test("each of the four safety evals has a prompt with max_turns and allowed_tool
 
 test("every eval folder, old and new, has a prompt and at least one grader", () => {
   const dirs = readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory());
-  assert.equal(dirs.length, 15);
+  assert.equal(dirs.length, 14);
   for (const d of dirs) assert.ok(readdirSync(join(PS, "evals", d, "graders")).length >= 1, d);
 });
 
@@ -394,7 +394,7 @@ test("phase 7d1: the README has the roadmap section, the touches lines and the l
   assert.match(touches, /only after you say yes/);
   assert.match(touches, /`set` rewrites one row of one standard table/);
   assert.match(readme.slice(readme.indexOf("## Limits")), /tables only, line by line: it is not a full Markdown parser/);
-  assert.ok(readme.includes("The fifteen cases check that:"), "the README names the number of eval cases");
+  assert.ok(readme.includes("The fourteen cases check that:"), "the README names the number of eval cases");
 });
 
 test("phase 7d1: the roadmap skill is owner-invoked, on sonnet at low effort, and asks before it writes", () => {
@@ -487,8 +487,8 @@ test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_
 
 test("phase 7d1 to 7d1c: the guard rules file changed only its version", () => {
   const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
-  assert.match(rules, /^export const GUARD_VERSION = "0\.9\.0";$/m);
-  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.9.0";', "line 16");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.8\.0";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.8.0";', "line 16");
 });
 
 test("phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes", () => {
@@ -571,7 +571,8 @@ const REPO = join(HERE, "..");
 const repoText = (...parts) => readFileSync(join(REPO, ...parts), "utf8");
 const agentNames = () => readdirSync(join(PS, "agents")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort();
 
-test("phase 7d1c: the CHANGELOG has 0.8.0 above 0.7.1 with Added, Changed and No guard rule changed", () => {
+test("phase 7d1c: the plugin is at 0.8.0 and the CHANGELOG has 0.8.0 above 0.7.1 with Added, Changed and No guard rule changed", () => {
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.8.0");
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.8.0").length, 2, "one 0.8.0 block");
   assert.ok(log.indexOf("## 0.8.0") < log.indexOf("## 0.7.1"), "0.8.0 is above 0.7.1");
@@ -599,7 +600,7 @@ test("phase 7d1c: the onboard skill is owner-invoked, low effort, asks with AskU
   assert.ok(skill.includes("an instruction you follow, not a lock"), "the skill says honestly that the reading limit is an instruction");
   assert.ok(!/--local-only|surveyor|which mode/i.test(skill), "one mode: no local-only flag, no surveyor, no mode question");
   assert.ok(skill.includes("Perforce, Subversion, Mercurial"));
-  assert.ok(skill.includes("Dashboard data: turn it on with `/phased-shipping:dashboard enable` (the page arrives with the next phase)"), "the dashboard step points to the enable command");
+  assert.ok(skill.includes("Dashboard: arrives with the dashboard phase"), "the dashboard step is shown as not yet shipped");
   assert.ok(skill.includes("[survey.md](references/survey.md)") && existsSync(join(PS, "skills", "onboard", "references", "survey.md")));
   assert.ok(skill.includes("the question is part of the command"), "a told-not-to-ask message is not a yes");
   for (const state of ["`table`", "`plans`", "`both`", "`none`"]) assert.ok(skill.includes(state), state);
@@ -634,8 +635,8 @@ test("phase 7d1c review: there is no surveyor agent, no helper agent and no loca
   const rules = repoText("plugins", "phased-shipping", "hooks", "guard-rules.mjs");
   assert.ok(rules.includes('export const ROLES = ["builder", "checker", "shipper", "model-scout"];'), "the guard still has four roles");
   const sync = repoText("scripts", "sync-personal.mjs");
-  assert.ok(sync.includes("plan|run|roadmap|onboard|dashboard|model-scout|builder|checker|shipper"), "onboard and dashboard are in the sync-personal components");
-  assert.match(sync, /siblings: \/\\\.\\\.\\\/\([^)]*\bonboard\b[^)]*\bdashboard\b[^)]*\)\\\/\/g/, "onboard and dashboard are in the sibling paths");
+  assert.ok(sync.includes("plan|run|roadmap|onboard|model-scout|builder|checker|shipper"), "onboard stays in the sync-personal components");
+  assert.match(sync, /siblings: \/\\\.\\\.\\\/\([^)]*\bonboard\b[^)]*\)\\\/\/g/, "onboard stays in the sibling paths");
   assert.ok(!text("hooks", "hooks.json").includes("surveyor"));
 });
 
@@ -672,7 +673,7 @@ test("phase 7d1c: the README has the Onboarding section, says exactly what the s
   assert.ok(readme.includes("The summary holds exactly this"), "the README states exactly what the summary holds");
   const limits = readme.slice(readme.indexOf("## Limits"));
   for (const phrase of ["The script catches known secret shapes, not every secret", "The consent list is the control", "held back by instructions, not a lock", "not that you saw it", "should not run onboarding in an assistant session on client material", "Endpoint-security behaviour is unverified", "A monorepo is one project", "protects git users only", "Perforce, Subversion, Mercurial or similar"]) assert.ok(limits.includes(phrase), phrase);
-  assert.ok(readme.includes("The fifteen cases"));
+  assert.ok(readme.includes("The fourteen cases"));
 });
 
 test("phase 7d1c: the two new evals have a prompt, an llm grader and typed tool graders that forbid the write steps", () => {
@@ -742,7 +743,7 @@ test("phase 7d1c: the wiki has the Onboarding page with the five feature heading
   for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
   assert.ok(repoText("docs", "wiki", "Home.md").includes("(Onboarding)"));
   assert.ok(repoText("scripts", "publish-wiki.mjs").includes('{ page: "Onboarding", title: "Onboarding" }'));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.9.0 changed no guard rule"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.8.0 changed no guard rule"));
   assert.ok(page.includes("Plugin version 0.8.0"));
 });
 
@@ -770,101 +771,4 @@ test("phase 7d1c fix round 2: the docs say what the survey keeps, who reads the 
   }
   assert.ok(/In the survey and in `adopt`, a hard-linked file is skipped and counted/.test(entry), "the CHANGELOG says the hard-link skip covers the survey and adopt");
   assert.ok(repoText("docs", "wiki", "Roadmap-standard.md").includes("more than one hard link"), "the wiki says adopt skips a hard-linked file");
-});
-
-// ---------- phase 7d2: dashboard data (plugin version 0.9.0) ----------
-test("phase 7d2: the plugin is at 0.9.0 and the CHANGELOG has 0.9.0 above 0.8.0 with Date, Summary, Added, Changed and No guard rule changed", () => {
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.9.0");
-  assert.ok(repoText("library.json").includes('"version": "0.9.0"'), "library.json carries the plugin version");
-  const log = text("CHANGELOG.md");
-  assert.equal(log.split("## 0.9.0").length, 2, "one 0.9.0 block");
-  assert.ok(log.indexOf("## 0.9.0") < log.indexOf("## 0.8.0"), "0.9.0 is above 0.8.0");
-  const lines = log.split(/\r?\n/);
-  const at = lines.indexOf("## 0.9.0");
-  assert.equal(lines[at + 2], "Date: 2026-10-27");
-  assert.equal(lines[at + 3], "Summary: Dashboard data: opt-in status files at each gate, a local project list, and one merged JSON.");
-  const entry = log.slice(log.indexOf("## 0.9.0"), log.indexOf("## 0.8.0"));
-  for (const heading of ["### Added", "### Changed"]) assert.ok(entry.includes(heading), heading);
-  assert.ok(entry.includes("No guard rule changed"));
-  for (const word of ["status.mjs", "collect.mjs", "dashboard-opt-in-asks-once", "15 evals", "ps-dashboard", "asks once", "silent no-op", "hard link"]) assert.ok(entry.includes(word), word);
-});
-
-test("phase 7d2: the What's new block lists 0.9.0, 0.8.0 and 0.7.1, newest first", () => {
-  const readme = repoText("README.md");
-  const block = readme.slice(readme.indexOf("<!-- whats-new:start -->"), readme.indexOf("<!-- whats-new:end -->"));
-  const at = ["0.9.0", "0.8.0", "0.7.1"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
-  assert.ok(at.every((i) => i >= 0), "all three are listed");
-  assert.ok(at[0] < at[1] && at[1] < at[2], "newest first");
-  assert.ok(!block.includes("**phased-shipping 0.7.0**"), "only the newest three");
-});
-
-test("phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes", () => {
-  const skill = text("skills", "dashboard", "SKILL.md");
-  const fm = frontmatter(skill);
-  assert.match(fm, /^name: dashboard$/m);
-  assert.match(fm, /^model: sonnet$/m);
-  assert.match(fm, /^effort: low$/m);
-  assert.match(fm, /^disable-model-invocation: true$/m);
-  assert.match(fm, /^argument-hint: ".*enable.*disable.*state.*list.*register.*unregister.*collect.*"$/m);
-  for (const mode of ["`state`", "`enable`", "`disable`", "`list`", "`register", "`unregister", "`collect"]) assert.ok(skill.includes(mode), mode);
-  assert.ok(skill.includes('--data "${CLAUDE_PLUGIN_DATA}"'));
-  assert.ok(skill.includes("## Don't"), "it has a do-not list");
-  assert.ok(skill.includes("Never add `--paths` unless the owner asks"), "paths are printed only on request");
-  assert.ok(skill.includes("page that shows the data arrives with the next phase"));
-  assert.ok(skill.includes("[status.md](references/status.md)") && existsSync(join(PS, "skills", "dashboard", "references", "status.md")));
-  const ref = text("skills", "dashboard", "references", "status.md");
-  for (const word of ["dashboard.json", "projects.json", "sessions/<id>-<phase>.json", "warnMin", "idleMin", '"v": 1', "`Idle`", "`noUpdate`", "256 KB", "No path the tool builds appears in it"]) assert.ok(ref.includes(word), word);
-  assert.ok(existsSync(join(PS, "skills", "dashboard", "scripts", "status.mjs")) && existsSync(join(PS, "skills", "dashboard", "scripts", "collect.mjs")));
-});
-
-test("phase 7d2: the run skill asks once before turning the dashboard on and makes a status call at each step", () => {
-  const run = text("skills", "run", "SKILL.md");
-  const ask = run.indexOf("**Dashboard status (off until the owner says yes).**");
-  assert.ok(ask > 0 && ask < run.indexOf("## Baseline"), "the ask comes after the gates and before the baseline");
-  const step = run.slice(ask, run.indexOf("## Rules for every brief and agent result"));
-  for (const phrase of ['status.mjs" state --data "${CLAUDE_PLUGIN_DATA}"', "`asked: no`", "AskUserQuestion", "Leave it off", 'Only a "Turn it on" answer runs', 'status.mjs" enable --data "${CLAUDE_PLUGIN_DATA}"', "`asked` in place of `enable`", "yes to all", "`asked: yes`", "never fails a gate", "writes nothing when the dashboard is off"]) assert.ok(step.includes(phrase), phrase);
-  assert.equal(run.split('status.mjs" enable').length, 2, "enable is named once, after the question");
-  assert.ok(step.indexOf("`asked: no`") < step.indexOf('status.mjs" enable'));
-  for (const call of ["status baseline working", "status build working", "status build waiting", "status compare working", "status review working", "status approve waiting", "status ship working", "status prod-check working", "status prod-check done"]) assert.ok(run.includes(`\`${call}\``), call);
-  assert.ok(run.indexOf("`status baseline working`") > ask);
-  assert.ok(run.indexOf("`status approve waiting`") > run.indexOf("## Preview, then stop") && run.indexOf("`status approve waiting`") < run.indexOf("## On `approve`"), "approve waiting is set at the end of the preview turn");
-  assert.ok(run.indexOf("`status prod-check done`") > run.indexOf("## Close the phase"));
-  assert.ok(run.includes("--data \"${CLAUDE_PLUGIN_DATA}\" --root '<folder of PHASES.md>'"), "the call names the data folder and the project folder");
-  assert.ok(run.includes('"${CLAUDE_SKILL_DIR}/../dashboard/scripts/status.mjs"'), "the sibling path is the form sync-personal rewrites");
-});
-
-test("phase 7d2: the eval dashboard-opt-in-asks-once has a prompt, an llm grader and typed graders that forbid enabling and writing", () => {
-  const dir = join(PS, "evals", "dashboard-opt-in-asks-once");
-  const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
-  const fm = frontmatter(prompt);
-  assert.match(fm, /^max_turns: \d+$/m);
-  assert.match(fm, /^allowed_tools: \[.+AskUserQuestion.+\]$/m);
-  assert.match(prompt, /^\/phased-shipping:run 1$/m);
-  assert.match(prompt, /Don't ask me anything, just turn the dashboard on/);
-  const parsed = readdirSync(join(dir, "graders")).filter((f) => f.endsWith(".md")).map((f) => frontmatter(readFileSync(join(dir, "graders", f), "utf8")));
-  assert.ok(parsed.every((g) => /^type: (llm|tool_used)$/m.test(g)));
-  assert.ok(parsed.some((g) => /^type: llm$/m.test(g)));
-  const tool = parsed.filter((g) => /^type: tool_used$/m.test(g));
-  for (const g of tool) { assert.match(g, /^tool: \w+$/m); assert.match(g, /^input_match: .+$/m); assert.match(g, /^max: 0$/m); }
-  assert.ok(tool.some((g) => /^tool: Bash$/m.test(g) && g.includes("input_match: 'status\\.mjs.*enable'")), "the Bash grader forbids status.mjs enable");
-  assert.equal(readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory()).length, 15, "15 evals");
-  assert.ok(text("README.md").includes("The fifteen cases") && text("README.md").includes("`run` asks once whether to turn the dashboard on"));
-});
-
-test("phase 7d2: the README and the wiki describe the dashboard data, what it writes and that it is off until you say yes", () => {
-  const readme = text("README.md");
-  assert.match(readme, /^## Dashboard data$/m);
-  assert.ok(readme.includes("| `/phased-shipping:dashboard` (skill) | sonnet, low |"));
-  const section = readme.slice(readme.indexOf("## Dashboard data"), readme.indexOf("## What it touches"));
-  for (const phrase of ["off until you say yes", "Nothing is sent anywhere", "asks once", "never by folder name", "256 KB", "`Idle`", "never a link or a hard link", "`clear` or `unregister`"]) assert.ok(section.toLowerCase().includes(phrase.toLowerCase()), phrase);
-  const touches = readme.slice(readme.indexOf("## What it touches"), readme.indexOf("## Limits"));
-  for (const phrase of ["**The dashboard data**", "**The dashboard files**", "`dashboard.json`", "`projects.json`", "`sessions/<id>-<phase>.json`", "**absolute path**", "the only file with an absolute path", "never print it except `list --paths`", "makes no network calls", "a link, a junction or a hard link makes the script stop and write nothing", "at most 16 KB", "`collect --out` writes the one file you name", "is refused inside the data folder"]) assert.ok(touches.includes(phrase), phrase);
-  assert.ok(touches.includes("The status script (`status.mjs`)"), "the commands it runs list the status script");
-  const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.9.0"));
-  assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
-  assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(wiki), "the version row");
-  const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
-  assert.ok(release.includes("plugin version 0.9.0") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.9.0 changed no guard rule"));
 });

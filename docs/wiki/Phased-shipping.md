@@ -2,7 +2,7 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.9.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.8.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
@@ -37,7 +37,6 @@ Then plan and run a phase ([Use](https://github.com/trbbmnglg/phasewright/blob/m
 ```
 
 On a project's first run, `/phased-shipping:onboard` surveys its setup first ([Onboarding](Onboarding)). If your organization restricts plugin marketplaces, `node scripts/sync-personal.mjs` installs personal copies with a `ps-` prefix ([sync-personal.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/sync-personal.mjs), [Install](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#install)). The README lists everything the plugin reads, writes and runs under [What it touches](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#what-it-touches).
-| `/phased-shipping:dashboard` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/dashboard/SKILL.md)) | Turns the dashboard data on or off, lists the projects it follows, and merges roadmaps, plan timestamps, phase history and running sessions into one local JSON. Off until you say yes; the page that shows the data arrives with the next version. |
 
 ## What shipped when
 
@@ -55,7 +54,6 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.7.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The roadmap format, the `/phased-shipping:roadmap` skill and script, and a schema version on each history record. See [Roadmap standard](Roadmap-standard). |
 | 0.7.1 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Roadmap backups kept in `.roadmap-backups/`, a permanent `.original`, `set` keeps `.prev`, a new `restore` command, and a changed-while-writing check. See [Roadmap standard](Roadmap-standard). |
 | 0.8.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:onboard` skill, the survey script, `adopt` and the real-world status forms in the roadmap reader. See [Onboarding](Onboarding). |
-| 0.9.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:dashboard` skill, opt-in status files that the run writes at each step, a local project list, and one merged JSON for a dashboard page. Off until you say yes. |
 
 ## Limits
 
