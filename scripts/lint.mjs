@@ -114,7 +114,7 @@ function publishedFiles() {
     return lib.listFiles(ROOT);
   }
 }
-const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip)$|(^|\/)scripts\/denylist\.local\.txt$|\.local\.[^/]+$/;
+const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip|woff2)$|(^|\/)scripts\/denylist\.local\.txt$|\.local\.[^/]+$/;
 for (const file of publishedFiles()) {
   const path = lib.rel(file);
   if (SKIP.test(path)) continue;

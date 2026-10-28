@@ -68,7 +68,7 @@ This skill never writes a roadmap and never gives `--write`. The write belongs t
 Finish with this list, ticking what is done:
 - [x] Survey: saved in `.phased-shipping/survey.json` (files read, files skipped).
 - [ ] Roadmap: standardized, adopted or started (the next command, as above).
-- [ ] Dashboard data: turn it on with `/phased-shipping:dashboard enable` (the page arrives with the next phase).
+- [ ] Dashboard data: turn it on with `/phased-shipping:dashboard enable`, then open the page with `/phased-shipping:dashboard page`.
 
 ## Limits
 

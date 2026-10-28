@@ -1,0 +1,274 @@
+/* Phasewright progress sheet. A drawing sheet: square corners only, a frame with zone ticks and a title block, boxed
+   schedules, hard-edged hatching, blueprint colours in dark mode. No image, no external file, nothing but data: urls. */
+/* --prog is the in-progress colour of the logo (salmon) and is used only on borders, strokes and hatching, never on text or a
+   fill: on the light page the logo's light variant has it as #B33A0B (the pale #FFB28F is 1.6:1 there); --wait, the accent
+   of "Waiting for you" and of errors, is a crimson (light) and a rose (dark), a different tone from --prog. */
+:root{
+  --bg:#F5F6F4;--ink:#111417;--ink2:#47505A;--meta:#59626B;--hair:#D3D8DB;--rule:#111417;--grid:rgba(17,20,23,.045);
+  --wait:#A3123A;--prog:#B33A0B;--warn:#7F5300;--warnbg:#F6E6BF;--done:#1D6843;--idle:#59626B;--est:#7D868E;--focus:var(--prog);
+  --sans:"PW Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:"PW Mono",ui-monospace,"Cascadia Mono",Consolas,"SFMono-Regular",Menlo,monospace;
+  --u:8px;
+  color-scheme:light dark;
+}
+@media screen and (prefers-color-scheme:dark){:root{
+  --bg:#0D1F33;--ink:#EAF1F7;--ink2:#AFC2D3;--meta:#97ADC2;--hair:#25425F;--rule:#AFC2D3;--grid:rgba(175,194,211,.07);
+  --wait:#FF8FAB;--prog:#FFB28F;--warn:#FFD27A;--warnbg:#3A3014;--done:#9FE2BA;--idle:#97ADC2;--est:#7E97AE;--focus:#FFD27A;
+}}
+
+*,*::before,*::after{box-sizing:border-box;border-radius:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;padding:calc(var(--u)*3);font:400 14px/1.45 var(--sans);font-stretch:100%;font-synthesis:none;-webkit-font-smoothing:antialiased;
+  color:var(--ink);background-color:var(--bg);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:calc(var(--u)*3) calc(var(--u)*3)}
+[hidden]{display:none!important}
+h1,h2,h3,p,ul,ol,dl,dd{margin:0}
+ul,ol{padding:0;list-style:none}
+.vh{position:absolute!important;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.skip{position:absolute;left:-9999px;top:0}
+.skip:focus{left:8px;top:8px;z-index:50;background:var(--ink);color:var(--bg);padding:6px 10px}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+main:focus-visible{outline:none}
+.fig,.mono,.num{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums lining-nums}
+.none{color:var(--meta)}
+.unit{color:var(--meta)}
+
+/* the sheet: frame, trim line, zone ticks along the top and left edge */
+.sheet{position:relative;max-width:1400px;margin:0 auto;border:2px solid var(--rule);outline:1px solid var(--rule);outline-offset:5px;padding:calc(var(--u)*4) calc(var(--u)*4) calc(var(--u)*3);background:var(--bg)}
+.sheet::before,.sheet::after{content:"";position:absolute;pointer-events:none}
+.sheet::before{left:0;right:0;top:0;height:6px;background:repeating-linear-gradient(90deg,var(--rule) 0 1px,transparent 1px 12.5%)}
+.sheet::after{top:0;bottom:0;left:0;width:6px;background:repeating-linear-gradient(180deg,var(--rule) 0 1px,transparent 1px 160px)}
+.lbl,.kicker,.brand,h2,h3,.stamp,.titleblock dt,.part>summary,.rowh{font-stretch:85%;text-transform:uppercase;letter-spacing:.07em}
+
+/* the logo's hatch: diagonal stripes in the in-progress colour. It is drawn as the background of a pseudo-element that sits inside
+   a bar, a mark or the header rule (which clips it) and is one tile (8px) wider on the left; the drift moves that pseudo-element
+   by transform (the one property a browser can animate off the main thread), exactly one tile to the right, so the loop has no jump. */
+:root{--hatch:linear-gradient(135deg,var(--prog) 25%,transparent 25%,transparent 50%,var(--prog) 50%,var(--prog) 75%,transparent 75%,transparent)}
+
+/* revision strip */
+.top{position:relative;display:flex;justify-content:space-between;align-items:center;gap:calc(var(--u)*2);flex-wrap:wrap;padding-bottom:calc(var(--u) + 14px)}
+.top-band{position:absolute;left:0;right:0;bottom:0;height:10px;border-top:2px solid var(--prog);border-bottom:2px solid var(--prog);overflow:hidden}
+.mk-h,.seg-p{position:relative;overflow:hidden}
+.top-band::before,.mk-h::before,.seg-p::before{content:"";position:absolute;top:0;bottom:0;left:-8px;right:0;background-image:var(--hatch);background-size:8px 8px}
+.tb-left{display:flex;gap:var(--u);align-items:baseline;font-size:13px;font-stretch:85%;text-transform:uppercase;letter-spacing:.07em;color:var(--ink2)}
+.brand{font-weight:600;color:var(--ink)}
+.sep{color:var(--meta)}
+.controls{display:flex;gap:calc(var(--u)*1.5);align-items:center;flex-wrap:wrap;font:400 12px/1.4 var(--mono);color:var(--ink2)}
+.btn{font:500 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.04em;color:var(--ink);background:transparent;border:1.5px solid var(--ink);padding:3px 10px;cursor:pointer;-webkit-appearance:none;appearance:none}
+.btn:hover,.btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.cd{min-width:24ch}
+body:not(.js) .cd,body:not(.js) #pw-pause,body:not(.js) .foot-refresh{display:none}
+.banner{margin:var(--u) 0 0;padding:var(--u) calc(var(--u)*1.5);border:1.5px solid var(--warn);background:var(--warnbg);font-size:13px}
+.banner .mk{color:var(--warn)}
+.banner-err{border-color:var(--wait);background:transparent;border-left-width:4px}
+.banner-err .mk{color:var(--wait)}
+
+/* the summary line and the empty states */
+.lead{margin:calc(var(--u)*2) 0 calc(var(--u)*2);color:var(--ink2);font-size:13px}
+.lead .fig{color:var(--ink)}
+.empty{border:1.5px dashed var(--rule);padding:calc(var(--u)*2);color:var(--ink2);font-size:13px}
+.empty strong{color:var(--ink)}
+.note{margin:0 0 var(--u);padding:var(--u) calc(var(--u)*1.5);border:1.5px solid var(--warn);background:var(--warnbg);font-size:13px}
+.note .mk{color:var(--warn)}
+.note-err{border-color:var(--wait);background:transparent;border-left-width:4px}
+.note-err .mk{color:var(--wait)}
+.note ul li{margin-top:2px}
+
+/* marks: shapes made of straight edges only; state is a word and a shape, never colour alone */
+.mk{display:inline-block;width:11px;height:11px;margin-right:.45em;vertical-align:-1px;flex:none;background:currentColor}
+.mk-w{clip-path:polygon(0 0,100% 50%,0 100%)}
+.mk-q{background:linear-gradient(90deg,currentColor 0 30%,transparent 30% 60%,currentColor 60% 90%,transparent 90%)}
+.mk-d{clip-path:polygon(0 55%,18% 38%,38% 60%,82% 8%,100% 26%,38% 94%)}
+.mk-i{background:none;border:1.5px dashed currentColor}
+.mk-n{clip-path:polygon(50% 0,100% 100%,0 100%)}
+.mk-p{background:none;border:1.5px solid currentColor}
+.mk-h{background:none;border:1.5px solid var(--prog)}
+.mk-x{background:none;border:1.5px dashed currentColor}
+
+/* projects: nested details; the closed row is the executive summary */
+.projects{display:grid;gap:calc(var(--u)*1.5)}
+details>summary{list-style:none;cursor:pointer}
+details>summary::-webkit-details-marker{display:none}
+summary:focus-visible{outline-offset:-2px}
+.proj{border:2px solid var(--rule);background:var(--bg)}
+.proj[data-attn]{border-color:var(--wait)}
+.prow{display:grid;grid-template-columns:minmax(13rem,2fr) repeat(auto-fit,minmax(8.75rem,1fr));gap:var(--u) calc(var(--u)*2);align-items:start;padding:calc(var(--u)*1.25) calc(var(--u)*1.5)}
+.proj[open]>.prow{border-bottom:1.5px solid var(--rule)}
+.pname{display:flex;gap:var(--u);align-items:flex-start;min-width:0;font-size:16px;font-weight:600;line-height:1.3}
+.pname::before,.sess>summary .sname::before{content:"";flex:none;width:10px;height:10px;margin-top:5px;background:var(--ink);clip-path:polygon(0 0,100% 50%,0 100%)}
+details[open]>summary .pname::before,details[open]>summary .sname::before{clip-path:polygon(0 0,100% 0,50% 100%)}
+.pname .t{--tmax:30ch;font-weight:600}
+.c[data-h]::before{content:attr(data-h);display:block;font:500 10px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--meta);margin-bottom:1px}
+.c{min-width:0;font-size:13px}
+.c .fig{font-size:12.5px}
+.kv{display:block;white-space:nowrap}
+.stamp{display:inline-block;margin-top:4px;font:600 12px/1.2 var(--mono);color:var(--wait);border:2px solid var(--wait);padding:2px 6px;white-space:nowrap}
+.pbad{color:var(--wait);font-weight:600}
+/* the roadmap bar of a project row, as the logo's three squares: shipped (filled), in progress (hatched), planned (outlined) */
+.progress{display:block;margin-top:6px;max-width:26rem}
+.pbar{display:flex;gap:3px;height:10px}
+.seg{display:block;flex:1 1 0;min-width:6px;border:2px solid var(--ink)}
+.seg-s{background-color:var(--ink)}
+.seg-p{border-color:var(--prog)}
+.plabel{display:block;margin-top:3px;font:400 11.5px/1.4 var(--mono);color:var(--ink2)}
+.pbody{padding:calc(var(--u)*2) calc(var(--u)*1.5);display:grid;gap:calc(var(--u)*2)}
+.kick{display:flex;gap:calc(var(--u)*1.5);align-items:center;margin-bottom:var(--u)}
+.kicker{font:500 11px/1 var(--mono);border:1.5px solid var(--rule);padding:4px 6px;color:var(--ink)}
+h2{font-size:15px;font-weight:600;line-height:1.2}
+h3{font-size:12.5px;font-weight:600;line-height:1.2;color:var(--ink2)}
+
+/* sessions: each is a details row with a drawing stamp for its state */
+.slist{display:grid;gap:var(--u)}
+.sess{border:1.5px solid var(--rule)}
+.sess>summary{display:grid;grid-template-columns:minmax(12rem,1.4fr) repeat(auto-fit,minmax(7rem,1fr));gap:var(--u) calc(var(--u)*2);align-items:start;padding:var(--u) calc(var(--u)*1.5)}
+.sess[data-state=waiting]{border:2px solid var(--wait)}
+.sess[open]>summary{border-bottom:1px solid var(--hair)}
+.sname{display:flex;gap:var(--u);align-items:flex-start;min-width:0;font-weight:600}
+.sname .ph-n{font:500 12.5px/1.45 var(--mono);color:var(--ink2);flex:none}
+.sname .t{--tmax:34ch}
+.st{display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;font-weight:600;font-stretch:85%;text-transform:uppercase;letter-spacing:.07em}
+[data-state=waiting] .st{color:var(--wait);border:2px solid var(--wait);padding:2px 6px}
+[data-state=working] .st{color:var(--ink)}
+[data-state=done] .st{color:var(--done)}
+[data-state=idle] .st{color:var(--idle);border:1.5px dashed var(--idle);padding:1px 5px;font-weight:500}
+[data-state=done] .c{color:var(--ink2)}
+.warn{display:inline-flex;align-items:center;white-space:nowrap;margin-top:4px;font:500 11.5px/1.5 var(--mono);color:var(--warn);background:var(--warnbg);border:1.5px solid var(--warn);padding:0 6px 0 4px}
+.idle-note{display:block;margin-top:2px;font:400 11.5px/1.4 var(--mono);color:var(--meta)}
+.sbody{padding:calc(var(--u)*1.5)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));border:1.5px solid var(--rule);margin-top:var(--u)}
+.facts div{padding:5px 8px;border:1px solid var(--hair)}
+.facts dt{font:600 9.5px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.06em;color:var(--meta)}
+.facts dd{font-size:13px}
+.flow-note{margin-top:var(--u);font-size:12.5px;color:var(--ink2)}
+.over{color:var(--wait);font-weight:600}
+
+/* the phase flow: eight gates, straight segments, square joins; loops are right-angled arrows */
+.flow{display:block;width:100%;min-width:860px;height:auto;overflow:visible}
+.flow .gb{fill:var(--bg);stroke:var(--rule);stroke-width:1.5}
+.flow .g-run .gb{stroke:var(--prog);stroke-width:2.5}
+.flow .g-pend .gb{stroke:var(--meta)}
+.flow .g-done .band{fill:var(--ink2)}
+.flow .g-wait .band{fill:var(--wait)}
+.flow .g-wait .gb{stroke:var(--wait);stroke-width:2.5}
+.flow .hatch{fill:none;stroke:var(--prog);stroke-width:2}
+.flow .bandline{stroke:var(--rule);stroke-width:1.5}
+.flow .gname{font:600 11px var(--sans);font-stretch:85%;text-transform:uppercase;letter-spacing:.06em;fill:var(--ink)}
+.flow .gst{font:400 11px var(--sans);fill:var(--ink2)}
+.flow .g-run .gst,.flow .g-wait .gst{font-weight:600}
+.flow .g-wait .gst{fill:var(--wait)}
+.flow .g-pend .gname,.flow .g-pend .gst{fill:var(--meta)}
+.flow .grd{font:500 10.5px var(--mono);fill:var(--ink)}
+.flow .link{stroke:var(--rule);stroke-width:1.5;fill:none}
+.flow .head{fill:var(--rule)}
+.flow .loop{stroke:var(--ink2);stroke-width:2.5;fill:none;stroke-linejoin:miter;stroke-linecap:butt}
+.flow .loop-head{fill:var(--ink2)}
+.flow .loop-lbl,.flow .loop-name{paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:miter}
+.flow .loop-lbl{font:600 12.5px var(--mono);fill:var(--ink)}
+.flow .loop-name{font:400 12px var(--sans);fill:var(--ink2)}
+.flow .loop-active{stroke:var(--prog);stroke-width:3;stroke-dasharray:9 5}
+.flow .loop-active-head{fill:var(--bg);stroke:var(--prog);stroke-width:2}
+.scroll-hint{display:none;margin:0 0 6px;font:400 11.5px/1.4 var(--mono);color:var(--meta)}
+
+/* parts inside a project */
+.part{border:1.5px solid var(--rule)}
+.part>summary{display:flex;gap:var(--u);align-items:baseline;padding:var(--u) calc(var(--u)*1.5);font-size:12.5px;font-weight:600;color:var(--ink)}
+.part>summary::before{content:"";flex:none;width:9px;height:9px;background:var(--ink);clip-path:polygon(0 0,100% 50%,0 100%);align-self:center}
+.part[open]>summary{border-bottom:1px solid var(--hair)}
+.part[open]>summary::before{clip-path:polygon(0 0,100% 0,50% 100%)}
+.part>summary .sub{font-weight:400;color:var(--ink2);text-transform:none;letter-spacing:0;font-stretch:100%}
+.pbox{padding:calc(var(--u)*1.5)}
+
+/* schedules: a full grid, like a door schedule on a drawing */
+.scroll{position:relative;overflow-x:auto;max-width:100%}
+.scroll:focus-visible{outline-offset:4px}
+.tbl{border-collapse:collapse;width:100%;border:1.5px solid var(--rule);background:var(--bg);font-variant-numeric:tabular-nums lining-nums}
+.tbl th,.tbl td{padding:6px 8px;border:1px solid var(--hair);text-align:left;vertical-align:baseline}
+.tbl thead th{font:600 11px/1.25 var(--sans);font-stretch:85%;text-transform:uppercase;letter-spacing:.07em;color:var(--ink2);border-bottom:1.5px solid var(--rule);vertical-align:bottom}
+.tbl caption{text-align:left;padding:0 0 6px;font:500 11.5px/1.4 var(--mono);color:var(--ink2)}
+.tbl td.n,.tbl th.n{text-align:right;font-family:var(--mono);font-size:13px;white-space:nowrap}
+.tbl td.id{font:500 12.5px/1.45 var(--mono);color:var(--ink2);white-space:nowrap}
+.tbl tfoot th,.tbl tfoot td{border-top:2px solid var(--rule);font-weight:600}
+.tbl .r-parked td{color:var(--meta)}
+.tbl .stt{display:inline-flex;align-items:center;white-space:nowrap;font-size:12px;font-weight:600}
+.tbl .stt-planned{color:var(--ink2);font-weight:500}
+.tbl .stt-parked{color:var(--meta);font-weight:400}
+.tbl-road{min-width:860px}
+.tbl-est{min-width:760px}
+.eva{display:block}
+.eva .dim{stroke:var(--ink2);stroke-width:1}
+.eva .act{fill:var(--ink)}
+.eva .act.over{fill:var(--wait)}
+
+/* truncation: one line with an ellipsis; the full text on hover and focus; a screen reader always reads it in full */
+.t{position:relative;display:block;min-width:0;max-width:var(--tmax,30ch)}
+.t-s{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.t-f{position:absolute;left:0;top:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.t.is-cut{cursor:help}
+.t.is-cut:hover .t-f,.t.is-cut:focus:not(.t-dismissed) .t-f,body:not(.js) .t:hover .t-f{
+  clip-path:none;width:max-content;height:auto;overflow:visible;white-space:normal;overflow-wrap:anywhere;font-weight:400;
+  z-index:40;max-width:min(36rem,calc(100vw - 16px));padding:5px 8px;margin:-6px 0 0 -9px;
+  background:var(--bg);color:var(--ink);border:1px solid var(--ink)}
+.t.is-cut:focus-visible{outline:none}
+.t.is-cut:focus-visible .t-f{outline:2px solid var(--focus);outline-offset:1px}
+td .t{--tmax:38ch}
+
+/* title block, bottom right as on a drawing */
+.foot{margin-top:calc(var(--u)*4);display:flex;flex-wrap:wrap-reverse;justify-content:space-between;align-items:flex-end;gap:calc(var(--u)*2);font-size:12px;color:var(--meta)}
+.foot p{max-width:52ch}
+.titleblock{order:2;margin:0 0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:2px solid var(--rule);min-width:min(520px,100%)}
+.titleblock div{padding:5px 8px;border:1px solid var(--hair)}
+.titleblock dt{font-size:9.5px;font-weight:600;color:var(--meta)}
+.titleblock dd{font-size:13px;color:var(--ink)}
+
+@media (max-width:900px){
+  .prow{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .prow .pname{grid-column:1/-1}
+  .sess>summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sess>summary .sname{grid-column:1/-1}
+  .titleblock{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:1040px){
+  .scroll-hint{display:block}
+}
+@media (max-width:640px){
+  .flow{min-width:976px}
+  body{padding:var(--u)}
+  .sheet{padding:calc(var(--u)*3) calc(var(--u)*2) calc(var(--u)*2);outline-offset:3px}
+}
+/* Motion is declared only here: on a screen, for a reader who has not asked for less. Everything else is still (and so is
+   the printed page). Each stripe pattern moves one tile (8px) to the right by transform and starts again, so the loop has no
+   jump; the active loop arrow's dashes run; the paused class (set by the Pause button) stops all of it. A page with many
+   moving marks (the calm class, set by the page when it has more than 25) keeps only the header rule and the running gates moving. */
+@media screen and (prefers-reduced-motion:no-preference){
+  .mk-h::before,.seg-p::before{animation:hatch-drift 1.6s linear infinite;will-change:transform}
+  .sheet.has-working .top-band::before{animation:hatch-drift 4s linear infinite;will-change:transform}
+  .sheet.calm .mk-h::before,.sheet.calm .seg-p::before{animation:none;will-change:auto}
+  .sess[data-state=working] .hatch.live{animation:hatch-shift 1.6s linear infinite;will-change:transform}
+  .flow .loop-active{animation:flow-dash 1s linear infinite}
+  body.paused *,body.paused *::before,body.paused *::after{animation-play-state:paused!important}
+  @keyframes hatch-drift{to{transform:translateX(8px)}}
+  @keyframes hatch-shift{to{transform:translateX(6px)}}
+  @keyframes flow-dash{to{stroke-dashoffset:-28}}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
+@media print{
+  body{background:#fff!important;color:#000!important;padding:0;font-size:9.5pt}
+  .sheet{outline:0;border:1.5px solid #000;max-width:none;padding:10pt}
+  .controls,.skip,#pw-stale,noscript{display:none!important}
+  .mk-h::before,.seg,.seg-p::before,.top-band,.top-band::before{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .scroll-hint{display:none!important}
+  .scroll{overflow:visible}
+  .tbl-road,.tbl-est,.flow{min-width:0}
+  .t{max-width:none}
+  .t-s{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  thead{display:table-header-group}
+  tr,li,figure,.sess{break-inside:avoid}
+  h2,h3{break-after:avoid}
+  a{color:inherit;text-decoration:none}
+  @page{margin:12mm}
+}

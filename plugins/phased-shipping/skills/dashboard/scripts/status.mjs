@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The dashboard's status files: an on/off setting, a local list of projects and one small file per running phase.
 // It uses node built-ins only, sends nothing anywhere and reads or writes nothing outside the data folder, except that
-// it resolves the project folder it is told about (a real path, nothing is read inside it).
+// it resolves the project folder it is told about (a real path, nothing is read inside it) and looks, by name only, for a
+// .git entry in that folder and its parents (see "The project" below).
 //
 //   node status.mjs state      --data <dir>
 //   node status.mjs enable     --data <dir>
@@ -24,30 +25,73 @@
 //   dashboard.json            { v, enabled, asked, warnMin, idleMin }
 //   projects.json             { v, projects: [{ id, path, name, labels, roadmaps, added }] }, at most 100 projects.
 //                             The only place an absolute path is ever written, and it is printed only by `list --paths`.
-//   sessions/<id>-<phase>.json  { v, project, phase, phase_name, step, state, step_started, updated }, at most 16 KB.
+//   sessions/<id>-<tag>+<phase>.json  (<id>-u<tag>+<phase>.json for an unlisted folder)  { v, project, roadmap?, unlisted?, phase, phase_name, step, state, step_started, updated, trail? }, at most 16 KB.
+//                             roadmap is the path of the roadmap file the run was started for, relative to the project root
+//                             (the folder the run passes, plus PHASES.md); <tag> is the first 6 hex digits of the SHA-256 of that
+//                             path, in lower case only where the file system does not tell letter case apart (Windows and macOS by
+//                             default; seam io.caseInsensitive). Two roadmaps of one repository so keep one file each for the same
+//                             phase id. A folder whose roadmap path is not usable has no roadmap field; its file carries unlisted: true, its name has a
+//                             literal u before the 6 hex digits (<id>-u<tag>+<phase>.json) and its tag is of a fixed text and the folder's path from the
+//                             project root, so two such folders do not share a file and no unlisted name is ever the name of a listed roadmap's file.
+//                             A file from before (sessions/<id>-<phase>.json, no roadmap field) is read by the collector and never written, taken over or
+//                             removed by `set` or `clear`: a `set` or `clear` only ever reads, writes or removes its own file. It ages out as Idle and is then
+//                             archived like any session.
+//                             trail is optional: [{ step, state, at }], the last 40 changes of step or state, appended only
+//                             when `set` changes the step or the state (a first call writes none, a repeated call only moves
+//                             `updated`, a call after `done` starts it again). The dashboard page draws loops from it.
+// The project: --root is the folder that holds PHASES.md. The project is the repository around it: the nearest folder (the
+// folder itself first, then each parent, at most 40 folders) that has a .git entry, a folder or a file (checked by name,
+// never opened, read or followed). The climb stops at the user's home folder and at the filesystem root; a .git there is
+// ignored. On a system with user ids (process.getuid; seam io.getuid) a .git that is not owned by the current user is not
+// trusted: the climb stops there and the folder itself is the project. With no repository the project is the folder itself,
+// as before. A repository root that is the data folder, is inside it or holds it is not used (the folder itself is). When the
+// folder is not the project root (it was found by climbing) and holds a PHASES.md, its path from the project root is added
+// to the project's roadmaps; the project root's own PHASES.md is not added then. A --root whose path from the project root
+// has a .git, node_modules or .roadmap-backups folder in it is refused (exit 1, nothing written). When a roadmap is not added
+// (more than 5 folders deep, a folder name with a character that is not allowed, or 10 roadmaps already) one more line says why,
+// in fixed words and never with the path. A --roadmap is relative to the project root.
 // <id> is the first 12 hex digits of the SHA-256 of the project's real path (lower-cased on Windows). A session file
-// name is built only from that id and a phase id that matches [A-Za-z0-9._-]{1,40} and is not only dots, lower-cased
-// (so 7a and 7A are one file everywhere): no other text reaches a path.
+// name is built only from that id, the 6 hex digits of the tag, a "+" and a phase id that matches [A-Za-z0-9._-]{1,40} and is
+// not only dots, lower-cased (so 7a and 7A are one file everywhere): no other text reaches a path. The "+" cannot occur in a
+// phase id, so a new name never reads as the older <id>-<phase>.json of another phase. A folder whose roadmap path is not
+// usable (see roadmapOf) is unlisted: it gets its own tag, the marker and the u in its name, never the older name.
+// A stored roadmap that is not a usable path is left out when projects.json is read (the file is not changed unless the
+// command writes it anyway); only a new --roadmap value must be usable.
 // Text fields are cleaned (control, bidirectional, zero-width, tag and other format characters become spaces, one
 // line, at most 200 characters; labels and names 80). Every write is a temp file in the same folder, flushed, then a
 // rename (retried a few times on Windows). A failure leaves the old file whole.
 //
-// main(argv, io) is the test seam: io.out, io.err, io.now (epoch ms), io.rename (replaces the rename step),
+// The page: when `set`, `clear` or `unregister` worked while the dashboard is on, the command line then rebuilds <data>/dashboard.html in
+// the same process with page.mjs, the script next to this one (run(), one fixed import; the builder is given the data
+// folder and nothing else). A page that cannot be built prints one line, `page not rebuilt (<reason>)` (an error code or a
+// short fixed phrase, never a path), and the exit code stays 0. While the dashboard is off nothing is built, and `disable`
+// leaves the page as it was last written.
+//
+// main(argv, io) is the test seam (it never builds the page; run(argv, io) is main plus the page and takes io.buildPage
+// as the seam for the builder): io.out, io.err, io.now (epoch ms), io.rename (replaces the rename step),
+// io.homedir (the home folder the climb stops at), io.caseInsensitive (whether a roadmap path is lower-cased for its tag; default from the platform), io.getuid and io.lstat (the current user id and the lstat of a .git entry),
 // io.maxSessionBytes, io.fd = { open, fstat, read, close } (every file of ours is opened and read through these, once
 // and checked on the open descriptor; each is optional). Nothing in the command line, the environment or a file can reach it.
 
 import { lstatSync, realpathSync, statSync, mkdirSync, openSync, fstatSync, readSync, writeFileSync, fsyncSync, closeSync, renameSync, rmSync, constants as fsConstants } from "node:fs";
-import { basename, dirname, join, resolve, isAbsolute } from "node:path";
+import { basename, dirname, join, resolve, relative, isAbsolute, sep } from "node:path";
+import { homedir } from "node:os";
 import { randomBytes, createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const WIN = process.platform === "win32";
+// Windows and macOS (by default) do not tell Docs and docs apart; elsewhere the letter case of a name matters (seam: io.caseInsensitive).
+const CASE_INSENSITIVE = WIN || process.platform === "darwin";
 const FILE_MODE = WIN ? undefined : 0o600;
 const DIR_MODE = WIN ? undefined : 0o700;
 const MAX_PROJECTS = 100;
 const MAX_LABELS = 20;
 const MAX_ROADMAPS = 10;
+const MAX_CLIMB = 40;
+const MAX_ROADMAP_FOLDERS = 5;
+const NEVER_LISTED = new Set([".git", "node_modules", ".roadmap-backups"]);
 const MAX_SESSION_BYTES = 16 * 1024;
+const MAX_TRAIL = 40;
 const MAX_CONFIG_BYTES = 4096;
 const MAX_REGISTRY_BYTES = 512 * 1024;
 const STEPS = ["baseline", "build", "compare", "review", "preview", "approve", "ship", "prod-check"];
@@ -55,6 +99,7 @@ const STATES = ["working", "waiting", "done"];
 const PHASE_RE = /^(?!\.+$)[A-Za-z0-9._-]{1,40}$/;
 const ID_RE = /^[0-9a-f]{12}$/;
 const DEFAULT_ROADMAP = "PHASES.md";
+const UNLISTED_SENTINEL = "phased-shipping:unlisted-roadmap";
 const OPEN_FLAGS = fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
 const DECODER = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
@@ -81,9 +126,17 @@ const isoDate = (ms) => new Date(ms).toISOString().slice(0, 10);
 function roadmapOf(raw) {
   const s = String(raw ?? "").replace(/\\/g, "/");
   if (!/^[A-Za-z0-9._@+() -]{1,100}(\/[A-Za-z0-9._@+() -]{1,100}){0,5}$/.test(s)) return null;
-  if (s.split("/").some((p) => /^\.+$/.test(p) || p !== p.trim() || p.endsWith("."))) return null;
+  if (s.split("/").some((p) => /^\.+$/.test(p) || p !== p.trim() || p.endsWith(".") || NEVER_LISTED.has(p.toLowerCase()))) return null;
   return /\.md$/i.test(s) ? s : null;
 }
+
+// The letter case of a path counts only where the file system tells names apart by it.
+const foldPath = (p, io = {}) => ((io.caseInsensitive ?? CASE_INSENSITIVE) ? p.toLowerCase() : p);
+// The first 6 hex digits of the SHA-256 of a roadmap path (folded as above). A folder whose roadmap path is not usable has no
+// such path: its tag is of a fixed sentinel and its folder path from the project root, so two such folders do not share one
+// (its file name also has a u before the tag, which a listed roadmap's file name never has).
+const roadmapTag = (roadmap, io = {}) => createHash("sha256").update(foldPath(roadmap, io)).digest("hex").slice(0, 6);
+const unlistedTag = (folder, io = {}) => createHash("sha256").update([UNLISTED_SENTINEL, foldPath(folder, io)].join(String.fromCodePoint(0))).digest("hex").slice(0, 6);
 
 // ── Arguments ───────────────────────────────────────────────────────────────
 const SPEC = {
@@ -272,9 +325,14 @@ function loadRegistry(dir, io) {
   for (const p of v.projects) {
     if (!isObj(p) || typeof p.id !== "string" || !ID_RE.test(p.id) || typeof p.path !== "string" || p.path.length > 1024 || typeof p.name !== "string" || typeof p.added !== "string") return bad;
     if (!Array.isArray(p.labels) || p.labels.length > MAX_LABELS || !p.labels.every((l) => typeof l === "string")) return bad;
-    if (!Array.isArray(p.roadmaps) || p.roadmaps.length > MAX_ROADMAPS || !p.roadmaps.every((r) => roadmapOf(r) !== null)) return bad;
+    // A stored roadmap that is not a usable path (a file written by an earlier version) is left out of the list in memory; the
+    // file is not changed unless the command is writing it anyway. Only a roadmap that is not even text fails the file.
+    if (!Array.isArray(p.roadmaps) || p.roadmaps.length > MAX_ROADMAPS || !p.roadmaps.every((r) => typeof r === "string")) return bad;
     if (projects.some((q) => q.id === p.id)) return bad;
-    projects.push({ id: p.id, path: p.path, name: clean(p.name, 80), labels: p.labels.map((l) => clean(l, 80)).filter(Boolean), roadmaps: p.roadmaps.map(roadmapOf), added: clean(p.added, 40) });
+    // Entries that become the same path once cleaned (docs\PHASES.md and docs/PHASES.md; on Windows also another letter case) are one: the first stays.
+    const seen = new Set();
+    const roadmaps = p.roadmaps.map(roadmapOf).filter((r) => { if (r === null || seen.has(foldPath(r, io))) return false; seen.add(foldPath(r, io)); return true; });
+    projects.push({ id: p.id, path: p.path, name: clean(p.name, 80), labels: p.labels.map((l) => clean(l, 80)).filter(Boolean), roadmaps, added: clean(p.added, 40) });
   }
   return { projects };
 }
@@ -295,14 +353,71 @@ function saveRegistry(dir, projects, io) {
   return failed ? `projects.json: ${failed}` : null;
 }
 
-function resolveProject(rootArg) {
+// True when `inner` is `outer` or inside it (both real paths).
+function insidePath(outer, inner) {
+  const rel = relative(outer, inner);
+  return rel === "" || (rel.split(sep)[0] !== ".." && !isAbsolute(rel));
+}
+
+// The project root for a folder: the nearest folder (the folder itself first, then each parent, at most MAX_CLIMB folders)
+// that has a .git entry, a folder or a file (lstat only: it is never opened, read or followed).
+// The climb stops at the user's home folder and at the filesystem root, and a .git found at either is ignored.
+// Where the system has user ids, a .git owned by someone else is not trusted: the climb
+// stops there, so a repository above that belongs to another user never becomes the project. Where it has none (Windows),
+// nothing is checked. io.getuid and io.lstat are the test seams. Returns null when there is none (or it is not trusted).
+function repoRootOf(real, home, io = {}) {
+  const lstat = io.lstat ?? lstatSync;
+  const getuid = typeof io.getuid === "function" ? io.getuid : typeof process.getuid === "function" ? () => process.getuid() : null;
+  let cur = real;
+  for (let i = 0; i < MAX_CLIMB; i++) {
+    if (home && samePath(cur, home)) return null;
+    const up = dirname(cur);
+    if (up === cur) return null;
+    let found = null;
+    try { found = lstat(join(cur, ".git")); } catch { found = null; }
+    if (found) return getuid && found.uid !== getuid() ? null : cur;
+    cur = up;
+  }
+  return null;
+}
+
+// The project for the folder the run names (the folder that holds PHASES.md). It is the repository around that folder, so a
+// roadmap kept in a subfolder belongs to the repository's one project; with no repository it is the folder itself.
+// A repository root that is the data folder, inside it, or that holds it is not used: the folder itself is.
+function resolveProject(rootArg, dataDir, io = {}) {
+  let given;
   try {
-    const real = realpathSync.native(resolve(rootArg));
-    if (!statSync(real).isDirectory()) throw new Error("not a folder");
-    return { real, id: idOf(real), name: clean(basename(real), 80) || "project" };
+    given = realpathSync.native(resolve(rootArg));
+    if (!statSync(given).isDirectory()) throw new Error("not a folder");
   } catch {
     return { fail: "cannot use --root: it is not an existing folder" };
   }
+  let data = dataDir;
+  try { data = realpathSync.native(dataDir); } catch { /* the data folder is not made yet */ }
+  if (insidePath(data, given)) return { fail: "cannot use --root: it is the data folder or inside it" };
+  let home = null;
+  try { home = realpathSync.native(io.homedir ?? homedir()); } catch { /* no home folder to stop at */ }
+  let real = repoRootOf(given, home, io) ?? given;
+  if (insidePath(data, real) || insidePath(real, data)) real = given;
+  const atRoot = samePath(real, given);
+  const parts = atRoot ? [] : relative(real, given).split(sep);
+  // A folder inside .git, node_modules or .roadmap-backups is never a place a run is for.
+  if (parts.some((s) => NEVER_LISTED.has(s.toLowerCase()))) return { fail: "cannot use --root: it is inside a .git, node_modules or .roadmap-backups folder of the project" };
+  const sub = [];
+  let skipped = null;
+  // The roadmap this run is for: the PHASES.md of the folder it passes, as a path from the project root (null when that path is not usable).
+  let roadmap = DEFAULT_ROADMAP;
+  if (!atRoot) {
+    roadmap = roadmapOf(`${parts.join("/")}/${DEFAULT_ROADMAP}`);
+    let st = null;
+    try { st = lstatOrNull(join(given, DEFAULT_ROADMAP)); } catch { /* not there */ }
+    if (st && st.isFile()) {
+      if (roadmap) sub.push(roadmap);
+      else skipped = parts.length > MAX_ROADMAP_FOLDERS ? "deep" : "name";
+    }
+  }
+  const tag = roadmap ? roadmapTag(roadmap, io) : unlistedTag(parts.join("/"), io);
+  return { real, id: idOf(real), name: clean(basename(real), 80) || "project", found: sub, skipped, roadmap, tag, defaults: atRoot ? [DEFAULT_ROADMAP] : [] };
 }
 
 // Adds labels and roadmaps to a list without duplicates, up to the caps. Returns true when the list changed.
@@ -318,18 +433,28 @@ function mergeInto(list, extra, cap, same = (a, b) => a === b) {
 }
 
 // Finds the project in the list or adds it. Returns { entry, changed } or { fail }.
-function registerProject(projects, proj, labels, roadmaps, nowMs) {
+function registerProject(projects, proj, labels, roadmaps, nowMs, io = {}) {
   let entry = projects.find((p) => p.id === proj.id);
   let changed = false;
   if (!entry) {
     if (projects.length >= MAX_PROJECTS) return { fail: `the project list is full (${MAX_PROJECTS}); unregister one first` };
-    entry = { id: proj.id, path: proj.real, name: proj.name, labels: [], roadmaps: [DEFAULT_ROADMAP], added: new Date(nowMs).toISOString() };
+    entry = { id: proj.id, path: proj.real, name: proj.name, labels: [], roadmaps: [...proj.defaults], added: new Date(nowMs).toISOString() };
     projects.push(entry);
     changed = true;
   }
   if (mergeInto(entry.labels, labels, MAX_LABELS)) changed = true;
-  if (mergeInto(entry.roadmaps, roadmaps, MAX_ROADMAPS, (a, b) => keyOf(a) === keyOf(b))) changed = true;
-  return { entry, changed };
+  if (mergeInto(entry.roadmaps, roadmaps, MAX_ROADMAPS, (a, b) => foldPath(a, io) === foldPath(b, io))) changed = true;
+  // A roadmap that is not in the list after the merge was left out because the list is full.
+  const full = roadmaps.some((r) => !entry.roadmaps.some((y) => foldPath(y, io) === foldPath(r, io)));
+  return { entry, changed, full };
+}
+
+// The one extra line that says why a roadmap was not added: fixed words, never a path.
+function whyNotAdded(proj, res) {
+  if (proj.skipped === "deep") return `roadmap not listed: its folder is more than ${MAX_ROADMAP_FOLDERS} folders below the project root`;
+  if (proj.skipped === "name") return "roadmap not listed: a folder name has a character that is not allowed (letters, digits and . _ @ + ( ) - and space only)";
+  if (res.full) return `roadmap not listed: the project already lists ${MAX_ROADMAPS} roadmaps`;
+  return null;
 }
 
 // ── Commands ────────────────────────────────────────────────────────────────
@@ -359,21 +484,23 @@ function registerCommand(dir, opts, config, io, out, err) {
   if (labels.some((l) => !l)) { for (const l of USAGE) err(l); err("a label cannot be empty"); return 2; }
   const roadmaps = (opts["--roadmap"] ?? []).map(roadmapOf);
   if (roadmaps.some((r) => r === null)) { err("a --roadmap must be a relative path of plain names ending .md, without .."); return 2; }
-  const proj = resolveProject(opts["--root"][0]);
+  const proj = resolveProject(opts["--root"][0], dir, io);
   if (proj.fail) return fail(err, proj.fail);
   const reg = loadRegistry(dir, io);
   if (reg.fail) return fail(err, `${reg.fail}; nothing was changed`);
-  const res = registerProject(reg.projects, proj, labels, roadmaps, io.nowMs);
+  const res = registerProject(reg.projects, proj, labels, [...proj.found, ...roadmaps], io.nowMs, io);
   if (res.fail) return fail(err, res.fail);
   if (res.changed) {
     const failed = saveRegistry(dir, reg.projects, io);
     if (failed) return fail(err, `${failed}; nothing was changed`);
   }
   out(`${res.changed ? "registered" : "already listed"}: ${res.entry.name} (id ${res.entry.id})`);
+  const why = whyNotAdded(proj, res);
+  if (why) out(why);
   return 0;
 }
 
-function unregisterCommand(dir, id, io, out, err) {
+function unregisterCommand(dir, id, config, io, out, err) {
   if (!ID_RE.test(id)) { err("an id is 12 lower-case hex digits, as `list` prints it"); return 2; }
   const reg = loadRegistry(dir, io);
   if (reg.fail) return fail(err, `${reg.fail}; nothing was changed`);
@@ -383,6 +510,7 @@ function unregisterCommand(dir, id, io, out, err) {
   const failed = saveRegistry(dir, reg.projects, io);
   if (failed) return fail(err, `${failed}; nothing was changed`);
   out(`removed: ${gone.name} (id ${gone.id}); its session files, if any, stay until they are cleared`);
+  if (config.enabled) io.after.changed = true;
   return 0;
 }
 
@@ -397,8 +525,28 @@ function listCommand(dir, opts, io, out, err) {
   return 0;
 }
 
-function sessionName(id, phase) {
-  return `${id}-${phase.toLowerCase()}.json`;
+// The session file of a phase in one roadmap: <id>-<tag>+<phase in lower case>.json, and for a folder whose roadmap path is not
+// usable (unlisted) <id>-u<tag>+<phase in lower case>.json: the u is in the name, so an unlisted file never has the name of a listed
+// roadmap's file, whatever the tags. The "+" cannot occur in a phase id, so a new name never reads as the older
+// <id>-<phase>.json of some other phase. That older name is read by the collector and is never written, taken over or removed here.
+const sessionName = (id, phase, tag, unlisted = false) => `${id}-${unlisted ? "u" : ""}${tag}+${phase.toLowerCase()}.json`;
+
+// The valid entries of a session file's trail ({ step, state, at }), newest MAX_TRAIL at most. Nothing else is kept.
+function trailOf(v) {
+  if (!isObj(v) || !Array.isArray(v.trail)) return [];
+  const ok = (e) => isObj(e) && STEPS.includes(e.step) && STATES.includes(e.state) && Number.isInteger(e.at) && e.at >= 0 && e.at <= 8.64e15;
+  return v.trail.filter(ok).map((e) => ({ step: e.step, state: e.state, at: e.at })).slice(-MAX_TRAIL);
+}
+
+// The trail after a `set`. A first call writes none (the session's own step, state and step_started say it all). A call
+// that changes the step or the state appends one entry; a repeated call changes nothing in it. A session that was
+// done starts a new run, so its trail starts again.
+function nextTrail(old, step, state, nowMs) {
+  if (!old || old.state === "done") return [];
+  const kept = trailOf(old);
+  if (old.step === step && old.state === state) return kept;
+  const first = STEPS.includes(old.step) && STATES.includes(old.state) && Number.isInteger(old.step_started) ? [{ step: old.step, state: old.state, at: old.step_started }] : [];
+  return [...(kept.length ? kept : first), { step, state, at: nowMs }].slice(-MAX_TRAIL);
 }
 
 function setCommand(dir, opts, config, io, out, err) {
@@ -411,24 +559,34 @@ function setCommand(dir, opts, config, io, out, err) {
   const labels = (opts["--label"] ?? []).map((l) => clean(l, 80));
   if (labels.some((l) => !l)) { err("a label cannot be empty"); return 2; }
   if (!config.enabled) { out(OFF_NOTE); return 0; }
-  const proj = resolveProject(opts["--root"][0]);
+  const proj = resolveProject(opts["--root"][0], dir, io);
   if (proj.fail) return fail(err, proj.fail);
   const reg = loadRegistry(dir, io);
   if (reg.fail) return fail(err, `${reg.fail}; nothing was written`);
-  const res = registerProject(reg.projects, proj, labels, [], io.nowMs);
+  const res = registerProject(reg.projects, proj, labels, proj.found, io.nowMs, io);
   if (res.fail) return fail(err, `${res.fail}; nothing was written`);
   const sdir = join(dir, "sessions");
   const made = ensureDir(sdir, false);
   if (made.fail) return fail(err, `${made.fail}; nothing was written`);
-  const file = sessionName(proj.id, phase);
+  // Only this run's own file is read, written or removed (an older <id>-<phase>.json is never touched).
+  const file = sessionName(proj.id, phase, proj.tag, !proj.roadmap);
   const prev = readOwn(sdir, file, MAX_SESSION_BYTES, io);
   if (prev.fail && prev.hard) return fail(err, `${prev.fail}; nothing was written`);
   const old = prev.value !== undefined && !prev.fail && isObj(prev.value) ? prev.value : null;
   const sameStep = old && old.step === step && Number.isFinite(old.step_started);
   const name = opts["--name"] ? clean(opts["--name"][0], 200) : typeof old?.phase_name === "string" ? clean(old.phase_name, 200) : "";
-  const session = { v: 1, project: proj.id, phase, phase_name: name, step, state, step_started: sameStep ? old.step_started : io.nowMs, updated: io.nowMs };
-  const text = json(session);
-  if (Buffer.byteLength(text) > (io.maxSessionBytes ?? MAX_SESSION_BYTES)) return fail(err, "the session file would be over 16 KB; nothing was written");
+  const session = { v: 1, project: proj.id, ...(proj.roadmap ? { roadmap: proj.roadmap } : { unlisted: true }), phase, phase_name: name, step, state, step_started: sameStep ? old.step_started : io.nowMs, updated: io.nowMs };
+  let trail = nextTrail(old, step, state, io.nowMs);
+  const limit = io.maxSessionBytes ?? MAX_SESSION_BYTES;
+  let text = json(trail.length ? { ...session, trail } : session);
+  // Over the cap: the oldest trail entries go first (the newest one always stays); the file is refused only when it
+  // is still too large without them.
+  while (Buffer.byteLength(text) > limit && trail.length > 1) {
+    trail = trail.slice(1);
+    text = json({ ...session, trail });
+  }
+  if (Buffer.byteLength(text) > limit) text = json(session);
+  if (Buffer.byteLength(text) > limit) return fail(err, "the session file would be over 16 KB; nothing was written");
   if (res.changed) {
     const failed = saveRegistry(dir, reg.projects, io);
     if (failed) return fail(err, `${failed}; nothing was written`);
@@ -436,20 +594,24 @@ function setCommand(dir, opts, config, io, out, err) {
   const failed = writeAtomic(join(sdir, file), text, io);
   if (failed) return fail(err, `session file: ${failed}; nothing was written`);
   out(`status set: phase ${phase} ${step} ${state}`);
+  const why = whyNotAdded(proj, res);
+  if (why) out(why);
+  io.after.changed = true;
   return 0;
 }
 
-function clearCommand(dir, opts, config, out, err) {
+function clearCommand(dir, opts, config, io, out, err) {
   const phase = opts["--phase"][0];
   if (!PHASE_RE.test(phase)) { err("--phase must be 1 to 40 characters from A-Z a-z 0-9 . _ -"); return 2; }
   if (!config.enabled) { out(OFF_NOTE); return 0; }
-  const proj = resolveProject(opts["--root"][0]);
+  const proj = resolveProject(opts["--root"][0], dir, io);
   if (proj.fail) return fail(err, proj.fail);
   const sdir = join(dir, "sessions");
   const info = inspectDir(sdir);
   if (info.fail) return fail(err, `${info.fail}; nothing was changed`);
   if (!info.exists) { out("no status file to clear"); return 0; }
-  const path = join(sdir, sessionName(proj.id, phase));
+  // Only the file of this roadmap (or unlisted folder) and phase; a file from before (<id>-<phase>.json) is never removed here.
+  const path = join(sdir, sessionName(proj.id, phase, proj.tag, !proj.roadmap));
   try {
     const st = lstatOrNull(path);
     if (!st) { out("no status file to clear"); return 0; }
@@ -459,6 +621,7 @@ function clearCommand(dir, opts, config, out, err) {
     return fail(err, `status file: ${codeOf(e)}; nothing was changed`);
   }
   out(`status cleared: phase ${phase}`);
+  io.after.changed = true;
   return 0;
 }
 
@@ -466,14 +629,52 @@ function clearCommand(dir, opts, config, out, err) {
 // A failure nobody planned for is reported by its code only (never a stack, which would carry absolute paths).
 export function main(argv, io = {}) {
   try {
-    return execute(argv, io);
+    return execute(argv, io, {});
   } catch (e) {
     (io.err ?? ((m) => console.error(m)))(`unexpected failure (${codeOf(e)}); nothing more was written`);
     return 1;
   }
 }
 
-function execute(argv, io) {
+// What the page builder's failure may say: an error code (EPERM) or a short lower-case phrase, nothing else.
+const REASON_RE = /^(?:[A-Z][A-Z0-9_]{1,24}|[a-z][a-z ]{2,40})$/;
+
+// The page is built in the same process by the script next to this one. The one import below is fixed (a file in this
+// folder); the builder is given the data folder and nothing else, and writes only <data>/dashboard.html there.
+async function buildThePage(dir, ctx) {
+  const mod = await import("./page.mjs");
+  return mod.buildPage(dir, { now: ctx.nowMs, rename: ctx.rename });
+}
+
+// run is main plus the page: after a `set`, `clear` or `unregister` that worked while the dashboard is on, <data>/dashboard.html is
+// rebuilt. A page that could not be built prints one line, `page not rebuilt (<reason>)`, and never changes the exit
+// code. While the dashboard is off, or when nothing changed, nothing is built. io.buildPage (async, (dir, io) =>
+// { ok } or { ok: false, reason }) is the test seam for the builder. The command line runs this.
+export async function run(argv, io = {}) {
+  const after = {};
+  let code;
+  try {
+    code = execute(argv, io, after);
+  } catch (e) {
+    (io.err ?? ((m) => console.error(m)))(`unexpected failure (${codeOf(e)}); nothing more was written`);
+    return 1;
+  }
+  if (code !== 0 || !after.changed || !after.dir) return code;
+  const out = io.out ?? ((s) => console.log(s));
+  let reason = null;
+  try {
+    const built = await (io.buildPage ?? buildThePage)(after.dir, { nowMs: after.nowMs, rename: io.rename });
+    if (!isObj(built) || built.ok !== true) reason = isObj(built) && typeof built.reason === "string" && REASON_RE.test(built.reason) ? built.reason : "error";
+  } catch (e) {
+    const c = codeOf(e);
+    reason = typeof c === "string" && REASON_RE.test(c) ? c : "error";
+  }
+  // The line is the last thing done; a failure to print it (a closed pipe) still leaves the command's own code.
+  if (reason) { try { out(`page not rebuilt (${reason})`); } catch { /* nothing more can be said */ } }
+  return code;
+}
+
+function execute(argv, io, after) {
   const out = io.out ?? ((s) => console.log(s));
   const err = io.err ?? ((s) => console.error(s));
   const usage = (msg) => { if (msg) err(msg); for (const l of USAGE) err(l); return 2; };
@@ -489,9 +690,11 @@ function execute(argv, io) {
   for (const flag of need) if (!opts[flag]) return usage(`${cmd} needs ${flag}`);
   if (cmd === "unregister") { if (pos.length !== 1) return usage("unregister needs one id"); } else if (pos.length) return usage(`${cmd} takes no positional argument`);
   const nowMs = Number.isFinite(io.now?.()) ? io.now() : Date.now();
-  const ctx = { ...io, nowMs };
+  const ctx = { ...io, nowMs, after };
 
   const dir = resolve(opts["--data"][0]);
+  after.dir = dir;
+  after.nowMs = nowMs;
   const info = inspectDir(dir);
   if (info.fail) return fail(err, `cannot use the data folder (${info.fail}); nothing was written`);
   const loaded = info.exists ? loadConfig(dir, ctx) : { config: { ...DEFAULT_CONFIG } };
@@ -501,12 +704,12 @@ function execute(argv, io) {
   if (cmd === "state") return stateCommand(config, out);
   if (cmd === "enable" || cmd === "disable" || cmd === "asked") return switchCommand(dir, cmd, config, ctx, out, err);
   if (cmd === "register") return registerCommand(dir, opts, config, ctx, out, err);
-  if (cmd === "unregister") return unregisterCommand(dir, pos[0], ctx, out, err);
+  if (cmd === "unregister") return unregisterCommand(dir, pos[0], config, ctx, out, err);
   if (cmd === "list") return listCommand(dir, opts, ctx, out, err);
   if (cmd === "set") return setCommand(dir, opts, config, ctx, out, err);
-  return clearCommand(dir, opts, config, out, err);
+  return clearCommand(dir, opts, config, ctx, out, err);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await run(process.argv.slice(2));
 }

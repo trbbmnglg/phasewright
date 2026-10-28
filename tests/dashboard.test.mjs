@@ -13,6 +13,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, exist
 import { tmpdir, homedir } from "node:os";
 import { join, dirname, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { main as status } from "../plugins/phased-shipping/skills/dashboard/scripts/status.mjs";
 import { main as collect } from "../plugins/phased-shipping/skills/dashboard/scripts/collect.mjs";
 
@@ -89,6 +90,11 @@ const setStatus = (w, root, phase, step, state, extra = [], o = {}) => st(["set"
 const register = (w, root, extra = []) => st(["register", "--data", w.data, "--root", root, ...extra]);
 const sessionFiles = (w) => (existsSync(join(w.data, "sessions")) ? readdirSync(join(w.data, "sessions")).sort() : []);
 const idFor = (w, root) => { const m = register(w, root).out.match(/id ([0-9a-f]{12})/); assert.ok(m); return m[1]; };
+// The session file name `set` writes for a phase in a roadmap: <id>-<6 hex of the SHA-256 of the roadmap path>+<phase in lower case>.json.
+// The path is lower-cased for the tag only where the file system ignores letter case (Windows, macOS), as the scripts do by default.
+const FOLDS = process.platform === "win32" || process.platform === "darwin";
+const tagFor = (roadmapPath, folds = FOLDS) => createHash("sha256").update(folds ? roadmapPath.toLowerCase() : roadmapPath).digest("hex").slice(0, 6);
+const sname = (id, phase, roadmapPath = RM, folds = FOLDS) => `${id}-${tagFor(roadmapPath, folds)}+${phase.toLowerCase()}.json`;
 
 const HEAD = "| # | Phase | Status | Kind | Priority | Urgency | Est. (raw \u2192 cal.) | Actual | Commit / deploy | Blocked by | Plan file | Note |";
 const row = (id, title, status, plan = "", note = "") => `| ${id} | ${title} | ${status} | backend | P1 | Soon | 2h \u2192 1.5h | | | | ${plan} | ${note} |`;
@@ -142,9 +148,9 @@ test("status: enable then set writes the session file and registers the project 
   assert.deepEqual(e.roadmaps, [RM]);
   assert.equal(e.name, "zork");
   assert.equal(e.path.toLowerCase(), realpathSync.native(p).toLowerCase());
-  assert.deepEqual(sessionFiles(w), [`${e.id}-7d2.json`]);
-  const s = readJson(w.data, `sessions/${e.id}-7d2.json`);
-  assert.deepEqual(s, { v: 1, project: e.id, phase: "7d2", phase_name: "Zork thing", step: "build", state: "working", step_started: NOW, updated: NOW });
+  assert.deepEqual(sessionFiles(w), [sname(e.id, "7d2")]);
+  const s = readJson(w.data, `sessions/${sname(e.id, "7d2")}`);
+  assert.deepEqual(s, { v: 1, project: e.id, roadmap: RM, phase: "7d2", phase_name: "Zork thing", step: "build", state: "working", step_started: NOW, updated: NOW });
   assert.equal(readJson(w.data, "dashboard.json").enabled, true);
 });
 
@@ -400,7 +406,7 @@ test("status: a project list or settings file edited into a bad shape stops the 
   enable(w);
   setStatus(w, p, "1", "build", "working");
   const reg = readJson(w.data, "projects.json");
-  for (const bad of ["{not json", JSON.stringify({ v: 2, projects: [] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], id: "ZZ" }] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], roadmaps: ["../x.md"] }] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], labels: [1] }] })]) {
+  for (const bad of ["{not json", JSON.stringify({ v: 2, projects: [] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], id: "ZZ" }] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], roadmaps: [5] }] }), JSON.stringify({ v: 1, projects: [{ ...reg.projects[0], labels: [1] }] })]) {
     writeFileSync(join(w.data, "projects.json"), bad);
     for (const r of [setStatus(w, p, "2", "build", "working"), register(w, p), st(["list", "--data", w.data])]) assert.equal(r.code, 1, bad);
     assert.equal(read(w.data, "projects.json"), bad, "the file was not rewritten");
@@ -513,7 +519,7 @@ test("collect: a roadmap and its plan files merge into the schema, with the plan
   assert.equal(proj.roadmaps[0].file, RM);
   assert.equal(proj.roadmaps[0].tables, 1);
   const [one, two] = phaseRows(j);
-  assert.deepEqual(Object.keys(one), ["id", "phase", "status", "kind", "priority", "urgency", "estRaw", "estCal", "actual", "commit", "planFile", "timestamps"]);
+  assert.deepEqual(Object.keys(one), ["id", "phase", "status", "kind", "priority", "urgency", "estRaw", "estCal", "estimateH", "actual", "commit", "planFile", "timestamps"]);
   assert.equal(one.id, "1");
   assert.equal(one.phase, "Zork thing");
   assert.equal(one.status, "shipped");
@@ -682,7 +688,7 @@ test("collect: session states at 89, 90, 179 and 180 minutes (noUpdate and Idle 
   const d = await at(180);
   assert.deepEqual([d["1"].shown, d["2"].shown, d["3"].shown], ["Idle", "Idle", "Idle"]);
   assert.equal(d["1"].noUpdate, true);
-  assert.deepEqual(Object.keys(a["1"]), ["project", "phase", "phase_name", "step", "state", "shown", "noUpdate", "updated", "step_started"]);
+  assert.deepEqual(Object.keys(a["1"]), ["project", "roadmap", "phase", "phase_name", "step", "state", "shown", "noUpdate", "updated", "step_started", "loops", "rounds", "visits", "workedMs", "elapsedMs", "estimateH", "archived"]);
   assert.equal(a["1"].phase_name, "Zork thing");
   // the thresholds come from dashboard.json
   const cfg = readJson(w.data, "dashboard.json");
@@ -780,7 +786,7 @@ test("collect: the output holds no absolute path, and a project path that appear
   noPath(w, usage.err, "usage");
 });
 
-test("collect: more than 200 session files are capped, and the output stays under 2 MB with many large roadmaps", async () => {
+test("collect: more than 100 session files are capped, and the output stays under 2 MB with many large roadmaps", async () => {
   const w = world("caps");
   enable(w);
   const folders = [];
@@ -794,7 +800,7 @@ test("collect: more than 200 session files are capped, and the output stays unde
   const id = readJson(w.data, "projects.json").projects[0].id;
   const sdir = join(w.data, "sessions");
   mkdirSync(sdir);
-  for (let i = 0; i < 205; i++) {
+  for (let i = 0; i < 105; i++) {
     const phase = `s${String(i).padStart(3, "0")}`;
     writeFileSync(join(sdir, `${id}-${phase}.json`), JSON.stringify({ v: 1, project: id, phase, phase_name: "n", step: "build", state: "done", step_started: NOW, updated: NOW }));
   }
@@ -802,8 +808,8 @@ test("collect: more than 200 session files are capped, and the output stays unde
   assert.equal(r.code, 0, r.err);
   assert.ok(Buffer.byteLength(r.out) <= 2 * 1024 * 1024, `output is ${Buffer.byteLength(r.out)} bytes`);
   const j = r.json();
-  assert.equal(j.sessions.length, 200);
-  assert.ok(j.errors.some((e) => /more than 200 session files/.test(e.reason)));
+  assert.equal(j.sessions.length, 100);
+  assert.ok(j.errors.some((e) => e.file === "sessions" && /^5 session\(s\) left out: more than 100 live sessions/.test(e.reason)), JSON.stringify(j.errors));
   assert.equal(j.projects.length, 12);
   assert.ok(j.projects[0].roadmaps[0].phases.length <= 300, "phases per project are capped");
   assert.ok(j.projects.some((p) => p.errors.some((e) => /2 MB/.test(e.reason))), "projects past the budget are left out and say so");
@@ -812,7 +818,7 @@ test("collect: more than 200 session files are capped, and the output stays unde
   reg.projects = Array.from({ length: 101 }, (_, i) => ({ ...reg.projects[0], id: i.toString(16).padStart(12, "0") }));
   writeFileSync(join(w.data, "projects.json"), JSON.stringify(reg));
   assert.equal((await col(["--data", w.data])).code, 1);
-  assert.ok(STATUS_SRC.includes("MAX_PROJECTS = 100") && COLLECT_SRC.includes("MAX_SESSIONS = 200") && COLLECT_SRC.includes("MAX_OUT_BYTES = 2 * 1024 * 1024"));
+  assert.ok(STATUS_SRC.includes("MAX_PROJECTS = 100") && COLLECT_SRC.includes("MAX_SESSIONS = 100") && COLLECT_SRC.includes("MAX_OUT_BYTES = 2 * 1024 * 1024"));
 });
 
 test("collect: --out writes atomically; a failed rename leaves the old file whole; a link or folder as the target is refused", async (t) => {
@@ -897,7 +903,8 @@ test("collect: the scripts import only node: built-ins, and the one dynamic impo
   }
   assert.equal([...COLLECT_SRC.matchAll(/\bimport\(/g)].length, 1, "one dynamic import");
   assert.ok(COLLECT_SRC.includes("await import(pathToFileURL(path).href)"), "its argument is a file URL built from a candidate path");
-  assert.equal([...STATUS_SRC.matchAll(/\bimport\(/g)].length, 0);
+  assert.equal([...STATUS_SRC.matchAll(/\bimport\(/g)].length, 1, "status.mjs has one dynamic import: the page builder next to it");
+  assert.ok(STATUS_SRC.includes('await import("./page.mjs")'), "a fixed file of its own folder, no variable");
   assert.ok(COLLECT_SRC.includes('const READER_FOLDER = { dashboard: "roadmap", "ps-dashboard": "ps-roadmap" };'), "the choice holds exactly the two fixed pairs");
   assert.ok(COLLECT_SRC.includes('const path = join(HERE, "..", "..", sibling, "scripts", "roadmap.mjs");'), "one path is built from the chosen sibling");
   assert.ok(!COLLECT_SRC.includes("CANDIDATES"), "there is no list of places to try");
@@ -1095,17 +1102,17 @@ test("status: phase ids that differ only in letter case share one session file, 
   for (const [first, second] of [["7a", "7A"], ["7A", "7a"]]) {
     assert.equal(setStatus(w, p, first, "build", "working").code, 0);
     assert.equal(setStatus(w, p, second, "compare", "working").code, 0);
-    assert.deepEqual(sessionFiles(w), [`${id}-7a.json`], `${first} then ${second}`);
+    assert.deepEqual(sessionFiles(w), [sname(id, "7a")], `${first} then ${second}`);
     const sessions = (await col(["--data", w.data])).json().sessions;
     assert.deepEqual(sessions.map((s) => [s.phase, s.step]), [[second, "compare"]]);
     assert.equal(st(["clear", "--data", w.data, "--root", p, "--phase", first]).code, 0);
     assert.deepEqual(sessionFiles(w), [], `clear ${first} removed the file written as ${second}`);
   }
-  // a file an older version named with capitals is still read
+  // a file name with a capital in its phase is not a session file name: skipped and reported by base name (the scripts write lower case only)
   put(w.data, `sessions/${id}-9B.json`, JSON.stringify({ v: 1, project: id, phase: "9b", phase_name: "", step: "build", state: "working", step_started: NOW, updated: NOW }));
   const old = await col(["--data", w.data]);
-  assert.deepEqual(old.json().sessions.map((s) => s.phase), ["9b"]);
-  assert.deepEqual(old.json().errors, []);
+  assert.deepEqual(old.json().sessions, []);
+  assert.deepEqual(old.json().errors, [{ file: `${id}-9B.json`, reason: "not a session file name" }]);
 });
 
 // 6. Paths inside text copied from a file, and keys.
@@ -1141,7 +1148,7 @@ test("collect: a hand-edited project path such as a plain word cannot rename a k
   const r = await col(["--data", dataDir]);
   assert.equal(r.code, 0, r.err);
   const j = r.json();
-  for (const proj of j.projects) assert.equal(Object.keys(proj).join(), "id,name,status,roadmaps,history,errors");
+  for (const proj of j.projects) assert.equal(Object.keys(proj).join(), "id,name,status,roadmaps,history,errors,summary");
   assert.deepEqual(j.projects.map((x) => x.name), ["name", "errors"], "a value that is not an absolute path is left as it is");
   assert.equal(Object.keys(j).join(), "v,generatedAt,thresholds,projects,sessions,warnings,errors");
   assert.ok(r.out.includes('"name": "name"'));
@@ -1211,7 +1218,7 @@ test("collect: a session time more than 5 minutes ahead (or a step that started 
     assert.deepEqual(j.warnings, [{ kind: "clock skew", project: id }]);
   }
   // a step that started after its last update
-  const file = join(w.data, "sessions", `${id}-1.json`);
+  const file = join(w.data, "sessions", sname(id, "1"));
   const base = JSON.parse(readFileSync(file, "utf8"));
   writeFileSync(file, JSON.stringify({ ...base, step_started: base.updated + 1 }));
   const odd = await at(0);
@@ -1220,7 +1227,7 @@ test("collect: a session time more than 5 minutes ahead (or a step that started 
   // a skewed session does not keep the same-project warning on
   setStatus(w, p, "2", "build", "working");
   assert.deepEqual((await at(0)).warnings, [{ kind: "same project, more than one open session", project: id }]);
-  const second = join(w.data, "sessions", `${id}-2.json`);
+  const second = join(w.data, "sessions", sname(id, "2"));
   const two = JSON.parse(readFileSync(second, "utf8"));
   writeFileSync(second, JSON.stringify({ ...two, updated: NOW + 525600 * MIN, step_started: NOW + 525600 * MIN }));
   const j = await at(0);
@@ -1326,7 +1333,7 @@ test("collect: known spellings of this machine's paths become [path]: mixed and 
   const real = realpathSync.native(p);
   const lead = real.startsWith("/") ? "/" : "";
   const segs = real.split(/[\\/]+/).filter(Boolean);
-  const enc = (s) => s.replace(":", "%3A");
+  const enc = (s) => s.split(":").join("%3A");
   const forms = [
     lead + segs.join("/"),
     lead + segs.join(BS),
@@ -1334,7 +1341,7 @@ test("collect: known spellings of this machine's paths become [path]: mixed and 
     lead + segs.join("//"),
     lead + segs.map((s, i) => (i === 0 ? s : `${i % 2 ? "/" : BS}${s}`)).join(""),
     (lead ? "%2F" : "") + segs.map(enc).join("%5C"),
-    (lead ? "%2f" : "") + segs.map((s) => enc(s).replace(":", "%3a")).join("%5c"),
+    (lead ? "%2f" : "") + segs.map((s) => s.split(":").join("%3a")).join("%5c"),
     real.slice(0, 12) + ZW + real.slice(12),
     real.slice(0, 20) + cp(0x202e) + cp(7) + real.slice(20),
   ];
@@ -1500,6 +1507,244 @@ test("collect: a data folder file is checked again after the read: a folder swap
   if (trouble) { t.diagnostic(`no links here (${trouble.code}); the swap did not run`); return; }
   assert.equal(r.code, 0, r.err);
   assert.deepEqual(r.json().sessions, [], "what was read from the swapped folder is dropped");
-  assert.ok(r.json().errors.some((e) => /^[0-9a-f]{12}-1\.json$/.test(e.file) && /link/.test(e.reason)), JSON.stringify(r.json().errors));
+  assert.ok(r.json().errors.some((e) => /^[0-9a-f]{12}-[0-9a-f]{6}\+1\.json$/.test(e.file) && /link/.test(e.reason)), JSON.stringify(r.json().errors));
   assert.ok(COLLECT_SRC.includes("a link, not a real file"));
+});
+
+// ── status.mjs: the repository is the project (phase 7d3, round 3) ──────────
+// Every folder is a temp folder; the home folder the climb stops at is injected (io.homedir), so no real .git above the
+// temp area can change a result. Expectations use the same id algorithm the script documents.
+const idOfPath = (p) => createHash("sha256").update(WIN ? realpathSync.native(p).toLowerCase() : realpathSync.native(p)).digest("hex").slice(0, 12);
+const shipped = roadmap([row("1", "Zork thing", "shipped"), row("2", "Zork next", "planned")]);
+function repoWorld(label, { git = true } = {}) {
+  const w = world(label);
+  const repo = w.proj("repo");
+  if (git) mkdirSync(join(repo, ".git"));
+  const home = { homedir: w.base };
+  const sub = (rel, withRoadmap = true) => {
+    const p = join(repo, ...rel.split("/"));
+    mkdirSync(p, { recursive: true });
+    if (withRoadmap) writeFileSync(join(p, RM), shipped);
+    return p;
+  };
+  return { w, repo, home, sub };
+}
+const registryOf = (w) => readJson(w.data, "projects.json").projects;
+
+test("status: a run in the repository root keeps the folder as the project, as before", () => {
+  const { w, repo, home } = repoWorld("repo-root");
+  writeFileSync(join(repo, RM), shipped);
+  enable(w);
+  assert.equal(setStatus(w, repo, "1", "build", "working", [], home).code, 0);
+  const [e] = registryOf(w);
+  assert.equal(e.id, idOfPath(repo));
+  assert.equal(e.name, "repo");
+  assert.deepEqual(e.roadmaps, [RM]);
+  assert.deepEqual(sessionFiles(w), [sname(e.id, "1")]);
+});
+
+test("status: a run in docs/roadmap inside a repository makes the repository the project, adds the roadmap path and attaches the session to the repository id", async () => {
+  const { w, repo, home, sub } = repoWorld("repo-sub");
+  const given = sub("docs/roadmap");
+  enable(w);
+  const r = setStatus(w, given, "1", "build", "working", ["--label", "zork"], home);
+  assert.equal(r.code, 0, r.err);
+  const reg = registryOf(w);
+  assert.equal(reg.length, 1, "one project, not one for the subfolder");
+  assert.equal(reg[0].id, idOfPath(repo));
+  assert.equal(reg[0].name, "repo");
+  assert.equal(reg[0].path.toLowerCase(), realpathSync.native(repo).toLowerCase());
+  assert.deepEqual(reg[0].roadmaps, [`docs/roadmap/${RM}`], "the nested path, and no default that is not there");
+  assert.deepEqual(sessionFiles(w), [sname(idOfPath(repo), "1", `docs/roadmap/${RM}`)]);
+  assert.equal(st(["clear", "--data", w.data, "--root", given, "--phase", "1"], home).code, 0);
+  assert.deepEqual(sessionFiles(w), [], "clear from the subfolder finds the repository's file");
+  // collect reads a nested relative roadmap path inside the project root
+  const c = await col(["--data", w.data]);
+  assert.equal(c.code, 0, c.err);
+  const proj = c.json().projects[0];
+  assert.equal(proj.status, "ok");
+  assert.deepEqual(proj.errors, []);
+  assert.equal(proj.roadmaps[0].file, `docs/roadmap/${RM}`);
+  assert.deepEqual(proj.roadmaps[0].phases.map((p) => p.id), ["1", "2"]);
+});
+
+test("status: two roadmap folders in one repository give one project with two roadmaps and one id; --roadmap is relative to the project root", () => {
+  const { w, repo, home, sub } = repoWorld("repo-two");
+  const a = sub("docs/a");
+  const b = sub("docs/b");
+  enable(w);
+  assert.equal(setStatus(w, a, "1", "build", "working", [], home).code, 0);
+  assert.equal(setStatus(w, b, "2", "build", "working", [], home).code, 0);
+  const reg = registryOf(w);
+  assert.equal(reg.length, 1);
+  assert.deepEqual(reg[0].roadmaps, [`docs/a/${RM}`, `docs/b/${RM}`]);
+  assert.deepEqual(sessionFiles(w), [sname(reg[0].id, "1", `docs/a/${RM}`), sname(reg[0].id, "2", `docs/b/${RM}`)].sort());
+  // the same folder again changes nothing in the list (deduped)
+  assert.equal(setStatus(w, a, "1", "compare", "working", [], home).code, 0);
+  assert.equal(registryOf(w)[0].roadmaps.length, 2);
+  const x = st(["register", "--data", w.data, "--root", join(repo, "docs"), "--roadmap", `notes/${RM}`], home);
+  assert.equal(x.code, 0, x.err);
+  assert.deepEqual(registryOf(w)[0].roadmaps, [`docs/a/${RM}`, `docs/b/${RM}`, `notes/${RM}`]);
+  assert.equal(registryOf(w).length, 1);
+});
+
+test("status: with no .git anywhere the folder itself is the project; a .git that is a file (worktree style) counts", () => {
+  const w = world("no-git");
+  const p = w.proj("zork");
+  const deep = join(p, "docs", "roadmap");
+  mkdirSync(deep, { recursive: true });
+  writeFileSync(join(deep, RM), shipped);
+  enable(w);
+  assert.equal(setStatus(w, deep, "1", "build", "working", [], { homedir: w.base }).code, 0);
+  assert.equal(registryOf(w)[0].id, idOfPath(deep));
+  assert.equal(registryOf(w)[0].name, "roadmap");
+  assert.deepEqual(registryOf(w)[0].roadmaps, [RM]);
+  // a worktree-style .git file; its content is never read, so it can say anything
+  writeFileSync(join(p, ".git"), "gitdir: /nowhere/at/all\n");
+  assert.equal(setStatus(w, deep, "1", "compare", "working", [], { homedir: w.base }).code, 0);
+  const reg = registryOf(w);
+  assert.equal(reg.length, 2, "the old entry is not rewritten or migrated; the repository is a new one");
+  assert.equal(reg[0].id, idOfPath(deep));
+  assert.deepEqual(reg[0].roadmaps, [RM]);
+  assert.equal(reg[1].id, idOfPath(p));
+  assert.deepEqual(reg[1].roadmaps, [`docs/roadmap/${RM}`]);
+});
+
+test("status: a .git at the home folder is ignored (a dotfiles repository does not swallow everything), wherever the home folder is", () => {
+  const w = world("home-git");
+  mkdirSync(join(w.base, ".git"));
+  const p = w.proj("zork");
+  enable(w);
+  assert.equal(setStatus(w, p, "1", "build", "working", [], { homedir: w.base }).code, 0);
+  assert.equal(registryOf(w)[0].id, idOfPath(p), "the folder itself, not the home folder");
+  // the folder under home that has its own .git is still found
+  mkdirSync(join(p, ".git"));
+  const q = join(p, "docs");
+  mkdirSync(q);
+  assert.equal(setStatus(w, q, "2", "build", "working", [], { homedir: w.base }).code, 0);
+  assert.equal(registryOf(w).at(-1).id, idOfPath(p));
+  // another home folder: its .git is ignored too
+  const other = tmp("home-git-else");
+  const q2 = join(other, "x");
+  mkdirSync(q2);
+  mkdirSync(join(other, ".git"));
+  assert.equal(setStatus(w, q2, "3", "build", "working", [], { homedir: other }).code, 0);
+  assert.equal(registryOf(w).at(-1).id, idOfPath(q2));
+});
+
+test("status: a nested repository wins: the nearest .git is the project root", () => {
+  const { w, repo, home, sub } = repoWorld("nested");
+  const inner = sub("tools/inner", false);
+  mkdirSync(join(inner, ".git"));
+  const given = sub("tools/inner/docs");
+  enable(w);
+  assert.equal(setStatus(w, given, "1", "build", "working", [], home).code, 0);
+  const [e] = registryOf(w);
+  assert.equal(e.id, idOfPath(inner));
+  assert.notEqual(e.id, idOfPath(repo));
+  assert.equal(e.name, "inner");
+  assert.deepEqual(e.roadmaps, [`docs/${RM}`]);
+});
+
+test("status: a repository that holds the data folder is not used (the folder itself is), and a folder inside the data folder is refused", () => {
+  const w = world("data-in-repo");
+  const repo = w.proj("repo");
+  mkdirSync(join(repo, ".git"));
+  const data = join(repo, ".dash-data");
+  const given = join(repo, "docs");
+  mkdirSync(given);
+  writeFileSync(join(given, RM), shipped);
+  const run = (argv) => st(argv, { homedir: w.base });
+  assert.equal(run(["enable", "--data", data]).code, 0);
+  const r = run(["set", "--data", data, "--root", given, "--phase", "1", "--step", "build", "--state", "working"]);
+  assert.equal(r.code, 0, r.err);
+  const [e] = readJson(data, "projects.json").projects;
+  assert.equal(e.id, idOfPath(given), "falls back to the given folder");
+  assert.deepEqual(e.roadmaps, [RM]);
+  mkdirSync(join(data, "inner"));
+  const before = snapshot(data);
+  const inside = run(["set", "--data", data, "--root", join(data, "inner"), "--phase", "1", "--step", "build", "--state", "working"]);
+  assert.equal(inside.code, 1);
+  assert.ok(inside.err.includes("data folder"));
+  assert.equal(snapshot(data), before);
+});
+
+test("status: a repository root that was already registered keeps its id and entry when a run comes from a subfolder", () => {
+  const w = world("keep-id");
+  const repo = w.proj("repo");
+  writeFileSync(join(repo, RM), shipped);
+  enable(w);
+  const oldId = idFor(w, repo);
+  assert.equal(oldId, idOfPath(repo));
+  mkdirSync(join(repo, ".git"));
+  const given = join(repo, "docs");
+  mkdirSync(given);
+  writeFileSync(join(given, RM), shipped);
+  assert.equal(setStatus(w, given, "1", "build", "working", [], { homedir: w.base }).code, 0);
+  const reg = registryOf(w);
+  assert.equal(reg.length, 1);
+  assert.equal(reg[0].id, oldId);
+  assert.deepEqual(reg[0].roadmaps, [RM, `docs/${RM}`]);
+  assert.deepEqual(sessionFiles(w), [sname(oldId, "1", `docs/${RM}`)]);
+});
+
+test("status: the climb looks at 40 folders at most: the repository at the 40th folder is found, one level further is not", () => {
+  const w = world("climb");
+  const top = w.proj("top");
+  mkdirSync(join(top, ".git"));
+  const chain = (n) => { let p = top; for (let i = 0; i < n; i++) p = join(p, "d"); mkdirSync(p, { recursive: true }); return p; };
+  enable(w);
+  const near = chain(39);
+  assert.equal(setStatus(w, near, "1", "build", "working", [], { homedir: w.base }).code, 0);
+  assert.equal(registryOf(w)[0].id, idOfPath(top), "40 folders counting the given one");
+  const far = chain(40);
+  assert.equal(setStatus(w, far, "2", "build", "working", [], { homedir: w.base }).code, 0);
+  assert.equal(registryOf(w).at(-1).id, idOfPath(far), "41 folders: no repository, the folder itself");
+});
+
+test("status: a link or junction in the given path is resolved by real path first, so the repository behind it is found", (t) => {
+  const { w, repo, home, sub } = repoWorld("linked");
+  const real = sub("docs/roadmap");
+  const elsewhere = tmp("linked-else");
+  const link = join(elsewhere, "link");
+  try { symlinkSync(real, link, "junction"); } catch (e) { t.diagnostic(`no links here (${e.code})`); return; }
+  enable(w);
+  assert.equal(setStatus(w, link, "1", "build", "working", [], home).code, 0);
+  const [e] = registryOf(w);
+  assert.equal(e.id, idOfPath(repo));
+  assert.deepEqual(e.roadmaps, [`docs/roadmap/${RM}`]);
+});
+
+test("status: the .git entry is never read or followed: only its name is looked at (a file, a folder and a dangling link all count)", (t) => {
+  const { w, repo, home, sub } = repoWorld("git-unread");
+  writeFileSync(join(repo, ".git", "config"), "[core]\n");
+  const given = sub("docs");
+  enable(w);
+  const opened = [];
+  const fd = { open: (p, flags) => { opened.push(p); return openSync(p, flags); } };
+  assert.equal(setStatus(w, given, "1", "build", "working", [], { ...home, fd }).code, 0);
+  assert.ok(opened.length > 0 && opened.every((p) => !p.split(/[\\/]/).includes(".git")), `opened: ${opened.length}`);
+  const climb = STATUS_SRC.slice(STATUS_SRC.indexOf("function repoRootOf"), STATUS_SRC.indexOf("function resolveProject"));
+  assert.ok(climb.includes("lstatSync") && !/(readFileSync|readdirSync|existsSync|openSync|statSync\()/.test(climb.replace(/lstatSync/g, "")), "the climb uses lstat existence only");
+  // a dangling .git link counts: the climb does not follow it
+  const w2 = world("git-dangling");
+  const p2 = w2.proj("repo");
+  const g = join(p2, "docs");
+  mkdirSync(g);
+  try { symlinkSync(join(w2.base, "missing-target"), join(p2, ".git")); } catch (e) { t.diagnostic(`no links here (${e.code})`); return; }
+  enable(w2);
+  assert.equal(setStatus(w2, g, "1", "build", "working", [], { homedir: w2.base }).code, 0);
+  assert.equal(registryOf(w2)[0].id, idOfPath(p2));
+});
+
+test("status: while the dashboard is off, a run from a repository subfolder writes nothing", () => {
+  const { w, repo, home, sub } = repoWorld("off-sub");
+  const given = sub("docs/roadmap");
+  const r = setStatus(w, given, "1", "build", "working", [], home);
+  assert.equal(r.code, 0);
+  assert.ok(r.out.includes("nothing written"));
+  assert.ok(!existsSync(w.data));
+  assert.equal(st(["clear", "--data", w.data, "--root", given, "--phase", "1"], home).code, 0);
+  assert.ok(!existsSync(w.data));
+  assert.deepEqual(listing(repo).filter((f) => f.includes("projects.json") || f.includes("sessions")), []);
 });

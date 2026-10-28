@@ -19,6 +19,7 @@ This wiki describes what has shipped. Each page links the file its claims come f
 - [Approval check](Approval-check): approval bound to the commands you saw at the preview.
 - [Roadmap standard](Roadmap-standard): one roadmap format, with a check and a standardize command that writes only after you say yes.
 - [Onboarding](Onboarding): the first run in a project, which lists what it would read, reads nothing until you confirm and never opens source code or credential files.
+- [Dashboard](Dashboard): one local page that shows each project, its running sessions and the loops back in a phase, rebuilt at every step and making no network request.
 - [Phase history and estimates](Phase-history-and-estimates): what each shipped phase records and how it calibrates the next estimate.
 - [Library skills and agents](Library-skills-and-agents): the Markdown skills and agents, and the catalogue that lists them.
 - [Security policy](Security-policy): how to report a vulnerability.
