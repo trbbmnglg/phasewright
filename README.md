@@ -7,9 +7,9 @@ Skills, agents and plugins that keep AI-assisted coding work small, checked and 
 
 ## What's new
 
+- **phased-shipping 0.11.0** (2026-10-28): Faster runs without a lower bar: fast and full verify sets, reusable green baselines, review briefs and visible timings.
 - **phased-shipping 0.10.0** (2026-10-27): The dashboard page: projects, sessions and current phase with its loops, one local file rebuilt at every step, no network.
 - **phased-shipping 0.9.0** (2026-10-27): Dashboard data: opt-in status files at each gate, a local project list, and one merged JSON.
-- **phased-shipping 0.8.0** (2026-10-27): Onboarding: survey a project with your consent first, then standardize, adopt or start a roadmap.
 
 Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
 <!-- whats-new:end -->
@@ -159,10 +159,12 @@ To report a vulnerability, or to see how releases are built, read [SECURITY.md](
 ## Develop
 
 ```bash
-npm run verify     # lint + manifest check + tests (Node 20 or newer, no dependencies)
-npm run manifest   # regenerate library.json after changing an item
+npm run verify       # lint + manifest check + every test + the test inventory (Node 20 or newer, no dependencies)
+npm run verify:fast  # lint + manifest check + the files in tests/fast-list.json (the regression pack and the fast core); for use between fixes
+npm run manifest     # regenerate library.json after changing an item
 ```
 
+- **The test inventory** (`tests/inventory.txt`) lists test names and whether each runs or is skipped. It catches a test that vanishes or is newly skipped in a full `npm run verify`; it does not look inside a test, and `verify:fast` does not check it. A hand-edited `tests/inventory.txt` that still has valid lines is not caught by `--write` (the git diff is the trace), and the workflow-file test is a tripwire, not a proof: it does not look at `shell:`, `env:` or trigger filters such as branches or paths. See the Speed page of the wiki for more limits.
 - **Each skill** needs `name` (the folder name), `description` (max 1024 characters), `license: MIT` and a `metadata` block (`title`, `tags`, `featured`, `order`, `version`). Quote any description that contains `: ` or double quotes.
 - **The lint** also scans every file for emails, phone numbers, keys, machine paths and any term listed in a local `scripts/denylist.local.txt` (git-ignored).
 - **What's new** at the top is written from the plugin CHANGELOG: `node scripts/whats-new.mjs --write`.

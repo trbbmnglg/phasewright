@@ -1,0 +1,24 @@
+{
+  "files": [
+    "tests/regression-pack.test.mjs",
+    "tests/sweep-runner.test.mjs",
+    "tests/phased-shipping-docs.test.mjs",
+    "tests/guard.test.mjs",
+    "tests/shell-split.test.mjs",
+    "tests/history.test.mjs",
+    "tests/commands-hash.test.mjs",
+    "tests/tree-state.test.mjs",
+    "tests/whats-new.test.mjs",
+    "tests/wiki.test.mjs",
+    "tests/verify.test.mjs",
+    "tests/test-inventory.test.mjs",
+    "tests/test-report.test.mjs",
+    "tests/readme.test.mjs",
+    "tests/releases.test.mjs",
+    "tests/security-policy.test.mjs",
+    "tests/summary.test.mjs",
+    "tests/ids.test.mjs",
+    "tests/logo.test.mjs",
+    "tests/adopt.test.mjs"
+  ]
+}

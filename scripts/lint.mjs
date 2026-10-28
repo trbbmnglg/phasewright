@@ -5,7 +5,8 @@
 // Local-only extra check: scripts/denylist.local.txt (git-ignored, one term per line).
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as lib from "./lib.mjs";
 import { NAME_RE, makeRules } from "./lint-rules.mjs";
 
@@ -65,67 +66,83 @@ function lintAgent(agentsDir, f, whereBase, { plugin }) {
 
 const mdFiles = (dir) => readdirSync(dir).filter((x) => x.endsWith(".md")).sort();
 
-const skillsDir = join(ROOT, "skills");
-for (const slug of readdirSync(skillsDir).sort()) lintSkill(skillsDir, slug, "skills", { plugin: false });
+// Lints one repository root (default: the library root, or LIBRARY_ROOT) and returns { errors, warnings }.
+// denyFile is the local denylist (default: LIBRARY_DENYLIST, or scripts/denylist.local.txt). It resets the module's lists
+// on every call, so it is for one caller at a time; the tests call it in this process instead of starting a node process per case.
+// gitFiles(dir) returns the NUL-separated list of the files git would publish, and throws git's error outside a work tree (exit 128).
+const gitList = (dir) => execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
+  cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
+});
+export function lintRepo({ root = ROOT, denyFile = process.env.LIBRARY_DENYLIST ?? join(lib.SCRIPTS, "denylist.local.txt"), gitFiles = gitList } = {}) {
+  errors.length = 0;
+  warnings.length = 0;
+  const skillsDir = join(root, "skills");
+  for (const slug of readdirSync(skillsDir).sort()) lintSkill(skillsDir, slug, "skills", { plugin: false });
 
-const agentsDir = join(ROOT, "agents", "claude");
-for (const f of mdFiles(agentsDir)) lintAgent(agentsDir, f, "agents/claude", { plugin: false });
+  const agentsDir = join(root, "agents", "claude");
+  for (const f of mdFiles(agentsDir)) lintAgent(agentsDir, f, "agents/claude", { plugin: false });
 
-const pluginsDir = join(ROOT, "plugins");
-if (existsSync(pluginsDir)) {
-  for (const slug of readdirSync(pluginsDir).sort()) {
-    const base = `plugins/${slug}`;
-    if (badName(slug)) fail(base, `folder name must be ${NAME_RULE}`);
-    const manifest = join(pluginsDir, slug, ".claude-plugin", "plugin.json");
-    if (!existsSync(manifest)) { fail(base, "missing .claude-plugin/plugin.json"); continue; }
-    const m = JSON.parse(readFileSync(manifest, "utf8"));
-    if (m.name !== slug) fail(base, `plugin name "${m.name}" must match the folder`);
-    if (!m.version || !m.description) fail(base, "plugin.json needs version and description");
-    const pSkills = join(pluginsDir, slug, "skills");
-    if (existsSync(pSkills)) for (const s of readdirSync(pSkills).sort()) lintSkill(pSkills, s, `${base}/skills`, { plugin: true });
-    const pAgents = join(pluginsDir, slug, "agents");
-    if (existsSync(pAgents)) for (const f of mdFiles(pAgents)) lintAgent(pAgents, f, `${base}/agents`, { plugin: true });
-    const pHooks = join(pluginsDir, slug, "hooks", "hooks.json");
-    if (existsSync(pHooks)) checkHooksJson(`${base}/hooks/hooks.json`, readFileSync(pHooks, "utf8"));
+  const pluginsDir = join(root, "plugins");
+  if (existsSync(pluginsDir)) {
+    for (const slug of readdirSync(pluginsDir).sort()) {
+      const base = `plugins/${slug}`;
+      if (badName(slug)) fail(base, `folder name must be ${NAME_RULE}`);
+      const manifest = join(pluginsDir, slug, ".claude-plugin", "plugin.json");
+      if (!existsSync(manifest)) { fail(base, "missing .claude-plugin/plugin.json"); continue; }
+      const m = JSON.parse(readFileSync(manifest, "utf8"));
+      if (m.name !== slug) fail(base, `plugin name "${m.name}" must match the folder`);
+      if (!m.version || !m.description) fail(base, "plugin.json needs version and description");
+      const pSkills = join(pluginsDir, slug, "skills");
+      if (existsSync(pSkills)) for (const s of readdirSync(pSkills).sort()) lintSkill(pSkills, s, `${base}/skills`, { plugin: true });
+      const pAgents = join(pluginsDir, slug, "agents");
+      if (existsSync(pAgents)) for (const f of mdFiles(pAgents)) lintAgent(pAgents, f, `${base}/agents`, { plugin: true });
+      const pHooks = join(pluginsDir, slug, "hooks", "hooks.json");
+      if (existsSync(pHooks)) checkHooksJson(`${base}/hooks/hooks.json`, readFileSync(pHooks, "utf8"));
+    }
   }
+
+  // Personal and internal data scan over every text file in the published tree.
+  const deny = [];
+  if (existsSync(denyFile)) {
+    for (const line of readFileSync(denyFile, "utf8").split(/\r?\n/)) if (line.trim()) deny.push(line.trim().toLowerCase());
+  } else {
+    warn("denylist", "scripts/denylist.local.txt not found: internal-term scan skipped (generic patterns still run)");
+  }
+  // Whole-word, case-insensitive: a term must not sit inside a longer word.
+  const denyRes = deny.map((t) => [t, new RegExp(`(?<![A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&")}(?![A-Za-z0-9])`, "i")]);
+  // The files git would publish (tracked, plus untracked and not ignored), so git-excluded local
+  // folders such as .plans/ aren't scanned. Outside a git work tree (test fixtures) walk the folder.
+  function publishedFiles() {
+    try {
+      const out = gitFiles(root);
+      return out.split("\0").filter(Boolean).map((p) => join(root, p)).filter((f) => existsSync(f)).sort();
+    } catch (e) {
+      // Exit 128 is "not a git repository"; anything else (git missing, other error) gets one warning.
+      if (e.status !== 128) warn("scan", `git file listing failed (${e.code ?? e.status}); scanning every file on disk`);
+      return lib.listFiles(root);
+    }
+  }
+  const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip|woff2)$|(^|\/)scripts\/denylist\.local\.txt$|\.local\.[^/]+$/;
+  for (const file of publishedFiles()) {
+    const path = relative(root, file).split("\\").join("/");
+    if (SKIP.test(path)) continue;
+    const text = readFileSync(file, "utf8");
+    for (const [re, label, allow] of PII) {
+      for (const m of text.matchAll(re)) if (!(allow && allow(m[0]))) fail(path, `${label} found: "${m[0].slice(0, 40)}"`);
+    }
+    for (const [term, re] of denyRes) if (re.test(text)) fail(path, `internal term from the local denylist found: "${term}"`);
+  }
+
+  return { errors: [...errors], warnings: [...warnings] };
 }
 
-// Personal and internal data scan over every text file in the published tree.
-const deny = [];
-const denyFile = process.env.LIBRARY_DENYLIST ?? join(lib.SCRIPTS, "denylist.local.txt");
-if (existsSync(denyFile)) {
-  for (const line of readFileSync(denyFile, "utf8").split(/\r?\n/)) if (line.trim()) deny.push(line.trim().toLowerCase());
-} else {
-  warn("denylist", "scripts/denylist.local.txt not found: internal-term scan skipped (generic patterns still run)");
-}
-// Whole-word, case-insensitive: a term must not sit inside a longer word.
-const denyRes = deny.map((t) => [t, new RegExp(`(?<![A-Za-z0-9])${t.replace(/[.*+?^${}()|[\]\\\/-]/g, "\\$&")}(?![A-Za-z0-9])`, "i")]);
-// The files git would publish (tracked, plus untracked and not ignored), so git-excluded local
-// folders such as .plans/ aren't scanned. Outside a git work tree (test fixtures) walk the folder.
-function publishedFiles() {
-  try {
-    const out = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
-      cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 64 * 1024 * 1024,
-    });
-    return out.split("\0").filter(Boolean).map((p) => join(ROOT, p)).filter((f) => existsSync(f)).sort();
-  } catch (e) {
-    // Exit 128 is "not a git repository"; anything else (git missing, other error) gets one warning.
-    if (e.status !== 128) warn("scan", `git file listing failed (${e.code ?? e.status}); scanning every file on disk`);
-    return lib.listFiles(ROOT);
-  }
-}
-const SKIP = /(^|\/)(\.git|node_modules|dist|evals\/results)\/|\.(png|jpg|webp|zip|woff2)$|(^|\/)scripts\/denylist\.local\.txt$|\.local\.[^/]+$/;
-for (const file of publishedFiles()) {
-  const path = lib.rel(file);
-  if (SKIP.test(path)) continue;
-  const text = readFileSync(file, "utf8");
-  for (const [re, label, allow] of PII) {
-    for (const m of text.matchAll(re)) if (!(allow && allow(m[0]))) fail(path, `${label} found: "${m[0].slice(0, 40)}"`);
-  }
-  for (const [term, re] of denyRes) if (re.test(text)) fail(path, `internal term from the local denylist found: "${term}"`);
+// The text lint prints for a result: one line per warning and error, then the verdict.
+export function reportLines({ errors, warnings }) {
+  return [...warnings.map((w) => `warning  ${w}`), ...errors.map((e) => `error    ${e}`), errors.length ? `\nlint failed: ${errors.length} error(s)` : "\nlint passed"];
 }
 
-for (const w of warnings) console.log(`warning  ${w}`);
-for (const e of errors) console.log(`error    ${e}`);
-console.log(errors.length ? `\nlint failed: ${errors.length} error(s)` : "\nlint passed");
-process.exit(errors.length ? 1 : 0);
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const result = lintRepo();
+  for (const line of reportLines(result)) console.log(line);
+  process.exit(result.errors.length ? 1 : 0);
+}

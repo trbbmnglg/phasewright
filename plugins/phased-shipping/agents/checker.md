@@ -15,6 +15,8 @@ You run checks and report. You never fix anything.
   - **new:** not in the baseline. These are the only ones that block.
   - **pre-existing:** already failing in the baseline.
   - **fixed:** failing in the baseline, passing now.
+- **compare with no baseline file:** when the baseline was reused (the brief names no baseline file and says so), there is nothing to classify against, so every failure is **new**. Never look for a baseline file on your own, never use an older one you find, and never call a failure pre-existing without one.
+- **A parallel group** has its own baseline file, named in the brief. Read and write only the file for your group.
 
 ## Rules
 - **No shell.** If you have no working shell tool, or it stops responding mid-task, stop at once. Start your report with `NO SHELL:`, then say what is done, and list the commands that did not run.

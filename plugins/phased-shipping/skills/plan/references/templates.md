@@ -67,7 +67,9 @@ N. Docs, typecheck, full test run (<h>)
 - <concrete case>; a regression test for every defect found.
 
 ## Commands
-- Baseline and verify (same commands): `<typecheck>` · `<lint>` · `<test>` · `<build>` · browser: `<cmd or none>`
+- **Full verify** (baseline and final compare): `<typecheck>` · `<lint>` · `<test>` · `<build>` · browser: `<cmd or none>`
+- **Fast verify** (after the build and after each fix round): `<lint>` · `<typecheck>` · `<tests for the area this phase changes>` · `<the regression pack, if the project has one>` (or `same as full`)
+- **Parallel groups** (optional; groups of Full verify commands that write no shared files and may run at the same time): group 1 = `<cmds>`; group 2 = `<cmds>`. The groups must cover every Full verify command exactly once, the browser check included. Leave this line out when none of the commands are independent. Write each of these as one top-level bullet, with its commands in backticks: `run` reads one Full verify bullet, one Fast verify bullet and one Parallel groups bullet,; a second Full verify bullet, a fenced block or a bullet with no command means a baseline cannot be reused.
 - Deploy, in order: `<migration>` → `<backend>` → `<frontend>` · window: <restriction or none>
 - Prod check: `<cmd or flows>`
 - Rollback (required before deploy): `<cmd that restores the previous version>`
@@ -81,7 +83,7 @@ N. Docs, typecheck, full test run (<h>)
 ```markdown
 ## Phase N shipped
 - Commit: ... · Deploy id: ... · Migration: ...
-- Gates: baseline <ok | N pre-existing> · tests N/N (new failures 0) · typecheck ok · build ok · browser ok · prod check ok · rollback <not needed | ran>
+- Gates: baseline <ok | reused | N pre-existing> · full verify <ok, tree id> · tests N/N (new failures 0) · typecheck ok · build ok · browser ok · prod check ok · rollback <not needed | ran>
 - Estimate vs actual (agent time, approval wait excluded): ~3 h vs 3.5 h (why, if off by more than 30%)
 - Models used: build <alias (effort)> · checks <...> · ship <...> · review <...>
 - Next: Phase N+1 (<name>); waiting on <input, if any>

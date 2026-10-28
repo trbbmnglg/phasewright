@@ -72,6 +72,24 @@ This protects against accidental and model-made drift. It does not protect again
 - A fix-forward round that changes the plan's commands needs a new preview (Preview steps 1 and 2 again, then end the turn) before the fresh `approve`.
 - It needs `node` and, unlike the guard, doesn't depend on hooks, so it works where an organization policy turns hooks off.
 
+## Speed
+
+`run` is built to run your project's checks fewer times and in a better order, never to lower the bar:
+- **Two verify sets.** A plan names a **Full verify** set (everything the project has) and a **Fast verify** set (lint, typecheck, the tests for the area the phase changes and the project's regression pack). The fast set runs after the build and after each fix round. The full set runs once on the final tree, right before the preview. A plan with the older single `Baseline and verify (same commands)` line is read as full = fast, so the same commands run at every step. The other rules here (a reused baseline, the Full verify row, review depth, timings) apply to it as well, and a green fast compare on such a plan counts as a full verify. The Full verify always includes the project's browser check if it has one.
+- **The preview needs a full run.** It is never shown on a fast result alone: its gates table always has a Full verify row with the tree id it ran on. You can ask for the full set at any round.
+- **A baseline is reused only from a green full verify.** `tree-state.mjs` gives the working tree an id and keeps a short list (at most 50) of green full verifies in the data folder. The next phase skips its baseline only when the tree id, the full-verify commands and the Node version match and the record is at most 7 days old. Reuse can only make a compare stricter: a failure that is not in a green baseline is new and blocks.
+- **Parallel groups.** If the plan names groups of full-verify commands that write no shared files, `run` gives each group its own checker in one message. Any group that is partial, unfinished or failing means the check is not a pass.
+- **Security reviews with a brief.** The first review of a phase is full depth. Later reviews are deltas: the files changed since the last reviewed tree, each claimed fix attacked, and new surface probed. A very large surface, or two unrelated trust boundaries, is split across two reviewers. The tier and effort are never lowered, a stage is never time-boxed, and a verdict is never reused across a change to the same files. See [review-brief.md](skills/run/references/review-brief.md).
+- **The time is shown.** The preview has a "Where the time went" table, and the history records the timings (seconds for the baseline, the checks, the reviews and the ship step, and counts of full runs, fast runs and reviews), whether the baseline was reused and the reviewers' tokens, so `stats` can show them.
+
+The honest limits:
+- The plugin cannot make your project's own test suite faster. It can only run it fewer times and in a better order. A slow suite stays slow every time it runs.
+- A weak fast set is still caught by the final full compare and by CI, at the cost of a late fix round. Choose the fast set to find most failures early.
+- `tree-state.mjs` writes git blob and tree objects into the repository's object store (no branch or tag points at them), and they stay until `git gc` removes them. It never changes your index, HEAD, refs or working files. It runs git with every hook switched off (`core.hooksPath` points at an empty folder), but a filter driver set in the repository's own configuration still runs, as it does with `git add`. Every id call re-reads and re-filters every file (nothing is cached), so on a large repository it takes as long as `git add -A` on a fresh index. The temporary index folder is removed on every path except when the process is killed. It refuses a tree that holds a submodule or a nested repository, and a temp folder inside the repository.
+- The tree id does not change for an edit to a git-ignored file, for `node_modules`, for the contents of a submodule, or for a change of line endings alone when the repository converts them (`core.autocrlf`). A reused baseline also cannot see a global tool or an operating system update; that can only surface as a new failure in a later compare, which blocks. After any change outside the tracked, text-visible files, or when unsure, `run` never skips the final Full verify.
+- The plan reader only reads `-` and `*` bullets for the Full verify, Fast verify, Baseline and Parallel groups lines. A plan that writes one of them as a `+` bullet or a numbered item is not read correctly, so a change to those commands would not change the hash. Write those lines as `-` or `*` bullets (the plan template does).
+- Two runs that record at the same moment can lose one record, which only means one less reuse. A record file that exists but cannot be read is never overwritten.
+
 ## Requirements
 
 - Claude Code v2.1.292 or later (per-call effort; older versions run subagents at their file's effort).
@@ -153,19 +171,21 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 - **The dashboard files**, only after you turn the dashboard on (while it is off, `enable`, `disable`, `asked` and `unregister` are the only `status.mjs` commands that write; the page file below is written by your own `page` command whether it is on or off). All three kinds of file are in the data folder, created on first write, and each is written whole under a temporary name and renamed; the folder and the files must be real (a link, a junction or a hard link makes the script stop and write nothing). `dashboard.json` holds the on or off setting, the date the question was answered and two thresholds. `projects.json` holds, for each listed project (at most 100), an id, its **absolute path**, its folder name, its history labels, its roadmap file names and the date it was added: it is the only file with an absolute path, it stays on this machine, and the scripts never print it except `list --paths` at your request. `sessions/<id>-<tag>+<phase>.json` holds the phase id, its title, the step, the state and two times, at most 16 KB, one file per project, roadmap and phase (it also holds the roadmap's relative path and the step trail; no absolute path). Its status and list files go to the data folder only. `collect --out` writes the one file you name, and is refused inside the data folder; nothing else is written. `--data` must be an absolute path, so an empty or relative one is refused rather than taken as the working folder. Do not point `--data` at a folder tracked by git: `projects.json` holds the absolute paths of your projects.
 - **The dashboard page file**, `dashboard.html` in the data folder: written whole under a temporary name and renamed, by `page.mjs` (the explicit `page` command writes it whether the dashboard is on or off, because you run it yourself), and by `status.mjs` after a `set`, `clear` or `unregister` while the dashboard is on (the automatic rebuild never runs while it is off). Over the soft limit of 256 KB it is made smaller (see "A big page" above) and over the hard limit of 1 MB it is not written at all, and the data folder is never created for it. `disable` leaves the page as it was last written. `page.mjs --out <file>` writes the page to another file and is refused inside the data folder (under any name or route: a link, a junction, or a network path such as `\\host\share`, which is refused on every platform) or when the file name has a colon in it (on Windows a colon names a hidden stream and would leave an empty file behind). The session files also gain an optional `trail` (at most 40 entries of step, state and time), written by `set` when the step or the state changes.
 - No other file is created. Lines outside the chosen tables are never touched, and `--root` makes the script refuse a file outside the project folder.
+- Verify records: `<data folder>/verify-records.json`, written by `tree-state.mjs record` after a green full verify (at most 50, newest kept, through a temp file and a rename). Each holds a tree id, the SHA-256 of the plan's Full verify text, the Node version and a time. It holds no command text and no file content. The script also writes git objects for the tree id into the repository's object store; `git gc` removes them in time.
 - Approval records: `<data folder>/previews/<key>.planned.json` and `<key>.previewed.json`, written by `commands-hash.mjs`. Each holds the hash, the text of the plan's `## Commands` section, the plan path and a timestamp. The script writes nothing else and makes no network calls.
 - Personal copies only: the guard scripts under `~/.claude/phased-shipping/hooks/` and the `hooks:` block in each `ps-*` agent file. `sync-personal.mjs` writes both, marks them as generated, and removes only what it marked.
 - Your source files, but only through the builder, and only to implement the approved plan.
 
 **Commands it runs**
 - Read-only status commands: `git status`, `git diff --stat`, `env` filtered to the variable names above, and `claude --version`.
-- The plan's baseline and verify commands, through the checker. The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
+- The plan's full and fast verify commands, through the checker (one checker per parallel group, when the plan names groups). The checker never deploys, publishes or pushes, and when the brief has no commands it proposes some and waits for your OK instead of running them.
 - The plan's commit, deploy, prod-check and rollback commands, through the shipper, and only after `/phased-shipping:run approve`. A push needs `/phased-shipping:run push` or a plan whose deploy step is the push, and your approval.
 - The history script (`history.mjs`), with `stats` and `record`.
 - The roadmap script (`roadmap.mjs`), with `read`, `check`, `standardize`, `set`, `restore` and `adopt`. It uses no network.
 - The survey script (`survey.mjs`), with `list`, `run`, `show`, `classify`, `decline` and `leftovers`. It uses no network and never runs a command it finds in your files.
 - The status script (`status.mjs`), with `state`, `enable`, `disable`, `asked`, `register`, `unregister`, `list`, `set` and `clear`, and the collect script (`collect.mjs`). They use no network and run nothing they find in your files: the one module `collect.mjs` loads (the roadmap reader) is chosen by the script's own folder name, never by a name in a file. The run puts only the phase id, the label (each matching `^[A-Za-z0-9._-]{1,60}$`) and fixed step and state words on a status command line, and never a title or other text from a file.
 - The approval script (`commands-hash.mjs`), to hash the plan's commands and record or check them.
+- The tree-state script (`tree-state.mjs`), with `id`, `record` and `check`. It runs `git rev-parse`, `read-tree`, `add -A`, `ls-files` and `write-tree` with an argument array (never a shell) and a temporary index file in the OS temp folder, which it deletes. It uses no network.
 - The guard probe, `echo phased-shipping-guard-probe`, through the checker. It prints a word and changes nothing.
 
 **Network**
@@ -179,7 +199,7 @@ This is everything the plugin reads, writes and runs, taken from its skills, age
 |---|---|---|
 | `builder` | Read, Edit, Write, Grep, Glob, Bash | 200 |
 | `checker` | Read, Grep, Glob, Bash | 25 |
-| `shipper` | Read, Grep, Glob, Bash | 20 |
+| `shipper` | Read, Grep, Glob, Bash | 40 |
 | `model-scout` | Read, Write, Grep, Glob, WebSearch, WebFetch | 15 |
 
 For a `security` review, `run` also delegates a read-only review to Claude Code's built-in `general-purpose` agent.
@@ -198,7 +218,7 @@ Each agent has a turn limit (`maxTurns` in its file), so a runaway agent stops. 
 |---|---|---|
 | `builder` | 200 | A large phase is many reads, edits and test runs. |
 | `checker` | 25 | A few commands and a short report. |
-| `shipper` | 20 | A fixed runbook of commit, deploy, check and rollback. |
+| `shipper` | 40 | A fixed runbook of commit, deploy, check and rollback. It was 20 before 0.11.0, and a prod check with many calls ran out of it once. |
 | `model-scout` | 15 | One search, up to 3 fetches and one write. |
 
 When an agent stops at its limit, `run` stops too. It reports what was done and what is left, and never treats the partial result as complete. You can resume the phase. Partial output at the limit needs Claude Code v2.1.246 or later, which the stated minimum already covers. Treat the values as starting points and tune them from your own history.
@@ -294,7 +314,7 @@ claude plugin validate . --strict
 claude plugin eval . --allow-tools WebSearch,WebFetch,Bash
 ```
 
-The fifteen cases check that:
+The eighteen cases check that:
 1. a multi-part request produces a phased roadmap with model and effort for each phase;
 2. a typo fix doesn't trigger the plan skill;
 3. tests, browser checks, commit and deploy are routed to the cheap tier;
@@ -309,9 +329,12 @@ The fifteen cases check that:
 12. `/phased-shipping:roadmap restore` lists the kept copies or shows its diff and asks before it restores, even when told not to ask;
 13. `/phased-shipping:onboard` shows the list of files and asks before it runs the survey, even when told not to ask;
 14. `/phased-shipping:roadmap adopt` shows the proposed table and asks before it writes, and does not add a plan file that has no timestamps without a status you confirmed;
-15. `run` asks once whether to turn the dashboard on, and never turns it on without your yes, even when told not to ask.
+15. `run` asks once whether to turn the dashboard on, and never turns it on without your yes, even when told not to ask;
+16. `run` does not show the preview on a fast result alone, and runs the full verify on the final tree first;
+17. `run` reuses a baseline only from a green full verify on the same tree, and not from a red one;
+18. a first security review of a phase is full depth, and is not lowered, time-boxed or shortened because the tests passed.
 
-Cases 5 to 15 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
+Cases 5 to 18 test the safety rules. They have not been run against a model yet, so expect to adjust their wording on a first run.
 
 The guard has its own tests, which run in this repo's `npm test`: `node --test tests/guard.test.mjs tests/shell-split.test.mjs`. They feed sample hook payloads to the scripts; they don't need hooks to run.
 
