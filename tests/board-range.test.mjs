@@ -16,11 +16,16 @@ const IDENTITY = { GIT_AUTHOR_NAME: "tester", GIT_AUTHOR_EMAIL: "tester@example.
 const dirs = [];
 test.after(() => { for (const d of dirs) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
 
-// A repository with three commits, and a git function bound to it (the shape commitShas expects).
-function fixture() {
+// A repository with three commits, and a git function bound to it (the shape commitShas expects). Git is slow where this runs (every
+// call starts a process), so the three commits are made once. The tests that only read use that repository; the ones that change history
+// work in a clone of it (the same commit ids), which is one git call instead of ten.
+const gitIn = (dir) => (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, ...IDENTITY }, stdio: ["ignore", "pipe", "ignore"] });
+let base = null;
+function baseRepo() {
+  if (base) return base;
   const dir = mkdtempSync(join(tmpdir(), "board-range-"));
   dirs.push(dir);
-  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", env: { ...process.env, ...IDENTITY }, stdio: ["ignore", "pipe", "ignore"] });
+  const git = gitIn(dir);
   git("init", "--quiet");
   const commit = (message) => {
     writeFileSync(join(dir, "file.txt"), `${message}\n${Math.random()}\n`);
@@ -28,7 +33,18 @@ function fixture() {
     git("-c", "commit.gpgsign=false", "commit", "--quiet", "--no-verify", "-m", message);
     return git("rev-parse", "HEAD").trim();
   };
-  return { git, commit, a: commit("first"), b: commit("second"), c: commit("third") };
+  return (base = { dir, git, commit, a: commit("first"), b: commit("second"), c: commit("third") });
+}
+const fixture = () => baseRepo();
+function cloneFixture() {
+  const origin = baseRepo();
+  const dir = mkdtempSync(join(tmpdir(), "board-range-clone-"));
+  dirs.push(dir);
+  execFileSync("git", ["clone", "--quiet", origin.dir, dir], { env: { ...process.env, ...IDENTITY }, stdio: "ignore" });
+  // The origin's commit helper writes into the shared repository, so a clone does not get it: a test that needs a commit in the clone makes
+  // one with git, which is bound to the clone.
+  const { commit, ...shared } = origin;
+  return { ...shared, dir, git: gitIn(dir) };
 }
 
 test("a normal range returns its commits, oldest first", () => {
@@ -44,7 +60,7 @@ test("an all-zero before returns only the latest commit", () => {
 });
 
 test("after the last commit is rewritten, the old head to the new head returns only the new head", () => {
-  const { git, c } = fixture();
+  const { git, c } = cloneFixture();
   git("-c", "commit.gpgsign=false", "commit", "--quiet", "--no-verify", "--amend", "-m", "third, reworded");
   const head = git("rev-parse", "HEAD").trim();
   assert.notEqual(head, c);
@@ -61,7 +77,7 @@ test("a before that is not in the repository returns only the new head", () => {
 });
 
 test("a before that is not an ancestor of the new head returns only the new head", () => {
-  const { git, a, c } = fixture();
+  const { git, a, c } = cloneFixture();
   git("checkout", "--quiet", "-b", "other", a);
   writeFileSync(join(git("rev-parse", "--show-toplevel").trim(), "other.txt"), "x\n");
   git("add", "-A");

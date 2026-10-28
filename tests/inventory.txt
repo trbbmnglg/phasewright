@@ -1,0 +1,927 @@
+# Test inventory. One line per test: the status, a tab, then the full name (suite > test).
+# The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
+# Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
+# Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
+# tests: 922
+linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
+linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
+linux:skip,win32:run	measure CLI: a command's stdout is passed through untouched, and --json goes to stderr
+linux:skip,win32:run	measure CLI: the command's exit code becomes ours and the record carries exit_code 7
+linux:skip,win32:run	sampler: after stop() every helper child the sampler started has exited
+run	--check with no record exits 4, and the two stages are kept apart
+run	--from matches a listed name exactly: a case variant of a dated name, of original or of prev is a usage error (exit 2) and writes nothing
+run	--into takes only a regular .md file outside node_modules, .git, build output, the backup folder and .phased-shipping
+run	--out: a file name with a dollar sign and a colon is refused on every platform (the colon rule has no exception)
+run	--out: a link or junction to the data folder is refused through the real path and through the identity walk; another folder is allowed
+run	--out: a network or device path (a UNC spelling, //host/share, the \\?\ and \\.\ forms) is refused on every platform, and a folder with the data folder's identity is refused whatever its real path says
+run	--publish adds one commit as the repository's identity, and a second run finds no changes
+run	--record then --check: exit 0 on a match
+run	--reset-history needs both flags and leaves the remote alone without them
+run	--reset-history with both flags leaves one commit by the repository's identity and writes a backup bundle
+run	--set-status: only an undecided file takes one; a decided file, a duplicate id, an unknown id and a bad status are usage errors
+run	CLI: --all lists other users' processes; the default hides them
+run	CLI: --fixture f --json prints valid JSON with schema_version 1 and the three buckets
+run	CLI: a Mac report says Mac support is untested
+run	CLI: bad options exit 2 with a usage line and never scan
+run	CLI: the human output has the pressure numbers, the numbered tables and ends with the read-only line
+run	CPU sampling: per-process CPU and owners merge by pid, and a reused pid is rejected
+run	CRLF text reads like LF text
+run	GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE in the parent environment, pointing at another repository, do not change the id
+run	Mac parser: ps output becomes records, joined to the executable path by pid
+run	Mac parser: vm_stat, memory_pressure, swap usage and top become numbers
+run	PowerShell and cmd launched from a shell: the first plain argument is the command, -EncodedCommand has many spellings
+run	PowerShell mode: backticks, curly quotes, Unicode spaces, CR, backslash, block comments, script blocks
+run	PowerShell tool: refused outright for builder, checker and shipper
+run	Quick start has exactly two commands, in one code fence
+run	SECURITY.md is at the root and nothing shadows it
+run	SKILL.md calls every script by full path, not from the skill folder
+run	SKILL.md: still one-line quoted frontmatter within limits, and carries the honesty rules
+run	Security links SECURITY.md, and the provenance line matches what the release workflow does
+run	What's inside says each skill is a folder with a SKILL.md, and every skill folder has one
+run	Windows parser: CIM JSON becomes normalized records with converted dates and CPU units
+run	Windows parser: a missing CommandLine or ExecutablePath does not throw
+run	Windows parser: the summary is masked, short and shows profile paths relative
+run	a .original is published whole: while its temp file exists the final name does not, and a kill before the link leaves no .original at all
+run	a .original that appears between the check and the link is kept as it is (treated as already kept), and the temp file is removed
+run	a BOM in front of the marker on the first line is allowed: the table is standard, set works and keeps the BOM; a BOM anywhere else does not count
+run	a Summary must be 20 to 160 characters
+run	a Summary with a character outside the allowlist is an error that names the version and the code point, never the character
+run	a before that is not an ancestor of the new head returns only the new head
+run	a before that is not in the repository returns only the new head
+run	a broken relative link fails, but a link inside a code block does not
+run	a broken repo link fails, and so does a link to a heading that does not exist
+run	a broken wiki link fails
+run	a clean fixture passes
+run	a clean plugin agent and skill pass, with no metadata block needed
+run	a damaged or foreign record file means no record, and record replaces it with a valid one
+run	a date must be written YYYY-MM-DD and be a real calendar date
+run	a description with no sentence end: short stays whole, long is cut
+run	a drifted generated page fails
+run	a fallback publish that fails with something left at the final name keeps its marker: the next write refuses, and nothing is written
+run	a file turned into a hard link after the list is caught at the read, and the read-time check is what catches it
+run	a file with an allowlisted name that holds binary bytes or is not text is skipped and never printed
+run	a first sentence longer than 200 characters is cut at a word boundary with an ellipsis
+run	a folder swapped for a link after the listing is never read through, and each containment check in readOne is needed
+run	a folder that is not a git repo, a sub-folder of one, and a missing folder are refused, with nothing printed but a fixed phrase
+run	a forbidden word fails, without printing a denylist term
+run	a forced exception in the rules denies the call with the error message
+run	a git failure that is not a missing or unrelated commit is not hidden
+run	a hard link to a file outside the project is not listed or read, and the check is what stops it
+run	a history file with old lines (no v) gives the same stats as before, and mixed lines read the same
+run	a kept copy of a roadmap cannot be given as the file: set, standardize --write and restore --write exit 2, change nothing and make no nested folder
+run	a leftover .incomplete marker (an earlier copy cut short) makes every write refuse with exit 1 and nothing written; read-only commands still work
+run	a locked or unreadable file is skipped once, reported by base name, and never retried
+run	a long first word is cut hard at 157 characters
+run	a missing Date or Summary line is an error that names the version
+run	a missing heading fails on a feature page and on a release page
+run	a missing or half-synced rules file denies for a known role instead of crashing
+run	a normal range returns its commits, oldest first
+run	a page that is empty or over 300 lines fails, and so does a missing required page
+run	a placeholder word or variable at the start of a longer value is still a secret, and a bare placeholder still passes
+run	a plan file name with an invisible character is skipped as an unusual name, never listed, read or printed
+run	a plan title with escape, link and bell characters reaches neither the output nor the written roadmap
+run	a planted fake secret in an allowlisted file skips the whole file, is counted, and is never printed or saved
+run	a quoted description with escaped quotes passes and round-trips
+run	a record with a guard value is saved as given, for each of the three values
+run	a record with timings and baseline_reused is saved as given
+run	a record with tokens is saved as given
+run	a record without caught_by still loads, and stats prints no catches line for such a file
+run	a record without tokens is saved as before, with no tokens field added
+run	a relative --data is refused with nothing read or written, and so are missing and repeated options
+run	a report never prints a command line: only the masked summary appears
+run	a repository with no commit yet is refused
+run	a roadmap path that cannot be resolved says 'no such file' only for a missing file; any other error gives its code
+run	a secret broken up by an invisible character is still recognised by the scan, and its tail never reaches the output
+run	a sentence ending within 200 characters is used as is
+run	a shipped release without a page fails, and so does a release page without an entry
+run	a short .original that is already there is trusted as a name, never written to, and never made by this tool
+run	a stale .prev temp name from an earlier run with the same process id does not block a set
+run	a stray file name fails
+run	a symbolic link or junction that points outside the project is not followed
+run	a term from the local denylist fails, including mixed case
+run	a tilde fence whose info string holds a backtick still opens a fence and wraps a decoy bullet
+run	a valid CHANGELOG gives the newest three entries, newest first, with date and summary
+run	a valid caught_by is saved as given: [] with no rounds, one entry per round, plus one for a rollback
+run	a value beyond the safe integer range is refused for timings and tokens, and stats ignores one in an old file
+run	actual_h is still computed from the timestamps, and --from reads a file
+run	adopt plan: --plans must be a folder inside the project and not under a folder adopt never reads; --root limits the project folder
+run	adopt plan: a file with no Timestamps line, placeholders only, a duplicate id and a heading-less file are never given a status
+run	adopt plan: a hard-linked plan file or roadmap file is skipped and named, and the link-count check is what skips it
+run	adopt plan: a plan file and a roadmap are found to depth 3 and not deeper; symbolic links are not followed
+run	adopt plan: an invisible character in a plan title (tag, zero-width, format, bidirectional) reaches neither the output nor the written roadmap
+run	adopt plan: finds plan files in docs/phases, .plans/phases and docs/<topic>, never in node_modules, and a custom --plans folder only when given
+run	adopt plan: plans/ and the project's own phases/ are scanned, a root-level phase file is not, and a name with a control or invisible character is skipped
+run	adopt plan: the proposal holds only the rows the plan files prove, in id order, with a Note that names the source
+run	after the last commit is rewritten, the old head to the new head returns only the new head
+run	agent model: best warns, a full ID fails, fable passes
+run	all four agents carry the agreed maxTurns
+run	allowed commands pass for builder and checker
+run	allowed commands pass for the shipper
+run	an agent file with a bad name fails the name rule
+run	an all-zero before returns only the latest commit
+run	an email address or a mailto link fails
+run	an email with a multi-label domain is reported in full
+run	an interrupted write leaves the old file valid and no temp file behind
+run	an invalid caught_by is rejected with invalid field: caught_by, and nothing is written
+run	an invalid guard value is rejected with invalid field: guard, and nothing is written
+run	an odd number of backticks and a web address are errors
+run	an older plan with one Baseline line is read as its full verify, and a plan with neither line exits 2
+run	an unknown frontmatter key warns but does not fail
+run	an unquoted colon in a plugin agent description fails (audit mutation test)
+run	an unquoted colon in frontmatter fails (real YAML would drop every field)
+run	an unquoted lookalike is not a command: arguments stay arguments
+run	an unterminated quote does not hide the rest of the text
+run	backups: .prev is the file's bytes before the most recent set after each run, and a refused set leaves it alone
+run	backups: LF and CRLF files - every copy is byte-identical to what it copied, and the new text keeps its endings
+run	backups: a .gitignore that is a folder or a link fails closed (exit 1, nothing written; the link part is skipped where links cannot be made)
+run	backups: a .original that is a directory makes every write fail closed, with the roadmap byte-identical
+run	backups: a .original that is a symlink is refused and its target is never written (skipped where symlinks cannot be made)
+run	backups: a dated name that already exists, a temp file that already exists and a .prev that is a directory all fail closed
+run	backups: an existing .gitignore in the folder is never modified; a content other than '*' gets a warning, exactly '*' does not
+run	backups: changed while writing - set, standardize --write and restore --write stop with the exact message and leave the injected change
+run	backups: fail closed when the folder cannot be used (a file in its place, a symlink or junction), the roadmap stays byte-identical, no .tmp left
+run	backups: the .original is never overwritten, even when the roadmap file is replaced with something unrelated
+run	backups: the first set makes the folder, its .gitignore and the .original; standardize --write and 20 more sets leave the .original byte-identical
+run	bad names, long descriptions, emails and tokens each fail with a clear message
+run	baseline_reused must be a boolean
+run	bash -c skips its options and --, and env -S parses its value
+run	big page: a page between 256 KB and 1 MB is written, by the rebuild and by the command, with the real limit and no seam
+run	big page: a real data folder with big idle roadmaps still gets a page after a set (it used to print page too large); over the hard limit fails closed
+run	big page: a set with such a project prints no page not rebuilt line
+run	big page: an idle session does not keep the tables, an archived one is kept in the page
+run	big page: one running project with a big roadmap (300 long shipped rows, a 147 KB file) no longer stops the page; the waiting session of a second project reaches it
+run	big page: over 256 KB the tables of projects with no running session are left out, largest first, until it fits; row, sessions and archive stay
+run	big page: running projects lose their tables only after the idle ones, never their rows or sessions; a page that fits has no note; idle projects go until it fits
+run	big page: the hard limit is 1 MB and the soft one 256 KB, in the source and in the docs
+run	big page: when the note line itself puts the page over the limit, one more project's tables go
+run	board-sync.mjs imports commitShas from ./board-range.mjs and no longer builds the range itself
+run	both case: a legacy table refuses to propose until it is standard, unless --into names the file
+run	both case: a standard table lists only the plan files whose ids are not in it; with no --into a write is refused
+run	both case: several roadmap files are listed, --into picks one, nothing is merged across files
+run	both marketplace files list phased-shipping, and the Cursor entry says what is Claude Code only
+run	builder and checker share their rules, the builder has two more (the plan files, the plugin files), and shipper has its own
+run	caps: 200 files in the list, 64 KB of text per file, 400 KB for the survey
+run	cell escapes the backslash first and then the pipe, so the text reads back unchanged and a pipe never splits a cell
+run	cells: clean(cellOf(v).trim()) gives v back for every string of a, space, | and backslash up to 6 characters
+run	cells: legacy cells read exactly as before (a Windows path, a UNC path, an escaped pipe), and set on another row leaves them byte-identical
+run	cells: the explicit round-trip cases, and a row built from cellOf values always splits into the expected cells
+run	cells: the writer has a backslash replacement in the same function, and no regular expression is built from text
+run	changed while reading: the .original holds the bytes READ at the start, and the command stops, whatever the file becomes right after the read
+run	changed while writing: an edit of the SAME length is caught for set, standardize --write and restore --write
+run	check --since accepts only a record made at or after it, and a bad --since is a usage error
+run	check exits 2 for a plan with two Full verify bullets or none with a command, and a changed parallel group or fast set changes the hash
+run	check reuses only on an exact match: tree, full-verify text and Node version, within 7 days
+run	check: each error code is reported on a small crafted table
+run	check: exit codes 0, 1 for errors, 1 with --strict for a legacy table, 2 for the unreadable and the wrong usage
+run	check: the messy fixture never throws and lists its notices by line
+run	classifier: Suggest closing is only ever a dev leftover (nothing else can reach it)
+run	classifier: Suggest closing needs two signals, and the confidence is medium unless all three line up
+run	classifier: a browser group is Your call, with counts and total MB; embedded web views are not browsers
+run	classifier: a busy dev tool is Your call, never Suggest closing
+run	classifier: a dev tool started through node is recognised from its arguments
+run	classifier: a name or path in the local protected list is Keep even when it matches a dev-leftover name
+run	classifier: a process active in the project folder is Keep (in use); the same idle one is not
+run	classifier: a process owned by another user is Keep and hidden without --all
+run	classifier: an orphaned, idle dev leftover whose project folder is gone is Suggest closing, high confidence
+run	classifier: an unclassifiable process, with unknown or missing fields, is Keep
+run	classifier: an unknown 800 MB process of the user in a user-writable folder is Your call
+run	classifier: an unknown process under Program Files or Windows is Keep, even a big one
+run	classifier: generic protected categories are Keep (shells, editors, security, git, VPN, coding tools)
+run	classifier: it is a pure function: same input, same output, input untouched
+run	classifier: the same process as a descendant of the current process is Keep (in use)
+run	classify gives the four states with the evidence stated, reading only plan and roadmap files
+run	classify skips a roadmap or plan file that looks like a secret and says so
+run	cli: exit codes and output as a real process, no absolute path is printed, and only the file's own folder is written
+run	client script, run in a sandbox: Idle starts at exactly the idle time, the warning at the warn time, and worked so far is the stored time plus the age of a working session
+run	client script, run in a sandbox: a cut-off title inside a summary is not focusable, one outside a summary is
+run	client script, run in a sandbox: clean storage starts the script, adds js, sets one 1 s timer and reloads only after the refresh time
+run	client script, run in a sandbox: stored values that are poisoned or refused are ignored and the script still starts
+run	client script, run in a sandbox: the paused state stops the reload, the button toggles it and stores a 1 or a 0
+run	client script, run in a sandbox: the test is sensitive (each change below makes one of the checks above fail)
+run	cmd mode: //c, glued /c, carets, only double quotes, %variables%
+run	collect: --out is refused (exit 2, nothing written) in the data folder or when a real path there is not a regular file, and a sibling folder is fine
+run	collect: --out writes atomically; a failed rename leaves the old file whole; a link or folder as the target is refused
+run	collect: HTML and Markdown in roadmap and session text come out as plain text, with < > & written as escapes, on stdout and in --out
+run	collect: a bad session file is skipped and reported by base name only, and its contents never reach the output
+run	collect: a bad trail skips the session and names the file only; more than 40 entries is a bad trail
+run	collect: a data folder file is checked again after the read: a folder swapped for a link during the read drops what was read
+run	collect: a file is opened once and its descriptor checked: a non-regular file, a size over the cap and a second name are refused without a read, and every descriptor is closed
+run	collect: a file over 256 KB is skipped and never read
+run	collect: a hand-edited project path such as a plain word cannot rename a key in the output
+run	collect: a plan file outside the project is skipped by base name and never read (dot-dot, a link, a junction, a hard link)
+run	collect: a plan file whose resolved path has a .git, node_modules or .roadmap-backups folder is refused with the reason and never opened
+run	collect: a project folder that moved shows not found, stays listed and is never removed from the list
+run	collect: a project that is not found has a summary of zeros, and a session of an older version (no trail) still works
+run	collect: a roadmap and its plan files merge into the schema, with the plan timestamps
+run	collect: a roadmap file that is a hard link or a link, or is listed with a bad path, is skipped and never read
+run	collect: a rollback from prod-check to build is a loop; active until prod-check is reached again, never when done
+run	collect: a run reads a bounded number of bytes in all, and says which files it skipped
+run	collect: a session of a project that is not on the list is not shown
+run	collect: a session time more than 5 minutes ahead (or a step that started after its update) is clock skew: Idle, noUpdate, a warning, never an open session
+run	collect: archived is done and more than 7 days since the last update; the project summary counts what is happening now
+run	collect: arguments are checked, and an empty or absent data folder gives an empty result
+run	collect: estimateH is the calibrated number of the matching row, null when there is none; the phase id ignores letter case
+run	collect: history joins only the labels stored with the project, never the folder name
+run	collect: hostile roadmap text cannot inject control characters or grow without limit
+run	collect: known spellings of this machine's paths become [path]: mixed and doubled separators, URL-encoded, 8.3 and Git Bash user folders, a hidden character inside
+run	collect: loops from the trail: one loop, two loops, the same gate twice, forward only, state-only changes
+run	collect: more than 100 session files are capped, and the output stays under 2 MB with many large roadmaps
+run	collect: session states at 89, 90, 179 and 180 minutes (noUpdate and Idle boundaries)
+run	collect: the new fields hold no absolute path and no raw < > &; collectData returns the same values the command prints
+run	collect: the output holds no absolute path, and a project path that appears in a title is removed
+run	collect: the roadmap module is found in the plugin layout and in the personal-copy layout, and nowhere else
+run	collect: the roadmap reader comes from the script's own folder name, and a neighbour of the other layout is never run
+run	collect: the scripts import only node: built-ins, and the one dynamic import is the roadmap reader chosen by the script's own folder name
+run	collect: this machine's project, data and home folder paths inside a roadmap cell become [path] in values only
+run	collect: two open sessions in one project give the warning; a done or idle one, or another project, does not
+run	collect: workedMs counts only the time in working, up to the last update; elapsedMs runs from the first entry
+run	comments are skipped, and an apostrophe in one does not hide the next line
+run	control words and groups do not hide a command
+run	csp: a script with CRLF line ends is inlined with LF and the policy hash is the hash of that text
+run	dashboard skill: its command lines have no double-quoted free text and only the allowed placeholders; both skills skip a folder that could end single quotes
+run	decline records a no in state.json (inside the ignored folder), show reports it, and a later survey keeps it
+run	denylist terms match whole words only
+run	deriveAuthor returns a no-reply identity and throws for anything else
+run	docs: status.md writes the escape names as visible text; the README and skills describe the step, the data folder and the paths truthfully
+run	docs: the two size limits, the need for JavaScript, the path wording and the --out exception read the same everywhere
+run	each of the four safety evals has a prompt with max_turns and allowed_tools, and a typed grader
+run	each secret shape is its own pattern: a shape the others do not cover fails when its pattern is removed
+run	editing a command then --check: exit 3 and a diff that names the changed line
+run	escapeRe escapes every special character, so the text matches itself and a near miss does not
+run	estimate table: a phase rolled back and shipped again shows the newest record, not the first attempt
+run	estimate: a history record with no roadmap row shows the id alone; a roadmap row with an Actual and no history still shows, after the history rows
+run	estimate: empty states, and the history of another project's labels is not used
+run	estimate: the page-size rule counts the rows the estimate table really holds (history rows with no roadmap row at all)
+run	estimate: the rows come from the history, so a roadmap with no Actual column still shows them; est and notes from the record, title from the roadmap
+run	estimate: two records for one phase use the newest; ids match without regard to case; a record with no actual time is no row
+run	evasion forms are all denied for the builder
+run	evasion: command substitution, backticks, process substitution
+run	evasion: separators, global options, assignments, paths
+run	evasion: shells, PowerShell, cmd, eval
+run	evasion: wrappers
+run	every bullet under How it helps and What it will not do carries a relative link, and the helps bullets stay short
+run	every character on the allowlist is accepted, and an even number of backticks is fine
+run	every command accepts its flags: read --root, and a root spelled differently from the file's path (short and long names)
+run	every deny rule fires on every sample, and the reason names the rule (in process)
+run	every eval folder, old and new, has a prompt and at least one grader
+run	every git call runs with an empty hooks folder and fsmonitor off, and a post-index-change hook of the repository does not run during id
+run	every install line in a tracked file names the marketplace and an existing plugin
+run	every path that is not a plain regular .gitignore, or has other content, is dealt with before .original (no .original after a refusal)
+run	every relative link and image points at a file that exists, and every anchor at a heading in the target
+run	every rule denies with the documented output (the decision the script prints)
+run	every shipped or in-progress release has a page, and the in-progress one says so
+run	every summary in the real library.json is within 240 characters
+run	every tokenizer loop is linear: 80000-word inputs are split in well under a second
+run	exotic syntax is flagged on the command that uses it
+run	fail closed: .phased-shipping is a file, a link, or has a .gitignore that is not '*': nothing is written
+run	fewer than three entries are all shown; no version heading is an error
+run	final fixes, L1: an older-form file hides a tagged file only when it is the one tagged file of its phase; with two roadmaps both stay and the older-form file goes
+run	final fixes, L2: collect reads roadmap entries that are the same path once (letter case through io.caseInsensitive)
+run	final fixes, L2: status compares roadmap entries with the same letter-case fold as the tags, under both io.caseInsensitive settings
+run	final fixes, L2: the page draws roadmap entries that are the same path once (letter case through its caseInsensitive option)
+run	fix round 1, H1: --record and --check print the normalized section after the status line
+run	fix round 1, L1: two Commands headings, or one that isn't exactly '## Commands', exit 2
+run	fix round 1, L2: --record, --check or --data with no value exits 1 and never prints the hash
+run	fix round 1, L5: a redirect glued to a word is a plan file write; similar names stay allowed
+run	fix round 1, L6: git checkout and git restore onto a plan file are denied for the builder only
+run	fix round 1, L7: an NTFS stream suffix on a plan file name is the same file
+run	fix round 1, L8: reading those files and folders merely named previews stay allowed; other roles are not restricted
+run	fix round 1, L8: the builder can't write the approval records or the plugin's data, skills and agents
+run	fix round 1, L9: a relative and an absolute path to the same file share a key; the same name in two folders differs
+run	fix round 2, L1: dot segments, doubled slashes and a trailing /. don't hide a plan or protected file
+run	fix round 2, L2: cp, mv, install -t and a phases folder as the destination; rsync, git apply and git mv
+run	fix round 2, L6: an option whose value starts with -- exits 1 with a message and creates no folder
+run	fix round 2, M1: node -e text that writes into previews or the plugin's data folder is denied
+run	fix round 2, M1: the builder can't run commands-hash.mjs --record; --check, --short and plain hashing stay allowed
+run	fix round 2, M2: the builder can't write the installed phased-shipping plugin folders; reading stays allowed
+run	fix round 2, item 10: task runners, node running a tool, wrangler triggers, npm version, jsr and goreleaser (builder and checker)
+run	fix round 2, item 11: gh auth status -t and --show-token print the token and are denied for every role
+run	fix round 2, item 1: flags hidden in expansions are denied for the shipper, except the value of -m, --message, -F and --file
+run	fix round 2, item 2: commands fed to a shell on stdin are denied for every role
+run	fix round 2, item 6: a Windows git path with escaped backslashes and spaces is read as git, and single backslashes outside quotes are denied
+run	fix round 2, item 7: trap, hash, alias, unalias, coproc, shopt expand_aliases and enable are denied for every role
+run	fix round 2, item 8: nothing inside .git or .husky from the shell or the file tools, and env that moves git's config
+run	fix round 2: PowerShell mode drops an assignment target and follows every script block
+run	fix round 2: a heredoc or here-string reaches the program behind a wrapper
+run	fix round 2: a shell with no -c text and no script file reads stdin and says so
+run	fix round 2: arguments with an expansion are marked (not enumerable), by the word's text
+run	fix round 2: cmd mode reads call, @, if and for /f
+run	fix round 2: coproc is a program of its own, and node follows a tool path under node_modules or .bin
+run	fix round 2: each change below, made in a copy of the scripts, makes its scenario fail
+run	fix round 2: git restore --staged alone only unstages and is allowed; with --worktree it is denied
+run	fix round 2: the legitimate commands still pass (false-deny guard)
+run	fix round 3, item 1: git's global and system config files are protected for every role (shell and file tools)
+run	fix round 3, item 2: read, printf -v, mapfile, readarray and getopts that fill HOME, USERPROFILE, GIT_* and the like are denied; harmless names pass
+run	fix round 3, item 3: curl short options with an attached value are writes (builder, checker, shipper); GET forms pass
+run	fix round 3, item 5: git fetch with --force or a + refspec is denied; plain fetches pass
+run	fix round 3, item 6: git config --get-regexp, --name-only and --show-scope are reads; writes stay denied
+run	folder links inside docs and plan folders are counted and reported, never followed
+run	folder warning: each CLI warns on stderr when run from inside the skill folder, and not from elsewhere
+run	fonts: both woff2 files are renamed (no Plex outside the copyright and licence records) and the licence file is unchanged
+run	fonts: the check catches a name that still says Plex (a copy of the font with one instance name put back to the old text)
+run	git global options move to globals and leave the subcommand first
+run	git: the backup folder never shows up in git status and git add -A stages nothing from it
+run	guard.mjs and guard-rules.mjs agree on the role pattern
+run	guard: --check reports a changed, missing or stale guard file and a changed agent block
+run	guard: --remove deletes only marked hook files and leaves other files and the history alone
+run	guard: a Claude home path with a dollar sign, a backtick or a double quote is refused before anything is written
+run	guard: a home path with spaces still gives a valid command line
+run	guard: a hook file carrying another plugin's marker is also refused
+run	guard: an agent copy that comes out without the hooks block stops the sync and names the file, with nothing written
+run	guard: an unmarked file where a hook script would go is refused, and nothing is written
+run	guard: every ps-* agent copy gets the hooks block with the right matcher and --agent, and keeps the rest
+run	guard: only a file that STARTS with the hook marker counts as ours; a marker further down is refused
+run	guard: plugin agent sources have no hooks field; only the generated copies get the block
+run	guard: pruning does not follow a link out of the hooks folder
+run	guard: the hook scripts land in <home>/phased-shipping/hooks, each starting with the marker, and hooks.json stays behind
+run	guard: the installed copy works when fed a payload directly
+run	guard: the personal agent copies block the call when the hook can't run (onFailure: block)
+run	headroom CLI: no data exits 3 without scanning; bad options exit 2
+run	headroom CLI: with peaks and a recorded scan it prints the arithmetic, JSON is valid, exit code is 0 even when short
+run	headroom: CPU short with only idle Suggest candidates says closing them frees no CPU and lists the busy Your call processes
+run	headroom: a run with fewer than 3 tree samples uses the available-memory drop and the report says so
+run	headroom: need 2,000 MB against 5,000 MB free fits and picks nothing
+run	headroom: need is the max of the last 5 peaks times 1.15 and ignores a 6th, older, larger peak
+run	headroom: no peaks gives no data yet and no picks
+run	headroom: short by 2,000 MB with only 675 MB in Suggest picks all of it, says it is not enough, and only lists Your call
+run	headroom: short by 600 MB with Suggest groups of 400, 275 and 100 picks 400 + 275, covered, not all three
+run	headroom: the rendered text never offers a command to close anything and always ends with the read-only line
+run	headroom: the reserve of 10% of total memory is subtracted from the available memory
+run	heredocs: a quoted body is text, an unquoted body runs its substitutions, a shell runs the body
+run	history: the joined text is one line in one cell and never carries a pipe or a newline into the table
+run	history: the plugin data folder's history.jsonl is the default, only when it exists
+run	history: with --project it joins Actual and the deploy text; the newest record wins and the Note says so
+run	history: without --project it lists the candidate labels with their overlap counts and stops, joining nothing
+run	hooks.json: a file that does not parse fails
+run	hooks.json: a valid file passes, and so does one with no hooks folder at all
+run	hooks.json: an unknown event fails
+run	hooks.json: every one of the 33 official events passes, and near misses fail
+run	hooks.json: scripts must be reached through CLAUDE_PLUGIN_ROOT
+run	hooks.json: the shape is checked
+run	hygiene: every test file that calls mkdtempSync also removes what it made
+run	hygiene: the test files that were measured leaking keep an after hook that removes every folder they made
+run	id equals HEAD^{tree} on a clean repo, changes on an edit, a new file and a deletion, and ignores an ignored file
+run	id refuses a temp folder that is the repository or inside it, and makes nothing there
+run	id refuses a tree that holds a submodule or a nested repository (mode 160000)
+run	in a git repo only the published tree is scanned; outside git the full walk still applies
+run	insideSkillDir: the skill folder and its subfolders count; a sibling with the same prefix and the parent do not
+run	invalid timings are rejected with a message naming the key, and nothing is written
+run	invalid tokens are rejected with a message naming the field, and nothing is written
+run	inventory: --check prints exactly what changed: missing, newly skipped and unlisted
+run	inventory: --write changes only this platform's status, keeps the other platform's, and gives a new test this run's status everywhere
+run	inventory: --write over an inventory is refused for a newly skipped test, and a new test does not make up for a lost one
+run	inventory: --write over an inventory that has a test the run lost is refused, and says which
+run	inventory: --write refuses a run with a failing test or no tests, and writes nothing
+run	inventory: --write refuses to write over a damaged inventory
+run	inventory: --write then --check passes and prints the count; --write prints what it wrote
+run	inventory: --write with --allow-removals prints the removals loudly and writes; new tests alone need no flag
+run	inventory: --write with no inventory to compare with (absent, empty, or only comments) is refused, and accepted with --allow-removals
+run	inventory: a long list of changes is cut with a count of the rest
+run	inventory: a missing test fails and is named
+run	inventory: a status per platform names linux then win32 once each, and differs between them
+run	inventory: a test newly skipped on one platform is refused by --write, and --allow-removals records the skip for that platform only
+run	inventory: a test run that exits non-zero, ends by a signal, or reports no tests is not written or checked, whatever its records say
+run	inventory: a test that is newly skipped fails, and one that now runs is only noted
+run	inventory: a test that is not listed fails until the inventory is written
+run	inventory: each platform checks its own status: a Windows-only test may skip on linux but not on win32, and a jq test the reverse
+run	inventory: lines are status, a tab and the full name, sorted, one per test
+run	inventory: merge matches the lines of a name used twice with its runs, run before skip, so the fewest lines change
+run	inventory: names are a multiset, so a name used twice must run twice
+run	inventory: on a platform outside the list, --check fails for a line with a status per platform and --write refuses before running anything
+run	inventory: the Linux run in CI that failed against one status per test passes against the real inventory, and the old format still fails it
+run	inventory: the count dropping is reported even when the names that remain are all listed
+run	inventory: the real tests/inventory.txt is well formed, and its header count is its number of lines
+run	inventory: the regression pack's tests are listed by name (they moved from the dashboard tests, so no name is new)
+run	inventory: the same results pass; a name that moves to another file keeps its line
+run	inventory: usage errors, a results file that is missing or damaged, and an inventory that is damaged
+run	inventory: with no --results the tests are run through the runTests seam, once
+run	invisible characters (tag, zero-width, format, bidirectional) in a package name or workflow name never reach the output or survey.json
+run	it has the required headings in order
+run	it links private reporting and a no-email fallback, and has no email
+run	it makes no promise one maintainer can't keep and uses no forbidden words
+run	it splits on && || ; | & and newlines
+run	keepOriginal after EEXIST: a folder or a link at .original exits 1 and writes nothing; so does a file next to a .original.incomplete marker
+run	key patterns need a left word boundary: slugs like risk-deadlines pass, a standalone key fails
+run	launchers: versions, package names, -c, --call, exec, x, pnpm options, yarn workspace, uv and pipx
+run	leading assignments come back in env, including those given through env and sudo
+run	leftovers lists prefixed temp entries and deletes nothing
+run	legacy: a candidate without the marker is legacy, the model-check table is not a candidate, two tables under one heading are two
+run	legacy: a file with no table gives no-roadmap-table, and odd input never throws
+run	legacy: a newer marker version is a notice and the table is read as v1
+run	legacy: unknown statuses are a notice, never an error, and are not counted
+run	lib.mjs: a *.local.* file is excluded from the manifest files, other files are kept
+run	library.json install lines follow the same rule
+run	library.json: free-resources is its own plugin, phased-shipping stays partial and no longer lists it
+run	lineDiff lists only removed and added lines
+run	lines placed below a ### heading do not count
+run	lint: *.local.* files are not scanned, and the PII scan still catches the same text in other files
+run	list equals what run reads; --exclude and --confirm narrow it and can never widen it
+run	listening ports and Windows counters parse from sample output
+run	local protected list: loads from FREE_RESOURCES_PROTECTED, and a missing or broken file never throws
+run	look: animation is declared only inside the screen, no-preference block (none in print, none for reduced motion); the paused class stops it
+run	look: the colours: salmon only on borders, strokes and hatching; every new colour pair is 3:1 (text 4.5:1) in both palettes; waiting is a different tone
+run	look: the hatch tile, the drift of the background and the drift of a gate's stripes are the same whole period, and the angle is the same wherever it is drawn
+run	look: the hatching is animated only where something is in progress, and the header rule only while a session is working
+run	look: the project row has a bar of shipped, in progress and planned phases that matches the counts, with a text label and an aria-label
+run	look: the script marks the page paused with a class (CSS stops the drift) and adds no second script
+run	main: --check fails before --write, --write then --check passes, and a second --write changes nothing
+run	main: --check names the first line that differs, with what was expected and what was found
+run	main: --write changes only the text between the markers, byte for byte
+run	main: a CHANGELOG error exits 1 with its message, and a missing input file exits 1
+run	main: a CRLF README stays CRLF after --write and still passes --check
+run	main: a plugin.json version that differs from the newest entry exits 1 and names both
+run	main: missing, repeated or reversed markers exit 1 with a message that names them
+run	main: the name shown comes from plugin.json
+run	main: unknown or missing flags exit 2 and touch nothing
+run	manifest --check fails after an edit until the manifest is rebuilt
+run	manifest: a plugin with no agents and no model pins is full for Copilot and Cursor; others stay partial
+run	mapStatus: a parenthetical moves to Plan file or Note, moved-to is parked, the rest is blocked
+run	mapStatus: confirmed, a bare number and every other word or shape stay blocked (never guessed)
+run	mapStatus: every word of the mapping, case-insensitive and trimmed
+run	mapStatus: the real-world forms (a date, a date with a parenthetical, bold with a plan reference, emphasis marks, the longest word)
+run	masking: tokens, keys, passwords and bearer values are masked; a profile path becomes relative
+run	measure CLI: bad options exit 2 before running anything
+run	measure: a Windows command line quotes each argument separately, so what you typed is what runs
+run	model-scout may write only <cwd>/PHASES.md, and has no shell
+run	model-scout regression: another folder, a subfolder, a .claude path, a missing cwd, both path keys
+run	modes: the roadmap keeps its mode, copies are owner-only and the folder 0700 where the system has modes; on Windows nothing throws
+run	more wrappers: busybox, script, su, winpty, flock, strace, ltrace, parallel, start
+run	mutation proof on a temp copy: removing a marker or a CHANGELOG line makes --check fail with a clear message
+run	mutation sweeps: the mutant count of each sweep in dashboard-page-sweeps-6.test.mjs is unchanged
+run	mutation sweeps: the mutant count of each sweep in dashboard-page-sweeps.test.mjs is unchanged
+run	mutation sweeps: the second part of the round 6 sweep is the cases after the first part
+run	names: a differently-cased file argument and a link use the backup set of the real file name; a colon name is refused on Windows
+run	nesting that is too deep throws, and so does a non-string
+run	no ## Commands section: exit 2
+run	no *.local.* file is tracked by git or listed in library.json
+run	no absolute path is printed by any adopt run in this file, and every temp folder is removed afterwards
+run	no code path can close, kill or signal a process
+run	no code path can close, kill or signal a process, except the sampler ending its own child handles
+run	no command body is kept or printed: a script is its name and invoking command, CI is names and a count of run steps
+run	no message of any command above contained an absolute path to a temp folder
+run	no output, survey.json or state.json holds an absolute path, and the read-only commands write nothing
+run	no rename wording, no listed local term, and no numbers in prose that would drift
+run	no script: the pause button and the refresh text are hidden until the script adds the js class; the banner stays
+run	no tracked file contains a term from the local list, when the list exists
+run	no word of a CI run step is kept or printed: a secret on a line after a backslash continuation leaves no trace
+run	none of the SVGs uses text, rounded shapes, a gradient, a filter or a link
+run	nothing from the plan, the files or the data folder reaches the output: only fixed phrases, ids and dates
+run	one changed character in a command changes the hash; a change outside the section does not
+run	ordinary text is not mistaken for a secret: a secret NAME, a placeholder and prose pass
+run	other tools are not checked, for any role
+run	page command and collect: --out as a network or device path writes nothing; the data files stay byte for byte; a normal --out elsewhere still works
+run	page command and collect: --out with a colon in the file name is refused on every platform, with nothing written
+run	page command: --out is refused inside the data folder (any name but the default), allowed elsewhere
+run	page command: a data folder that is a file or link fails closed and writes nothing
+run	page command: a failed rename leaves the old page whole and no temp file
+run	page command: a page over the size limit is not written
+run	page command: a relative, empty or missing --data and bad numbers are usage errors; the data folder is never created
+run	page command: writes <data>/dashboard.html by default, atomically, with no temp file left
+run	page: empty and error states appear in context
+run	page: estimate against actual, roadmap rows and archived rows show their numbers
+run	page: every expectation of this file is platform independent (no drive letter, no fixed temp folder, no platform test)
+run	page: nested details for project, session, roadmap, estimate and archived; the first-load rule; sort order; summary on the row
+run	page: one script whose SHA-256 is the CSP hash, nothing fetched, no src, in-page links only, data: urls only, no http
+run	page: only the active loop moves, every arrow has a text label, a repeated gate says round N
+run	page: phaseFlow draws eight gates; a session without a trail shows a plain flow; a hostile or unknown session draws nothing
+run	page: refresh seconds and the written time are in the body; the clock times come from data-t in milliseconds
+run	page: size, fonts and --no-fonts
+run	page: square drawing only: border radius 0, no circle or ellipse or round caps, no shadows or smooth gradients, straight arrows
+run	page: the client script makes no request, builds no address and writes only text
+run	page: the client script reads sessionStorage only as a true or false from a fixed key pattern, or as a number or a checked key
+run	page: the fonts are woff2 and the licence text is the SIL Open Font License 1.1 with the Reserved Font Name
+run	page: the hostile string is cleaned and escaped in a project name, a phase title, a session label, a phase id and an error file name
+run	page: the loop arrow has room under the gates, a thick line, a clear head and its text on its own line; the flow scrolls with a hint on a narrow screen
+run	parse: a row with a cost-style est text and an Est. cell with minutes keeps the first two numbers
+run	parse: the standard fixture gives the expected phases, statuses and counts
+run	parse: unknown columns are ignored by the reader, escaped pipes stay in the cell, Est. numbers are extracted
+run	parsePlanFile: every Timestamps shape (all real, started only, all placeholders, no line, date only, odd text)
+run	parsePlanFile: heading variants, ids with letters, and a file with no Phase heading
+run	paths it names exist, and it stays short
+run	peaks: FREE_RESOURCES_DATA wins; the defaults are LOCALAPPDATA on Windows and ~/.local/state elsewhere
+run	peaks: a --token value in the command is stored masked, whether or not the caller masked it
+run	peaks: a corrupt line is skipped, not fatal
+run	peaks: append then read returns the last 5 for a key in order, without another key's runs
+run	phase 7 fix round 1: the commands shown and the commands briefed are the section the script printed
+run	phase 7 fix round 2: README and CHANGELOG say exactly what is protected and what is not
+run	phase 7 fix round 2: no override for a hash script that can't run, plan says run stops, the brief window adds no command
+run	phase 7, builder: Write, Edit and NotebookEdit to PHASES.md or phases/phase-*.md are denied
+run	phase 7, builder: other files that look similar are allowed
+run	phase 7, builder: reading the plan files and writing similar names is allowed
+run	phase 7, builder: shell writes to the plan files are denied (best effort)
+run	phase 7, others: the shipper, the checker, the main session and model-scout may write PHASES.md
+run	phase 7: plan records `planned` and adds the Commands hash line; the shipper reports the hash
+run	phase 7: run records the preview, checks it on approve and push, and a mismatch is a hard stop
+run	phase 7: the changelog has a 0.5.0 entry above 0.4.0, and the README is honest about what the binding stops
+run	phase 7b: builder, checker and shipper carry the NO SHELL rule and the Windows note, and never tell the agent to call powershell or cmd
+run	phase 7b: run attributes fix rounds, records caught_by, and reads NO SHELL and UNFINISHED results
+run	phase 7b: the changelog has one 0.6.0 block above 0.5.0, and the README has the Windows note and the two limits
+run	phase 7b: the checker runs long commands in the foreground with a 10-minute timeout and reports unfinished ones
+run	phase 7b: the eval run-no-shell-not-verified has a prompt and at least two graders with a typed llm grader
+run	phase 7d1 to 7d1c: the guard rules file changed only its version
+run	phase 7d1: plan and run reach the roadmap script the same way they reach commands-hash.mjs
+run	phase 7d1: the CHANGELOG has 0.7.0 above 0.6.3, says no guard rule changed, and lists what was added
+run	phase 7d1: the README has the roadmap section, the touches lines and the limit
+run	phase 7d1: the roadmap skill is owner-invoked, on sonnet at low effort, and asks before it writes
+run	phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders
+run	phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes
+run	phase 7d1b: the README names the backup folder, the never-deleted .original, the ignore file and the honest limits
+run	phase 7d1b: the restore eval has a prompt, an llm grader and a typed tool grader that forbids restore --write
+run	phase 7d1b: the roadmap skill has the restore mode, still owner-invoked, and asks before it restores
+run	phase 7d1c fix round 2: the docs say what the survey keeps, who reads the files, and which characters are cleaned, exactly
+run	phase 7d1c part A: the roadmap skill has the adopt mode, asks before it writes, asks about undecided files one by one, and stays owner-invoked
+run	phase 7d1c review: there is no surveyor agent, no helper agent and no local-only mode anywhere in the plugin, docs or scripts
+run	phase 7d1c: every agent in agents/ is counted everywhere, the guard has four roles, and no document counts the agents any other way
+run	phase 7d1c: the CHANGELOG has 0.8.0 above 0.7.1 with Added, Changed and No guard rule changed
+run	phase 7d1c: the README has the Onboarding section, says exactly what the survey reads, never reads and writes, and states the limits
+run	phase 7d1c: the onboard skill is owner-invoked, low effort, asks with AskUserQuestion and never writes a roadmap
+run	phase 7d1c: the plan skill offers onboarding once, remembers a no, uses a survey only for proposed hints and never runs the survey
+run	phase 7d1c: the two new evals have a prompt, an llm grader and typed tool graders that forbid the write steps
+run	phase 7d1c: the wiki has the Onboarding page with the five feature headings, linked from Home, and the guard page says no rule changed to 0.8.0
+run	phase 7d2: the CHANGELOG keeps 0.9.0 above 0.8.0 with Date, Summary, Added, Changed and No guard rule changed
+run	phase 7d2: the README and the wiki describe the dashboard data, what it writes and that it is off until you say yes
+run	phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes
+run	phase 7d2: the eval dashboard-opt-in-asks-once has a prompt, an llm grader and typed graders that forbid enabling and writing
+run	phase 7d2: the run skill asks once before turning the dashboard on and makes a status call at each step
+run	phase 7d3: the CHANGELOG keeps 0.10.0 above 0.9.0 with Date, Summary, Added, Changed and No guard rule changed
+run	phase 7d3: the README describes the page, its fonts and what it touches, and the wiki has the Dashboard page
+run	phase 7d3: the dashboard skill has the page mode with the command-line rules, and the references document the page
+run	phase 7g: the checker reports durations and captures exit codes; the README's Windows section says so
+run	phase 7k: the CHANGELOG has 0.6.3 above 0.6.2 and says it is documentation only
+run	phase 7p fix 11: the review brief says the pack proves only what its tests assert, and a split reviewer may read other files
+run	phase 7p fix 12, 13: the docs name both tree-state test files and the ship_s key
+run	phase 7p fix 1: no public file names a text standard, a product or a site for the fence rules
+run	phase 7p fix 1: the plan template and plan skill keep the format unambiguous, and the scripts find themselves through a link
+run	phase 7p fix 1: the run skill says only a printed reuse line counts, adds --since for the in-phase skip only, and names the blind spots
+run	phase 7p fix 2: the final full run is skipped only for a full verify that ran after the last build or fix round
+run	phase 7p fix 3: the CHANGELOG says what the approval script's fence change does, and the script header points at fenceStep
+run	phase 7p fix 4: the run skill says the build or a fix round in both places
+run	phase 7p fix 4: the script header, the CHANGELOG and the review brief carry the corrections
+run	phase 7p fix 5: the README and the Speed page name the two limits of the test inventory and the workflow test
+run	phase 7p fix 5: the checker has no baseline file when the baseline was reused, and one file per parallel group
+run	phase 7p: the README has the Speed section with the honest limits, and the wiki has the Speed page with a sidebar link
+run	phase 7p: the What's new block lists 0.11.0, 0.10.0 and 0.9.0, newest first
+run	phase 7p: the plan template and the plan skill have both verify sets and the parallel groups, and read an old plan as full = fast
+run	phase 7p: the plugin is at 0.11.0 everywhere and the CHANGELOG has 0.11.0 above 0.10.0 with Date, Summary, Added, Changed and No guard rule changed
+run	phase 7p: the review brief has the three stages, the full-depth first review, the split and the never-lower rules, and names no project
+run	phase 7p: the run skill reuses a baseline only from a green full verify, never previews on a fast result, and reviews the first time at full depth
+run	phase 7p: the shipper has 40 turns and the README says so
+run	phase 7p: the three new evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders
+run	phase 7p: the wiki pages say 0.11.0 where they name the current version
+run	plugin agent names must match the file and have no colon
+run	plugin agents: bad effort and maxTurns fail
+run	plugin agents: fields that plugins ignore fail
+run	plugin skills: missing description, broken link and a long body are caught
+run	plugin skills: name must match the folder, allowed-tools warns, bad effort and model fail
+run	pressure verdict: each threshold and its boundary
+run	prints the full hash, or 12 hex characters with --short
+run	programName reduces paths, extensions and case
+run	publish-wiki.mjs imports cell from releases-table.mjs and defines none of its own
+run	read: prints JSON with the file's base name only
+run	reader: a legacy table with the real-world status forms places them, and only the unknown words stay blocked, with the exact --set-status hint
+run	real process: the script reached through a symbolic link or junction to its folder still runs and records
+run	real repo: --check exits 0 when the script is run
+run	real repo: each marker occurs once, both sit in the top of the README before The problem, after the tagline
+run	real repo: the CHANGELOG says what the Date and Summary lines are for
+run	real repo: the README block equals the block rendered from the real inputs
+run	real repo: the newest three CHANGELOG entries carry valid lines, and the newest is the plugin version
+run	rebuild: a builder that fails or throws still exits 0 and prints one line with a code or a fixed phrase, never a path or text
+run	rebuild: a set while the dashboard is on writes <data>/dashboard.html with the session in it, and prints nothing more
+run	rebuild: clear rebuilds the page without the session; a clear with nothing to clear builds nothing
+run	rebuild: run as a command (a real process) writes the page after set and clear, and the exit code stays 0 when the page cannot be written
+run	rebuild: status.mjs has one fixed import of ./page.mjs, hands the builder the data folder only, and a build failure never reaches the exit code
+run	rebuild: the builder is given the data folder and nothing else; the real builder reports a folder that is not there and never creates it
+run	rebuild: the real builder failing (the page name is a folder, a rename refused) exits 0 with the one line
+run	rebuild: while the dashboard is off, or when the command failed, nothing is built
+run	record adds v: 1, keeps a given v, and rejects a v that is not a positive integer
+run	record refuses a record file that exists but cannot be read, and ignores a stored record whose time is not strict ISO
+run	redirections are not separators
+run	regression, PowerShell assignment and script blocks (fix round 2): the command after the target and every {...} group are followed
+run	regression, PowerShell: shell.mjs reads backticks, curly quotes, Unicode spaces, CR, backslash, -EncodedCommand prefixes, script blocks (every role also refuses the shell itself)
+run	regression, a command over 32768 characters is denied for a known role (and not for the main session)
+run	regression, abbreviations: git accepts any unique prefix of a long option
+run	regression, bash syntax the splitter can't follow is denied for every role
+run	regression, cmd: //c, glued /c, carets, quotes, variables (shell.mjs follows them; the shipper also refuses cmd itself)
+run	regression, environment: GIT_* and hook-skipping variables are denied for every role
+run	regression, every role: powershell, pwsh and cmd are refused in every spelling
+run	regression, gh: read-only for builder and checker, a short list for the shipper
+run	regression, git allowlist: anything outside the role's list is denied
+run	regression, long and pathological input: linear time, a size cap, no fail-open
+run	regression, network writes (curl, wget, Invoke-WebRequest) are denied for builder, checker and shipper
+run	regression, publish and deploy: the subcommand anywhere, @version, package names, launchers, more tools
+run	regression, wrappers: bash -c --, env -S, busybox, script, su, winpty, flock, strace, ltrace, parallel, start
+run	release.yml reads releases.json for the title and keeps its pinned actions and permissions
+run	releases.json and the README Releases section carry no rename wording
+run	releases.json: versions, names, statuses and dates are well formed
+run	rename retry, through the commands: a rename refused once per target still gives a finished set; a refused-for-good rename fails closed; a change during a wait is caught
+run	rename retry: on Windows a refused rename is retried up to 10 times after the same check, waiting 10..100 ms; elsewhere it is not retried
+run	renderTable escapes cells and still renders the gold name as the exact expected string
+run	restore --write: a byte-identical choice says nothing to restore and writes nothing
+run	restore --write: from original, prev and a dated name each give exactly that copy's bytes; each restore saves the file first, so a second restore undoes the first
+run	restore: a backup that is a symlink is not listed and cannot be restored (skipped where symlinks cannot be made)
+run	restore: a failure to list the backups exits 1 (like any unusable backup folder), writes nothing, and names the file by its base name
+run	restore: a plan prints the lines and writes nothing
+run	restore: legacy copies beside the file are listed and restorable by name
+run	restore: names with a slash, a backslash or .. are a usage error; an unknown name, an unreadable copy and a file outside --root exit 2 and write nothing
+run	restore: the listing shows names, sizes, line counts and times newest first, and marks legacy copies beside the file
+run	restore: with no backups it says so, exits 0 and creates nothing
+run	root items follow the same effort rules, and a root skill without metadata still fails
+run	round 4, 1: older session files are still read and never touched by set or clear; an unlisted roadmap falls back; the tag follows the lower-case path; a wrong tag or shape is skipped
+run	round 4, 1: two roadmaps in one repository keep their own session file, title, estimate and trail; clear removes only its own; the same-project warning still fires
+run	round 4, 2: a file that is not standard gives no title and no estimate to a session, on the page or in the active estimate
+run	round 4, 3: a .git owned by someone else is not trusted (through the user-id seams); the project root's own roadmap is not added by a climb
+run	round 4, 4: over 25 moving things the page carries the class calm (server side); the stylesheet stills only the marks and segments under it
+run	round 4, 5: a roadmap that is not added says why in one fixed line: too deep, a name with a character that is not allowed, a full list
+run	round 4, 6 and 8: a --root inside .git, node_modules or .roadmap-backups is refused with nothing written; a folder named like the roadmap is not one; the data side refuses such a path
+run	round 4, 7: the page recounts a summary number that is not a whole number, shows an unusable written time as unknown, and counts only sessions of listed projects
+run	round 4, 8: a PHASES.md that is a link is not listed as a roadmap (skipped where links cannot be made)
+run	round 4: the rules are in the scripts: each change makes its scenario fail
+run	round 5, 1: a folder with no usable roadmap path keeps its own session file, marker and tag: no deletion, no inheritance, clear removes only its own, no estimate or title
+run	round 5, 1: an unlisted name has a u in it, so no tag can make it a listed roadmap's file; a phase named like a tag and a phase cannot alias another session's name
+run	round 5, 2: a projects.json from an earlier version, with roadmaps that are not usable paths, still works for set, list, register and unregister
+run	round 5, 3: files of projects that are not listed do not count toward the 100-session cap, and past it the newest are kept and the drop is reported once
+run	round 5, 4: a hostile summary figure is never shown above the rows the page draws
+run	round 5, 5: Docs and docs in one repository get two session files (skipped where the file system ignores letter case)
+run	round 5, 5: the tag follows io.caseInsensitive in both scripts, two roadmaps differing only in case get two rows, and an upper-case phase in a file name is skipped
+run	round 5, 7: set and clear never read, write, take over or remove an older file, from the root, an unlisted folder, a listed sub-roadmap or a folder too deep to list
+run	round 5, 7: when an older file and a tagged file exist for one project and phase, only the newer is shown (the phase compared without regard to case), and nothing is reported
+run	round 5: the rules are in the scripts: each change makes its scenario fail
+run	round 6, 2: of 1,000 session files only the newest 250 by modified time are opened; the live ones survive and the rest are counted as left out
+run	round 6, 3: 200 clock-skewed sessions do not push the live ones out of the cap
+run	round 6, 3: the cap keeps the newest by updated, not by step_started
+run	round 6, 4: the case-folded roadmap match is used only where io.caseInsensitive is true, in collect and in the page
+run	round 6, 6: a summary with a million legacy files and a hundred thousand names is shown as at most 10,000 files and 10 names
+run	round 6, 7: roadmap entries that become the same path once cleaned are one entry when the list is read and written
+run	round 6, 8: 100 sessions with 40-entry trails and 100-character names still build a page under the 1 MB hard limit
+run	round 6, 8: the sessions cap and the number of files read are the same in the source and in the docs
+run	round 6, second part: the rules are in the scripts: each change makes its scenario fail
+run	round 6: the rules are in the scripts: each change makes its scenario fail
+run	run --all-listed refuses when the files changed after the list: nothing is read
+run	run builds here only when the plan's model and effort both match this skill's
+run	run handles proposed commands, partial results, close steps and tokens
+run	run skill: every status.mjs command line has no --name, no double-quoted free text and only the allowed placeholders
+run	run starts the checker with the probe, shows a Guard row that warns, and records guard
+run	run without the owner's confirmation exits 1, reads nothing and creates nothing
+run	run's override and version gates, the template line and both READMEs say what the plan promises
+run	sampler: a pid that disappears mid-run, or a root that is gone, does not throw or add CPU
+run	sampler: a tick line parses, and a line that is not a tick is ignored
+run	sampler: descendants are the root and everything below it, never a sibling, and a cycle cannot loop
+run	sampler: macOS ps output parses into the tree (fixture only; Mac is untested on a real machine)
+run	sampler: peak tree MB counts descendants only, and CPU cores come from CPU-second deltas over wall time
+run	sampler: streaming typeperf lines parse, including a partial last line, and the drop is first minus lowest
+run	secrets are looked for in the parsed values too: a JSON escape, an escaped slash or a zero-width split cannot hide one
+run	separators inside quotes do not split
+run	set: a standard table's id is found even when the same id is in a legacy table
+run	set: changes only the one row, all other lines are identical, and no .tmp is left (the copies are in the backup folder)
+run	set: keeps CRLF line endings and the last-newline state, and refuses an existing temp file in the backup folder
+run	set: touches only the cells it was given, writes the status in lowercase and the actual as <n> h
+run	set: validates the status and the actual, and refuses unknown, legacy and ambiguous ids
+run	shell.mjs has no imports beyond node: built-ins
+run	shipper: force, skip-checks and history rewrites are denied
+run	show keeps a command, an action, a stack entry and a manifest or deploy file only in the forms the script writes, and strips invisible characters
+run	show keeps only known fields from a survey.json on disk, cleans and caps them, and says it was read from disk
+run	show refuses a survey that is not schema v 1
+run	source: adopt builds no regular expression from text and reads no folder it should not
+run	stale banner: 90 minutes, from one value in the page, the placeholder and the script
+run	standardize --write: LF and CRLF files keep their line endings and the last-newline state
+run	standardize --write: a file outside --root is refused (exit 2) and nothing is written
+run	standardize --write: a file that is not valid UTF-8 is refused before anything is written
+run	standardize --write: every line outside the chosen tables is byte-identical, and an unchosen legacy table is untouched
+run	standardize --write: refuses when the backup name exists in the folder, and changes nothing
+run	standardize --write: refuses when the temp file is already in the backup folder, and the file stays as it was
+run	standardize --write: refuses while rows are blocked (exit 1, no backup, file unchanged)
+run	standardize --write: round trip, check exits 0 with no notice, a second standardize says nothing to change
+run	standardize --write: with --set-status it makes the backup and the new file, and prints no absolute path
+run	standardize plan: a --set-status that matches no row is a usage error, and so is a bad status or table
+run	standardize plan: a header that would clash, a bad priority and a duplicate id are blocked for hand fixing
+run	standardize plan: a table without a Status column gets the loud notice
+run	standardize plan: an id that is in two tables gets a table-prefixed hint, and the prefix selects the table
+run	standardize plan: the parenthetical text moves to Plan file or Note, and a cost cell moves to Note on a chosen status
+run	standardize plan: writes nothing, lists the marker, renames, normalisations and the blocked rows with the exact hint
+run	standardize: a table that is already standard says nothing to change and writes nothing
+run	stats counts a record as having timings only when it holds at least one valid timings value
+run	stats counts each check, says how many phases recorded caught_by, and shows progress to 15
+run	stats output for records without tokens is unchanged, with no tokens line
+run	stats prints how many phases had the guard active, counting only phases that recorded it
+run	stats prints how many phases have tokens and the median agent tokens per phase
+run	stats prints median seconds, median full runs and reused baselines over phases that have timings
+run	stats with no history still says so and exits 0
+run	stats with no timings prints none of the new lines, and old records are unchanged
+run	status and collect refuse a --data that is empty or relative (exit 2) and read and write nothing
+run	status and collect run as commands: exit codes and output through the real process
+run	status: a .git at the home folder is ignored (a dotfiles repository does not swallow everything), wherever the home folder is
+run	status: a bad phase id, step or state is refused with exit 2 and nothing is written
+run	status: a data folder that is a link, or a folder where a file belongs, fails closed and writes nothing through it
+run	status: a file in the data folder that is a link, a hard link or a folder fails closed
+run	status: a fresh data folder is off: state and set write nothing, and set exits 0
+run	status: a link or junction in the given path is resolved by real path first, so the repository behind it is found
+run	status: a nested repository wins: the nearest .git is the project root
+run	status: a project list or settings file edited into a bad shape stops the command and is left as it is
+run	status: a repository root that was already registered keeps its id and entry when a run comes from a subfolder
+run	status: a repository that holds the data folder is not used (the folder itself is), and a folder inside the data folder is refused
+run	status: a run in docs/roadmap inside a repository makes the repository the project, adds the roadmap path and attaches the session to the repository id
+run	status: a run in the repository root keeps the folder as the project, as before
+run	status: a session file over 16 KB is never written and the old one stays whole
+run	status: an explicit register while off exits 1 and writes nothing, even after asked
+run	status: an injected rename failure leaves the old files whole and no temp file behind
+run	status: arguments are checked: unknown option, a missing --data, a repeated single option, a missing folder
+run	status: asked records the question without turning the dashboard on
+run	status: disable then set writes nothing, and a session file already there is untouched
+run	status: enable then set writes the session file and registers the project with its label
+run	status: every file of ours is opened once and checked on the open descriptor: a non-regular file, a size over the cap and a second name are refused, and every descriptor is closed
+run	status: ids are stable for the same folder, differ for two folders, and ignore letter case on Windows
+run	status: list prints no absolute path unless --paths, and clear removes one session file
+run	status: on Windows a rename refused for a moment is retried; elsewhere it is not
+run	status: phase ids that differ only in letter case share one session file, in both orders, and clear finds it; collect compares them without case
+run	status: set keeps step_started within a step and moves it when the step changes
+run	status: text fields are cleaned of control, bidirectional, zero-width, tag and format characters, and capped
+run	status: the .git entry is never read or followed: only its name is looked at (a file, a folder and a dangling link all count)
+run	status: the climb looks at 40 folders at most: the repository at the 40th folder is found, one level further is not
+run	status: the project list holds at most 100 projects
+run	status: two roadmap folders in one repository give one project with two roadmaps and one id; --roadmap is relative to the project root
+run	status: unregister removes only that entry, and works while the dashboard is off
+run	status: while the dashboard is off, a run from a repository subfolder writes nothing
+run	status: with no .git anywhere the folder itself is the project; a .git that is a file (worktree style) counts
+run	strict: collect keeps at most 10 names of the files that are not standard, and the count is the number of files
+run	strict: only standard roadmap files are drawn and counted; the others are named in one note, and a project with none has an empty state, no bar and a working estimate part
+run	strict: page: a missing field is not standard, more than 10 names, hostile names, not found, the title block and the estimate titles
+run	strict: the big-page logic counts only what is drawn
+run	strict: the rule is in the scripts: each change makes the scenarios fail
+run	supported versions is a rule, not a table of numbers
+run	survey.json has v 1, the schema keys, the commands with their sources, and equals what show prints
+run	sweep runner: a change whose text is not in the script makes the sweep reject
+run	sweep runner: a mutant that survives (its scenario passes) makes the sweep reject, with an assertion error naming the case
+run	sweep runner: a scenario that fails with something other than an assertion makes the sweep reject
+run	sweep runner: an empty list passes and runs nothing
+run	sweep runner: every case runs after a failure, and the first failure is the one thrown
+run	sweep runner: it returns the number of cases it ran, which is the number it was given, for any cap
+run	sweep runner: no more than the cap run at the same time
+run	sync --check: exits 1 when missing or stale and 0 after an install; it writes nothing
+run	sync --remove: removes only generated copies
+run	sync-personal: ps-dashboard gets every asset byte for byte, its page.mjs builds the page with the fonts and the policy, and its status.mjs rebuilds it
+run	sync-personal: ps-dashboard is installed byte for byte, ps-run reaches it, and its collect.mjs runs from the personal layout
+run	sync-personal: the onboard skill is installed as ps-onboard, no helper agent is installed, and the plan copy reaches the rewritten survey path
+run	sync-personal: the roadmap skill is installed as ps-roadmap and the sibling script path is rewritten
+run	sync: a marked ps-free-resources copy is pruned; unmarked and foreign-marked folders are left alone
+run	sync: a skill carrying another plugin's marker is also refused
+run	sync: an unmarked skills/free-resources is refused, not overwritten, and nothing else is written
+run	sync: installs free-resources with no prefix and its own marker, and keeps phased-shipping's ps- names
+run	sync: phased-shipping's history folder still points at <home>/phased-shipping
+run	task key: the command's first two words plus the folder name; --task overrides
+run	test-report: a parent test with subtests is a record too, after its children
+run	test-report: a test is one record with its file, name, status and time
+run	test-report: each test file has its own stack, so interleaved files keep their own paths
+run	test-report: events that are not about a test are ignored, and a line break in a name becomes a space
+run	test-report: skip and todo are skip, a failure is a record that is marked failed
+run	test-report: slowest sorts by time, longest first, and does not change its input
+run	test-report: suites add to the path but are not records, and siblings do not inherit each other's names
+run	test-report: the real runner (a real process) gives nested names, a skip and a failure as the reporter expects
+run	test-report: the reporter yields one JSON line per record, and readResults reads them back
+run	the 'first version kept' line is printed once by set, standardize --write and restore --write, whichever makes the .original
+run	the PHASES.md template has an optional Close steps section
+run	the README describes the guard, its cost and its limits, and no longer says a hook can't help
+run	the README lists what it touches and the four limits, and is at the new version
+run	the README table equals the table rendered from releases.json, with the gold name only on v1.4.0
+run	the Releases markers are intact, the table equals the one rendered from releases.json, and the drift check passes
+run	the Summary line must read 'Summary: text'
+run	the allowlist is enforced: only allowlisted files are opened, and no planted marker reaches any output or the saved survey
+run	the allowlist reasons name what IS allowed
+run	the banner follows the first in-progress release, and falls back when none is in progress
+run	the block has no HTML, no raw web address, one line per bullet, and at most 110 words
+run	the block: banner, heading, three one-line bullets newest first, then the history link
+run	the builder's output has no time-per-step line and carries the personal-data rule
+run	the byte order mark in the reader is written as an escape, not as an invisible character, and still works
+run	the cap is 50 records, the newest kept, and the file stays valid JSON
+run	the changelog has a 0.3.0 entry with Added, Changed and Fixed
+run	the changelog has a 0.4.0 entry above 0.3.0 that describes the guard honestly
+run	the checker has no file-editing tools, proposes commands and never runs them
+run	the checker runs the probe first when the brief has it, and it is never a check failure
+run	the command line: unknown commands and options are usage errors that read nothing
+run	the command that invokes a script follows the package manager: pnpm and yarn lockfiles change it, npm is the default
+run	the compatibility table has the five columns and the three tool rows, macOS is said to be untested, and the plugin READMEs agree
+run	the excerpt of a phase at preview is present, in a code fence, and labelled as abridged
+run	the feature pages listed in the script all exist
+run	the files are flushed before they are published or closed
+run	the first screen (tagline to the end of Quick start, without the generated What's new block) is 60 to 250 words
+run	the first three secret patterns are the ones in scripts/lint.mjs
+run	the four SVGs exist, are at most 12 KB and have a viewBox
+run	the fourth and older entries need no lines, and a heading with extra text is not an entry
+run	the generated What's new block is at most 110 words and sits between the tagline and The problem
+run	the generated pages match what the renderers produce
+run	the guard version matches the plugin version
+run	the headings are exactly the agreed list, in order, with their levels
+run	the hook scripts import only node: built-ins and their own files, and never write or reach the network
+run	the in-place publish removes its marker only when nothing is left at the final name; a name that was taken before gets no marker at all
+run	the key differs for two plan files with the same name in different folders
+run	the key ignores case and slash direction of the path
+run	the last check is its own safety net: with the file scan removed, a secret in a workflow name still stops the run
+run	the last check: a secret shape in a name that no file scan sees stops the run, saves nothing and prints nothing
+run	the link validator still accepts the repository's own blob and tree links
+run	the logo is the H1: a picture with a dark source and an image that has the project name as alt text
+run	the main session and unrelated agents are never restricted
+run	the main session never loads the rules: a missing rules file does not matter for it
+run	the manifest is deterministic and orders by type then order then slug
+run	the marker counts when it is the nearest non-blank line above the header, and not otherwise
+run	the marketplace files list free-resources
+run	the marketplace name is the project name in both marketplace files
+run	the message for a missing line says what to write and where
+run	the newest entry must be the plugin version
+run	the old required-field check still works
+run	the page versions follow plugin.json, and no page says the guard has not been seen firing
+run	the pages make no claim that drifts or that the plugins cannot keep
+run	the placeholder end check is what catches true-Xy7pq9Lm2: with it loosened to a word boundary the value passes
+run	the plan skill's env regex catches the override variables and no key variables
+run	the plugin hooks.json wires the guard to the right tools, with no onFailure
+run	the probe is denied for every role with the active message
+run	the real command line works end to end from the project folder
+run	the real docs/wiki passes every rule
+run	the real index, HEAD, refs and status are untouched, and the id after a commit equals the new HEAD tree
+run	the real phased-shipping hooks.json passes lint and is wired to the guard
+run	the real repo lints with no errors, including the plugin files
+run	the real repo passes lint and its manifest is current
+run	the real script, run as a process: deny output, allow output, exit codes and --agent
+run	the real script: id prints one line equal to HEAD^{tree}, and check with no record exits 1
+run	the recovery message names the cut-short copy: .original is compared and may be deleted too; any other marker names its own copy, not .original
+run	the release note claims provenance only when the workflow makes it
+run	the release table lists only releases that are shipped or in progress
+run	the repository's own latest commit passes, and its author name has no space
+run	the roadmap standard page is in the feature list, has the five feature headings, and is linked from Home and the sidebar
+run	the roadmap's temp file lives in the backup folder; nothing named .tmp is ever next to the roadmap, at any moment of set, standardize --write or restore --write
+run	the role comes from agent_type (plugin names only) or from --agent
+run	the root plugin name is the project name in both plugin files
+run	the root: .git is found from a subfolder, a folder outside any repository is its own root, --root wins, and nothing above the root is read
+run	the same section gives the same hash, whatever the line endings or trailing spaces
+run	the script imports only node: built-ins
+run	the script imports only node: built-ins and never calls require or a dynamic import
+run	the script imports only node: built-ins and writes only under --data
+run	the script imports only node: built-ins, reads no environment variable and uses no network or process API
+run	the script never writes anywhere but the roadmap file's own folder or its backup folder: every write call names a known path variable
+run	the script's writes are all inside the state folder: every write helper is called only on paths built from it
+run	the section ends at the next heading, and a heading inside a code fence doesn't count
+run	the social preview is a 1280 by 640 PNG of at most 1 MB
+run	the source runs git with an argument array and never a shell
+run	the state folder's .gitignore is a single line, *, and a real git repository shows nothing from it
+run	the survey runs nothing: commands found in the files are only recorded
+run	the temp folders made by this file are removed by the after hook
+run	the temp index is made in the OS temp folder and is gone after success and after a forced failure
+run	the tree PowerShell mode only reads: no write or stop verbs, and only the fixed read-only native calls
+run	there is no way to record a red result: record takes no status option and a stray option is refused
+run	there is one mode: --local-only is gone, no helper hand-off is printed, and the summary says what the assistant sees
+run	timings.ship_s is accepted, and stats shows the median ship seconds
+run	title block: real figures instead of Sheet 1 of 1: written (UTC), projects, roadmap, sessions, archived, source
+run	tokens.reviewer is accepted and counts in the agent tokens line
+run	trail: a first call writes none, a change of step or state appends, a repeat only moves updated
+run	trail: a rollback from prod-check to build and the same gate twice show as loops on the drawn page with their counts
+run	trail: entries of an existing file are validated with the step and state lists, and a run after done starts again
+run	trail: inside the 16 KB cap the oldest entries go first and the newest stays; too large even without any is refused
+run	trail: nothing is written while the dashboard is off
+run	trail: the newest 40 entries are kept
+run	trailing punctuation and spaces are trimmed before the ellipsis
+run	tree-state.mjs and commands-hash.mjs reached through a link to their folder still run and print
+run	two Summary lines or two Date lines are an error
+run	unreadable or invalid input allows when no role is known, with no output and exit 0
+run	unregister: a malformed session file of the removed project is neither read nor reported, and the page has no trace of it
+run	unregister: the command line (a real process) rebuilds the page
+run	unregister: while the dashboard is on the page is rebuilt without the project; off, nothing is built; disable leaves the page as it was
+run	usage errors exit 1 and write nothing
+run	verify: a failing inventory check fails the run even when every test passed
+run	verify: a failing lint stops the run before the manifest, the tests and the inventory
+run	verify: a failing manifest check stops the run before the tests
+run	verify: a test run that recorded no tests fails, whether node exited 0 or not, and is never read as zero tests passing
+run	verify: allTestFiles takes every tests/*.test.mjs, so a new test file is picked up by CI with no list to edit
+run	verify: failing tests exit 1, still print the slowest, and skip the inventory (a failed run is not a list of what ran)
+run	verify: npm run verify and npm run verify:fast call the script, and CI runs npm run verify and nothing less
+run	verify: the 10 slowest are listed longest first, with the file and a name cut at 100 characters
+run	verify: the README and the Speed wiki page tell contributors about npm run verify:fast
+run	verify: the fast run fails when a listed file is missing, listed twice, or not a test file path, and runs nothing
+run	verify: the fast run is lint, the manifest check and only the files in the fast list, with no inventory step
+run	verify: the full run is lint, the manifest check, every test file, then the inventory, in that order
+run	verify: the inventory check runs for every full invocation, whatever other arguments it is given, and for no fast one
+run	verify: the real fast list is valid, names the regression pack, and every file in it exists
+run	verify: the regression pack's count is printed so a reviewer can be told it passed
+run	verify: the slow files start first, every test file still runs once, and every name in the slow list is a real file
+run	verify: the steps are commands with argument arrays, never a shell string
+run	verify: the test step prints the spec report and writes the JSON records to a results file
+run	verify: the workflow check is not fooled by quoted keys, by a needs on the verify job, or by triggers that no longer fire on a push or a pull request
+run	verify: the workflow check sees an if or a continue-on-error on the verify step or its job, and passes a clean workflow
+run	verify: unknown options and a bad --test-concurrency are usage errors that run nothing
+run	verifyText and commandsSection follow the standard Markdown fence rules: a longer fence is not closed by a shorter one, the closing fence must use the same character, an unclosed fence gives null
+run	verifyText fails closed on a fence opener indented 1 to 3 spaces, and on a comment or an HTML block that starts a line outside a code block
+run	verifyText skips fenced lines, refuses two Full verify bullets or none with a command, and hashes the parallel groups and the fast set it points at
+run	verifyText takes the Full verify bullet with its indented lines, falls back to the Baseline line, and is null without either
+run	verifyText: an empty or blank backtick span is not a command, and any mention of fast points at the one Fast verify bullet
+run	versions must go down and dates must not go up, down the file
+run	what the README says each agent can use matches the agent files
+run	where a link cannot be made, the copy is written under its final name between a marker and its removal; no marker and no temp file remain
+run	whitespace is collapsed before the sentence is taken
+run	wikiUrl maps the repository to its wiki and refuses any other host, owner or repository
+run	with --agent, unreadable or wrong-shaped input and a bad role are denied (the role is known from the argument)
+run	with a known role, input the guard can't read is denied as a guard error
+run	write: LF and CRLF files both keep their line endings, and a file with no last newline gets one
+run	write: a second adopt after an --into append proposes nothing new, and the file keeps passing check
+run	write: fails closed (nothing written) when the backup cannot be made, and keeps .original
+run	write: it never overwrites a file: an existing name is refused, and --into appends after the existing text
+run	write: the backup folder is git-ignored by its own .gitignore and a second --into write keeps the first .original
+run	write: the changed-while-writing check stops it with exit 1 and leaves the other writer's text
+run	write: undecided files are written only with --set-status; the other rows still go ahead
+run	write: with no roadmap it creates PHASES.md, check passes, and a second adopt proposes nothing new

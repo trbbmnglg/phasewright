@@ -2,12 +2,12 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.10.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.11.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
 | `/phased-shipping:plan` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/plan/SKILL.md)) | Sizes the work as trivial (skip), small (one phase) or large (roadmap), then writes one detailed phase plan at a time. |
-| `/phased-shipping:run` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)) | Runs one phase: gates, a baseline, the build, checks against the baseline and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. |
+| `/phased-shipping:run` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)) | Runs one phase: gates, a baseline (reused from an earlier green full verify on the same tree when it can), the build, fast checks against the baseline, one full verify on the final tree and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. |
 | `/phased-shipping:roadmap` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/roadmap/SKILL.md)) | Checks a project's roadmap file against the roadmap format, standardizes an older roadmap into it, adopts existing plan files into a roadmap, or restores a kept copy. It writes only after you say yes, with copies kept first in `.roadmap-backups/`. See [Roadmap standard](Roadmap-standard). |
 | `/phased-shipping:onboard` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/onboard/SKILL.md)) | The first run in a project: lists the files it would read, reads nothing until you confirm, saves a survey of the project's commands, CI and conventions, and points to standardize, adopt or a fresh roadmap. See [Onboarding](Onboarding). |
 | `model-scout` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/model-scout.md)) | Combines which models you can use, current official guidance and how each model did in your phase history. |
@@ -57,6 +57,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.8.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:onboard` skill, the survey script, `adopt` and the real-world status forms in the roadmap reader. See [Onboarding](Onboarding). |
 | 0.9.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:dashboard` skill, opt-in status files that the run writes at each step, a local project list, and one merged JSON for a dashboard page. Off until you say yes. |
 | 0.10.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The dashboard page: projects, sessions and the loops back in a phase, one local file rebuilt at every step, no network. See [Dashboard](Dashboard). |
+| 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
 
 ## Limits
 

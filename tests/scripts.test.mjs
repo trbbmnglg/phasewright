@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, cpSync, readFileSync, rmSync } f
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { lintRepo, reportLines } from "../scripts/lint.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const run = (script, root, args = [], env = {}) =>
@@ -13,6 +14,17 @@ const run = (script, root, args = [], env = {}) =>
     encoding: "utf8",
     env: { ...process.env, LIBRARY_ROOT: root, LIBRARY_DENYLIST: join(root, "no-denylist.txt"), ...env },
   });
+
+// Lints a fixture in this process, with the library's own lint function: the same result and the same text as the command, with no
+// node process per case. The real command is run as a process in the tests that say so (the real repo, a clean fixture, a failing
+// fixture, and one hooks.json event), so the command line, its exit code and its output stay covered.
+// A fixture is not inside a git work tree, so by default git is replaced by what it does there (exit 128, "not a git repository"),
+// which makes lint walk the folder; { git: true } asks the real git, for the fixtures that are repositories.
+const notAGitRepo = () => { throw Object.assign(new Error("not a git repository"), { status: 128 }); };
+function lintIn(root, env = {}, { git = false } = {}) {
+  const result = lintRepo({ root, denyFile: env.LIBRARY_DENYLIST ?? join(root, "no-denylist.txt"), ...(git ? {} : { gitFiles: notAGitRepo }) });
+  return { status: result.errors.length ? 1 : 0, stdout: reportLines(result).join("\n") + "\n" };
+}
 
 const META = 'metadata:\n  title: "T"\n  tags: "a,b"\n  featured: "false"\n  order: "1"\n  version: "1.0.0"';
 const skill = (name, extra = "", desc = "Does a thing. Use when asked.") =>
@@ -55,7 +67,7 @@ test("bad names, long descriptions, emails and tokens each fail with a clear mes
     "skills/Bad_Skill/SKILL.md": skill("other-name", "contact me at someone" + "@company.com and ghp_" + "a".repeat(36), "x".repeat(1100)),
     "agents/claude/helper.md": agent("helper", "claude-opus-5-5"),
   });
-  const out = run("lint.mjs", root).stdout;
+  const out = run("lint.mjs", root).stdout; // a real process: the exit code and the text of a failing fixture
   assert.match(out, /must match the folder/);
   assert.match(out, /lowercase letters, digits and single hyphens/);
   assert.match(out, /description is 1100 characters/);
@@ -71,7 +83,7 @@ test("an unquoted colon in frontmatter fails (real YAML would drop every field)"
     "skills/colon/SKILL.md": skill("colon", "", "Use this skill. TRIGGER on: any request"),
     "agents/claude/helper.md": agent("helper"),
   });
-  const r = run("lint.mjs", root);
+  const r = lintIn(root);
   assert.match(r.stdout, /unquoted ": "/);
   assert.equal(r.status, 1);
   rmSync(root, { recursive: true });
@@ -82,7 +94,7 @@ test("a quoted description with escaped quotes passes and round-trips", () => {
     "skills/quoted/SKILL.md": skill("quoted", "", '"Say \\"go\\" and it: works."'),
     "agents/claude/helper.md": agent("helper"),
   });
-  assert.equal(run("lint.mjs", root).status, 0);
+  assert.equal(lintIn(root).status, 0);
   assert.equal(run("build-manifest.mjs", root).status, 0);
   const items = JSON.parse(readFileSync(join(root, "library.json"), "utf8")).items;
   assert.equal(items.find((i) => i.slug === "quoted").description, 'Say "go" and it: works.');
@@ -94,12 +106,12 @@ test("a broken relative link fails, but a link inside a code block does not", ()
     "skills/s/SKILL.md": skill("s", "```\n[x](./nope.md)\n```"),
     "agents/claude/helper.md": agent("helper"),
   });
-  assert.equal(run("lint.mjs", ok).status, 0);
+  assert.equal(lintIn(ok).status, 0);
   const bad = fixture({
     "skills/s/SKILL.md": skill("s", "See [guide](references/guide.md)."),
     "agents/claude/helper.md": agent("helper"),
   });
-  assert.match(run("lint.mjs", bad).stdout, /broken link: references\/guide\.md/);
+  assert.match(lintIn(bad).stdout, /broken link: references\/guide\.md/);
   rmSync(ok, { recursive: true });
   rmSync(bad, { recursive: true });
 });
@@ -111,7 +123,7 @@ test("a term from the local denylist fails, including mixed case", () => {
   });
   const list = join(root, "denylist.txt");
   writeFileSync(list, "acmecorp\n");
-  const r = run("lint.mjs", root, [], { LIBRARY_DENYLIST: list });
+  const r = lintIn(root, { LIBRARY_DENYLIST: list });
   assert.match(r.stdout, /internal term from the local denylist found: "acmecorp"/);
   assert.equal(r.status, 1);
   rmSync(root, { recursive: true });
@@ -122,7 +134,7 @@ test("an agent file with a bad name fails the name rule", () => {
     "skills/s/SKILL.md": skill("s"),
     "agents/claude/Bad_Agent.md": agent("Bad_Agent"),
   });
-  const r = run("lint.mjs", root);
+  const r = lintIn(root);
   assert.match(r.stdout, /agents\/claude\/Bad_Agent\.md: file name must be lowercase letters, digits and single hyphens/);
   assert.equal(r.status, 1);
   rmSync(root, { recursive: true });
@@ -134,7 +146,7 @@ test("an email with a multi-label domain is reported in full", () => {
     "skills/s/SKILL.md": skill("s", `Write to ${email} please.`),
     "agents/claude/helper.md": agent("helper"),
   });
-  const r = run("lint.mjs", root);
+  const r = lintIn(root);
   assert.ok(r.stdout.includes(`email address found: "${email}"`), r.stdout);
   rmSync(root, { recursive: true });
 });
@@ -150,12 +162,12 @@ test("denylist terms match whole words only", () => {
     "skills/s/SKILL.md": skill("s", "Run the zorkify step."),
     "agents/claude/helper.md": agent("helper"),
   });
-  assert.equal(run("lint.mjs", ok, [], { LIBRARY_DENYLIST: list(ok) }).status, 0);
+  assert.equal(lintIn(ok, { LIBRARY_DENYLIST: list(ok) }).status, 0);
   const bad = fixture({
     "skills/s/SKILL.md": skill("s", "Ask the ZORK team."),
     "agents/claude/helper.md": agent("helper"),
   });
-  const r = run("lint.mjs", bad, [], { LIBRARY_DENYLIST: list(bad) });
+  const r = lintIn(bad, { LIBRARY_DENYLIST: list(bad) });
   assert.match(r.stdout, /internal term from the local denylist found: "zork"/);
   assert.equal(r.status, 1);
   rmSync(ok, { recursive: true });
@@ -169,14 +181,14 @@ test("key patterns need a left word boundary: slugs like risk-deadlines pass, a 
     "skills/s/SKILL.md": skill("s", `See risk-deadlines-and-other-key-changes and task-${"AKIA" + "A".repeat(16)} and my_${"ghp_" + "a".repeat(36)}.`),
     "agents/claude/helper.md": agent("helper"),
   });
-  const okRun = run("lint.mjs", ok);
+  const okRun = lintIn(ok);
   assert.equal(okRun.status, 0, okRun.stdout);
   for (const key of ["sk-" + "a".repeat(20), "ghp_" + "a".repeat(36), "AKIA" + "A".repeat(16), "xoxb-" + "1".repeat(12)]) {
     const bad = fixture({
       "skills/s/SKILL.md": skill("s", `token=${key} here`),
       "agents/claude/helper.md": agent("helper"),
     });
-    const r = run("lint.mjs", bad);
+    const r = lintIn(bad);
     assert.match(r.stdout, /API key or token found/, key);
     assert.equal(r.status, 1);
     rmSync(bad, { recursive: true });
@@ -197,7 +209,7 @@ const withPlugin = (files) => fixture({
 });
 // Lints a fixture and removes it. Returns { out, status }.
 function lintOf(root) {
-  const r = run("lint.mjs", root);
+  const r = lintIn(root);
   rmSync(root, { recursive: true, force: true });
   return { out: r.stdout, status: r.status };
 }
@@ -353,19 +365,19 @@ test("in a git repo only the published tree is scanned; outside git the full wal
   const repo = fixture(files);
   git(repo, "init", "-q");
   git(repo, "add", ".gitignore", "skills", "agents");
-  const clean = run("lint.mjs", repo);
+  const clean = lintIn(repo, {}, { git: true });
   assert.equal(clean.status, 0, clean.stdout);
   // A tracked file and an untracked, not-ignored file are both scanned.
   writeFileSync(join(repo, "untracked.md"), `key ${key}\n`);
-  const untracked = run("lint.mjs", repo);
+  const untracked = lintIn(repo, {}, { git: true });
   assert.match(untracked.stdout, /untracked\.md: API key or token found/);
   rmSync(join(repo, "untracked.md"));
   writeFileSync(join(repo, "tracked.md"), `key ${key}\n`);
   git(repo, "add", "tracked.md");
-  assert.match(run("lint.mjs", repo).stdout, /tracked\.md: API key or token found/);
+  assert.match(lintIn(repo, {}, { git: true }).stdout, /tracked\.md: API key or token found/);
   // Non-git folder: the old full walk applies, so the same ignored folder is scanned.
   const plain = fixture(files);
-  const walk = run("lint.mjs", plain);
+  const walk = lintIn(plain);
   assert.match(walk.stdout, /\.plans\/notes\.md: API key or token found/);
   assert.equal(walk.status, 1);
   rmSync(repo, { recursive: true, force: true });
@@ -459,6 +471,12 @@ test("hooks.json: every one of the 33 official events passes, and near misses fa
     assert.equal(r.status, 1, event);
     assert.match(r.out, new RegExp(`unknown hook event "${event}"`));
   }
+  // The one real-process smoke of this test: the command itself, run on a fixture with a near miss.
+  const root = withPlugin({ "plugins/plug/hooks/hooks.json": hooksJson(GOOD_COMMAND, "PreToolUsage") });
+  const real = run("lint.mjs", root);
+  rmSync(root, { recursive: true, force: true });
+  assert.equal(real.status, 1);
+  assert.match(real.stdout, /unknown hook event "PreToolUsage"/);
 });
 
 test("hooks.json: scripts must be reached through CLAUDE_PLUGIN_ROOT", () => {
@@ -484,7 +502,9 @@ test("the real phased-shipping hooks.json passes lint and is wired to the guard"
   const file = join(REPO, "plugins", "phased-shipping", "hooks", "hooks.json");
   const cfg = JSON.parse(readFileSync(file, "utf8"));
   assert.match(cfg.hooks.PreToolUse[0].hooks[0].command, /^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/guard\.mjs"$/);
-  const lint = spawnSync(process.execPath, [join(REPO, "scripts", "lint.mjs")], { encoding: "utf8" });
-  assert.equal(lint.status, 0, lint.stdout);
-  assert.doesNotMatch(lint.stdout, /hooks\.json/);
+  // The real repository, linted in this process (the real command is run on it in the first test of this file).
+  const result = lintRepo();
+  const text = reportLines(result).join("\n");
+  assert.equal(result.errors.length, 0, text);
+  assert.doesNotMatch(text, /hooks\.json/);
 });

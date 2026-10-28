@@ -6,16 +6,18 @@
 // temp folder is removed afterwards, and nothing is written to the real data folder. Files the guard protects by name
 // (a roadmap file, a plan file) are created by the test at run time; control, format and bidirectional characters
 // are built with String.fromCodePoint, never stored.
+// The helpers it shares with tests/regression-pack.test.mjs are in tests/helpers/dashboard.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync, symlinkSync, linkSync, renameSync, cpSync, statSync, lstatSync, openSync, fstatSync, readSync, closeSync } from "node:fs";
-import { tmpdir, homedir } from "node:os";
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync, realpathSync, symlinkSync, linkSync, renameSync, cpSync, statSync, lstatSync, openSync, fstatSync, readSync, closeSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, dirname, relative, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { main as status } from "../plugins/phased-shipping/skills/dashboard/scripts/status.mjs";
 import { main as collect } from "../plugins/phased-shipping/skills/dashboard/scripts/collect.mjs";
+import { WIN, NOW, cp, RM, PLANS, tmp, put, read, readJson, listing, snapshot, world, st, col, enable, setStatus, register, sessionFiles, idFor, row, roadmap, planText, noPath, seeded, phaseRows, BS, shipped, repoWorld } from "./helpers/dashboard.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..");
@@ -23,116 +25,13 @@ const PS = join(REPO, "plugins", "phased-shipping");
 const SCRIPTS = join(PS, "skills", "dashboard", "scripts");
 const STATUS_SRC = readFileSync(join(SCRIPTS, "status.mjs"), "utf8");
 const COLLECT_SRC = readFileSync(join(SCRIPTS, "collect.mjs"), "utf8");
-const WIN = process.platform === "win32";
 const MIN = 60000;
-const NOW = Date.UTC(2026, 9, 27, 10, 0, 0);
-const cp = (n) => String.fromCodePoint(n);
-// Names the guard protects are assembled here, so no such name is stored in this file.
-const RM = ["PH", "ASES.md"].join("");
-const PLANS = ["pha", "ses"].join("");
-
-const scratch = [];
-const tmp = (label = "w") => { const d = mkdtempSync(join(tmpdir(), `roadmap-test-dash-${label}-`)); scratch.push(d); return d; };
-test.after(() => { for (const d of scratch) rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); });
-
-const put = (root, rel, data) => {
-  const p = join(root, ...rel.split("/"));
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, data);
-  return p;
-};
-const read = (root, rel) => readFileSync(join(root, ...rel.split("/")), "utf8");
-const readJson = (root, rel) => JSON.parse(read(root, rel));
-function listing(dir, base = dir) {
-  const names = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    names.push(relative(base, p).split(/[\\/]/).join("/"));
-    if (e.isDirectory()) names.push(...listing(p, base));
-  }
-  return names.sort();
-}
-// Names and contents of everything under dir, or "(absent)": equal snapshots mean nothing was written.
-const snapshot = (dir) => (existsSync(dir)
-  ? listing(dir).map((f) => `${f}:${lstatSync(join(dir, f)).isFile() ? readFileSync(join(dir, f), "utf8") : "[dir]"}`).join("\n")
-  : "(absent)");
-
-// A world: a base folder, a data folder path (not created yet) and a way to make project folders.
-function world(label) {
-  const base = tmp(label);
-  const data = join(base, "data");
-  const proj = (name = "zork") => { const p = join(base, name); mkdirSync(p, { recursive: true }); return p; };
-  return { base, data, proj };
-}
-
-function st(argv, o = {}) {
-  const out = [];
-  const err = [];
-  const code = status(argv, { out: (s) => out.push(s), err: (s) => err.push(s), now: () => NOW, ...o });
-  return { code, out: out.join("\n"), err: err.join("\n"), all: [...out, ...err].join("\n") };
-}
-async function col(argv, o = {}) {
-  const out = [];
-  const err = [];
-  const reads = [];
-  const code = await collect(argv, {
-    out: (s) => out.push(s),
-    err: (s) => err.push(s),
-    now: () => NOW,
-    fd: { open: (p, flags) => { reads.push(p); return openSync(p, flags); } },
-    ...o,
-  });
-  const text = out.join("\n");
-  return { code, out: text, err: err.join("\n"), reads, json: () => JSON.parse(text) };
-}
-const enable = (w) => { const r = st(["enable", "--data", w.data]); assert.equal(r.code, 0, r.err); };
-const setStatus = (w, root, phase, step, state, extra = [], o = {}) => st(["set", "--data", w.data, "--root", root, "--phase", phase, "--step", step, "--state", state, ...extra], o);
-const register = (w, root, extra = []) => st(["register", "--data", w.data, "--root", root, ...extra]);
-const sessionFiles = (w) => (existsSync(join(w.data, "sessions")) ? readdirSync(join(w.data, "sessions")).sort() : []);
-const idFor = (w, root) => { const m = register(w, root).out.match(/id ([0-9a-f]{12})/); assert.ok(m); return m[1]; };
 // The session file name `set` writes for a phase in a roadmap: <id>-<6 hex of the SHA-256 of the roadmap path>+<phase in lower case>.json.
 // The path is lower-cased for the tag only where the file system ignores letter case (Windows, macOS), as the scripts do by default.
 const FOLDS = process.platform === "win32" || process.platform === "darwin";
 const tagFor = (roadmapPath, folds = FOLDS) => createHash("sha256").update(folds ? roadmapPath.toLowerCase() : roadmapPath).digest("hex").slice(0, 6);
 const sname = (id, phase, roadmapPath = RM, folds = FOLDS) => `${id}-${tagFor(roadmapPath, folds)}+${phase.toLowerCase()}.json`;
-
-const HEAD = "| # | Phase | Status | Kind | Priority | Urgency | Est. (raw \u2192 cal.) | Actual | Commit / deploy | Blocked by | Plan file | Note |";
-const row = (id, title, status, plan = "", note = "") => `| ${id} | ${title} | ${status} | backend | P1 | Soon | 2h \u2192 1.5h | | | | ${plan} | ${note} |`;
-const roadmap = (rows) => ["<!-- phased-shipping:roadmap v1 -->", HEAD, `|${"---|".repeat(12)}`, ...rows].join("\n") + "\n";
-const planText = (id, title, started = "2026-10-01T10:00:00Z") => `# Phase ${id}: ${title}\n**Timestamps:** started ${started} \u00b7 previewed 2026-10-01T12:00:00Z \u00b7 approved <ISO> \u00b7 shipped <ISO>\n`;
 const CANARY = "CANARY_OUTSIDE_TEXT";
-
-// Everything that identifies this machine's temp area, in the spellings a path could take in text.
-function pathForms(w) {
-  const raw = [tmpdir(), realpathSync.native(tmpdir()), w.base, realpathSync.native(w.base), homedir()];
-  const forms = new Set();
-  for (const p of raw) {
-    forms.add(p.toLowerCase());
-    forms.add(p.toLowerCase().split("\\").join("/"));
-    forms.add(JSON.stringify(p).slice(1, -1).toLowerCase());
-  }
-  forms.add("roadmap-test-dash-");
-  return [...forms];
-}
-const noPath = (w, text, what) => {
-  const t = text.toLowerCase();
-  for (const f of pathForms(w)) assert.ok(!t.includes(f), `${what}: found a path (${f.slice(0, 20)}...)`);
-};
-
-// ── status.mjs: off by default ──────────────────────────────────────────────
-test("status: a fresh data folder is off: state and set write nothing, and set exits 0", () => {
-  const w = world("off");
-  const p = w.proj();
-  const s = st(["state", "--data", w.data]);
-  assert.equal(s.code, 0, s.err);
-  assert.ok(s.out.includes("dashboard: off") && s.out.includes("asked: no"));
-  const r = setStatus(w, p, "1", "build", "working", ["--label", "zork"]);
-  assert.equal(r.code, 0, r.err);
-  assert.ok(r.out.includes("dashboard is off; nothing written"));
-  for (const argv of [["clear", "--data", w.data, "--root", p, "--phase", "1"], ["list", "--data", w.data]]) assert.equal(st(argv).code, 0);
-  assert.ok(!existsSync(w.data), "no data folder was created");
-});
-
 test("status: enable then set writes the session file and registers the project with its label", () => {
   const w = world("on");
   const p = w.proj("zork");
@@ -153,7 +52,6 @@ test("status: enable then set writes the session file and registers the project 
   assert.deepEqual(s, { v: 1, project: e.id, roadmap: RM, phase: "7d2", phase_name: "Zork thing", step: "build", state: "working", step_started: NOW, updated: NOW });
   assert.equal(readJson(w.data, "dashboard.json").enabled, true);
 });
-
 test("status: set keeps step_started within a step and moves it when the step changes", () => {
   const w = world("steps");
   const p = w.proj();
@@ -167,22 +65,6 @@ test("status: set keeps step_started within a step and moves it when the step ch
   setStatus(w, p, "1", "compare", "working", [], { now: () => NOW + 9000 });
   assert.equal(f().step_started, NOW + 9000);
 });
-
-test("status: disable then set writes nothing, and a session file already there is untouched", () => {
-  const w = world("disable");
-  const p = w.proj();
-  enable(w);
-  setStatus(w, p, "1", "build", "working");
-  assert.equal(st(["disable", "--data", w.data]).code, 0);
-  const before = snapshot(w.data);
-  const r = setStatus(w, p, "1", "ship", "working", ["--label", "other"], { now: () => NOW + 1000 });
-  assert.equal(r.code, 0);
-  assert.ok(r.out.includes("dashboard is off; nothing written"));
-  assert.equal(st(["clear", "--data", w.data, "--root", p, "--phase", "1"]).code, 0);
-  assert.equal(snapshot(w.data), before);
-  assert.ok(st(["state", "--data", w.data]).out.includes("dashboard: off"));
-});
-
 test("status: asked records the question without turning the dashboard on", () => {
   const w = world("asked");
   const p = w.proj();
@@ -196,7 +78,6 @@ test("status: asked records the question without turning the dashboard on", () =
   assert.ok(setStatus(w, p, "1", "build", "working").out.includes("nothing written"));
   assert.deepEqual(listing(w.data), ["dashboard.json"]);
 });
-
 test("status: an explicit register while off exits 1 and writes nothing, even after asked", () => {
   const w = world("regoff");
   const p = w.proj();
@@ -209,7 +90,6 @@ test("status: an explicit register while off exits 1 and writes nothing, even af
   assert.equal(register(w, p).code, 1);
   assert.equal(snapshot(w.data), before);
 });
-
 test("status: unregister removes only that entry, and works while the dashboard is off", () => {
   const w = world("unreg");
   const a = w.proj("zork");
@@ -240,7 +120,6 @@ test("status: unregister removes only that entry, and works while the dashboard 
   assert.equal(st(["unregister", idb, "--data", fresh.data]).code, 1);
   assert.ok(!existsSync(fresh.data));
 });
-
 test("status: ids are stable for the same folder, differ for two folders, and ignore letter case on Windows", () => {
   const w = world("ids");
   const a = w.proj("zork");
@@ -261,7 +140,6 @@ test("status: ids are stable for the same folder, differ for two folders, and ig
     assert.equal(readJson(w.data, "projects.json").projects.length, 2);
   }
 });
-
 test("status: a bad phase id, step or state is refused with exit 2 and nothing is written", () => {
   const w = world("bad");
   const p = w.proj();
@@ -279,7 +157,6 @@ test("status: a bad phase id, step or state is refused with exit 2 and nothing i
   assert.equal(snapshot(w.base), outside, "nothing was written anywhere else");
   assert.equal(setStatus(w, p, "1.0_a-b", "prod-check", "done").code, 0, "a plain id is accepted");
 });
-
 test("status: arguments are checked: unknown option, a missing --data, a repeated single option, a missing folder", () => {
   const w = world("args");
   const p = w.proj();
@@ -301,30 +178,6 @@ test("status: arguments are checked: unknown option, a missing --data, a repeate
   assert.equal(st(["register", "--data", w.data, "--root", p, "--roadmap", "docs\\plan.md"]).code, 0, "a Windows-style relative path is normalised");
   assert.deepEqual(readJson(w.data, "projects.json").projects[0].roadmaps, [RM, "docs/plan.md"]);
 });
-
-test("status: text fields are cleaned of control, bidirectional, zero-width, tag and format characters, and capped", () => {
-  const w = world("clean");
-  const p = w.proj();
-  enable(w);
-  const hostile = ["a", cp(0x1b), "[31m", cp(0x202e), "b", cp(0x200b), "c", cp(0xe0041), "d", cp(0x0a), "e", cp(0xad), cp(0x61c), cp(0x2066), "f"].join("");
-  const r = setStatus(w, p, "1", "build", "working", ["--name", hostile, "--label", hostile]);
-  assert.equal(r.code, 0, r.err);
-  const s = readJson(w.data, `sessions/${sessionFiles(w)[0]}`);
-  assert.equal(s.phase_name, "a [31m b c d e f");
-  assert.equal(readJson(w.data, "projects.json").projects[0].labels[0], "a [31m b c d e f");
-  assert.ok(!/[\p{Cc}\p{Cf}]/u.test(read(w.data, "projects.json").replace(/\r?\n/g, "")), "no control or format character reached the file");
-  setStatus(w, p, "2", "build", "working", ["--name", "x".repeat(500)]);
-  assert.equal(readJson(w.data, `sessions/${sessionFiles(w)[1]}`).phase_name.length, 200);
-  const odd = join(w.base, `z${cp(0x202e)}ork${cp(0x200b)}`);
-  let made = true;
-  try { mkdirSync(odd); } catch { made = false; }
-  if (made) {
-    const id = idFor(w, odd);
-    const e = readJson(w.data, "projects.json").projects.find((x) => x.id === id);
-    assert.ok(!/[\p{Cc}\p{Cf}]/u.test(e.name), "a folder name with format characters is cleaned");
-  }
-});
-
 test("status: a session file over 16 KB is never written and the old one stays whole", () => {
   const w = world("big");
   const p = w.proj();
@@ -356,7 +209,6 @@ test("status: a data folder that is a link, or a folder where a file belongs, fa
   assert.equal(setStatus(w, p, "1", "build", "working").code, 1);
   assert.deepEqual(readdirSync(target), [], "nothing was written through the link");
 });
-
 test("status: a file in the data folder that is a link, a hard link or a folder fails closed", (t) => {
   const w = world("filelinks");
   const p = w.proj();
@@ -399,7 +251,6 @@ test("status: a file in the data folder that is a link, a hard link or a folder 
   }
   if (!hard && !sym) t.diagnostic("this machine cannot create file links; only the folder cases ran");
 });
-
 test("status: a project list or settings file edited into a bad shape stops the command and is left as it is", () => {
   const w = world("hand");
   const p = w.proj();
@@ -438,7 +289,6 @@ test("status: an injected rename failure leaves the old files whole and no temp 
   assert.equal(snapshot(w.data), before, "the files are whole and no temp file is left");
   assert.equal(readJson(w.data, "dashboard.json").enabled, true);
 });
-
 test("status: on Windows a rename refused for a moment is retried; elsewhere it is not", () => {
   const w = world("retry");
   enable(w);
@@ -456,7 +306,6 @@ test("status: on Windows a rename refused for a moment is retried; elsewhere it 
   }
   assert.ok(!listing(w.data).some((n) => n.includes(".tmp-")));
 });
-
 test("status: the project list holds at most 100 projects", () => {
   const w = world("cap");
   enable(w);
@@ -469,40 +318,6 @@ test("status: the project list holds at most 100 projects", () => {
   assert.equal(readJson(w.data, "projects.json").projects.length, 100);
   assert.deepEqual(sessionFiles(w), [], "no session file was written for the project that did not fit");
 });
-
-test("status: list prints no absolute path unless --paths, and clear removes one session file", () => {
-  const w = world("list");
-  const p = w.proj("zork");
-  enable(w);
-  setStatus(w, p, "1", "build", "working", ["--label", "zork-app"]);
-  setStatus(w, p, "2", "build", "working");
-  const plain = st(["list", "--data", w.data]);
-  assert.equal(plain.code, 0);
-  assert.ok(plain.out.includes("zork") && plain.out.includes("zork-app") && plain.out.includes(RM));
-  noPath(w, plain.all, "list");
-  const paths = st(["list", "--data", w.data, "--paths"]);
-  assert.ok(paths.out.toLowerCase().includes(realpathSync.native(p).toLowerCase()));
-  const c = st(["clear", "--data", w.data, "--root", p, "--phase", "1"]);
-  assert.equal(c.code, 0);
-  assert.equal(sessionFiles(w).length, 1);
-  assert.ok(st(["clear", "--data", w.data, "--root", p, "--phase", "1"]).out.includes("no status file"));
-  noPath(w, [st(["state", "--data", w.data]).all, c.all].join("\n"), "state and clear");
-});
-
-// ── collect.mjs ─────────────────────────────────────────────────────────────
-// One project with a roadmap of two rows and a plan file for the first.
-function seeded(label, { rows, files } = {}) {
-  const w = world(label);
-  const p = w.proj("zork");
-  put(p, RM, roadmap(rows ?? [row("1", "Zork thing", "shipped", `${PLANS}/phase-1.md`), row("2", "Next thing", "planned")]));
-  put(p, `${PLANS}/phase-1.md`, planText("1", "Zork thing"));
-  for (const [rel, data] of Object.entries(files ?? {})) put(p, rel, data);
-  enable(w);
-  assert.equal(register(w, p, ["--label", "zork-app"]).code, 0);
-  return { w, p };
-}
-const phaseRows = (json, at = 0) => json.projects[at].roadmaps[0].phases;
-
 test("collect: a roadmap and its plan files merge into the schema, with the plan timestamps", async () => {
   const { w } = seeded("merge");
   const r = await col(["--data", w.data]);
@@ -533,7 +348,6 @@ test("collect: a roadmap and its plan files merge into the schema, with the plan
   assert.deepEqual([j.sessions, j.warnings, j.errors], [[], [], []]);
   noPath(w, r.out, "output");
 });
-
 test("collect: a project folder that moved shows not found, stays listed and is never removed from the list", async () => {
   const { w, p } = seeded("moved");
   const before = read(w.data, "projects.json");
@@ -552,7 +366,6 @@ test("collect: a project folder that moved shows not found, stays listed and is 
   writeFileSync(join(w.data, "projects.json"), JSON.stringify(reg));
   assert.equal((await col(["--data", w.data])).json().projects[0].status, "not found");
 });
-
 test("collect: a plan file outside the project is skipped by base name and never read (dot-dot, a link, a junction, a hard link)", async (t) => {
   const outside = tmp("outside");
   put(outside, "outside.md", `${planText("9", "Outside")}${CANARY}\n`);
@@ -582,7 +395,6 @@ test("collect: a plan file outside the project is skipped by base name and never
   assert.equal(rows[5].timestamps.started, "2026-10-01T10:00:00Z", "the rest of the project still loads");
   if (!made.length) t.diagnostic("this machine cannot create links; only the dot-dot and absolute cases ran");
 });
-
 test("collect: a roadmap file that is a hard link or a link, or is listed with a bad path, is skipped and never read", async () => {
   const outside = tmp("outside-rm");
   put(outside, "other.md", roadmap([row("1", CANARY, "planned")]));
@@ -611,7 +423,6 @@ test("collect: a roadmap file that is a hard link or a link, or is listed with a
   assert.ok(!ok.reads.some((p) => /escape\.md$/.test(p)), "a roadmap path that leaves the project was never opened");
   for (const read of ok.reads) assert.ok(!read.toLowerCase().startsWith(realpathSync.native(outside).toLowerCase()), `read outside: ${read}`);
 });
-
 test("collect: a file over 256 KB is skipped and never read", async () => {
   const big = `${planText("2", "Big")}${"x".repeat(300 * 1024)}\n`;
   const { w } = seeded("large", {
@@ -628,7 +439,6 @@ test("collect: a file over 256 KB is skipped and never read", async () => {
   assert.ok(!r.reads.some((p) => /phase-2\.md$|BIG\.md$/.test(p)), "the oversized files were not read");
   assert.equal(proj.roadmaps.length, 1);
 });
-
 test("collect: a run reads a bounded number of bytes in all, and says which files it skipped", async () => {
   const files = {};
   const rows = [];
@@ -642,7 +452,6 @@ test("collect: a run reads a bounded number of bytes in all, and says which file
   assert.ok(r.reads.filter((p) => /phase-\d\.md$/.test(p)).length < 4, "not every file was read");
   assert.ok(COLLECT_SRC.includes("MAX_TOTAL_READ = 64 * 1024 * 1024"));
 });
-
 test("collect: history joins only the labels stored with the project, never the folder name", async () => {
   const { w } = seeded("history");
   const other = w.proj("acmecorp");
@@ -698,7 +507,6 @@ test("collect: session states at 89, 90, 179 and 180 minutes (noUpdate and Idle 
   assert.equal(custom.json().sessions.find((s) => s.phase === "1").noUpdate, true);
   assert.equal((await col(["--data", w.data, "--now", String(NOW + 20 * MIN)])).json().sessions.find((s) => s.phase === "1").shown, "Idle");
 });
-
 test("collect: two open sessions in one project give the warning; a done or idle one, or another project, does not", async () => {
   const { w, p } = seeded("warn");
   const other = w.proj("acmecorp");
@@ -716,33 +524,6 @@ test("collect: two open sessions in one project give the warning; a done or idle
   assert.equal((await col(["--data", w.data])).json().warnings.length, 1);
   assert.deepEqual((await col(["--data", w.data, "--now", String(NOW + 200 * MIN)])).json().warnings, [], "idle sessions are not open");
 });
-
-test("collect: a bad session file is skipped and reported by base name only, and its contents never reach the output", async () => {
-  const { w, p } = seeded("badsess");
-  setStatus(w, p, "1", "build", "working");
-  const id = readJson(w.data, "projects.json").projects[0].id;
-  const good = { v: 1, project: id, phase: "x", phase_name: "n", step: "build", state: "working", step_started: NOW, updated: NOW };
-  const sdir = join(w.data, "sessions");
-  const bad = {
-    [`${id}-json.json`]: `{ "oops": "MARK_JSON" `,
-    [`${id}-types.json`]: JSON.stringify({ ...good, phase: "types", phase_name: 5, note: "MARK_TYPES" }),
-    [`${id}-step.json`]: JSON.stringify({ ...good, phase: "step", step: "MARK_STEP" }),
-    [`${id}-state.json`]: JSON.stringify({ ...good, phase: "state", state: "MARK_STATE" }),
-    [`${id}-time.json`]: JSON.stringify({ ...good, phase: "time", updated: "MARK_TIME" }),
-    [`${id}-name.json`]: JSON.stringify({ ...good, phase: "other", note: "MARK_NAME" }),
-    [`${id}-huge.json`]: JSON.stringify({ ...good, phase: "huge", phase_name: "MARK_HUGE".repeat(3000) }),
-    "notasession.json": "MARK_NAME_FILE",
-  };
-  for (const [name, data] of Object.entries(bad)) writeFileSync(join(sdir, name), data);
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  const j = r.json();
-  assert.deepEqual(j.sessions.map((s) => s.phase), ["1"], "only the good session is shown");
-  assert.deepEqual(j.errors.map((e) => e.file).sort(), [`${id}-huge.json`, `${id}-json.json`, `${id}-name.json`, `${id}-state.json`, `${id}-step.json`, `${id}-time.json`, `${id}-types.json`, "notasession.json"].sort());
-  assert.ok(!/MARK_/.test(r.out), "no content of a bad file is in the output");
-  assert.ok(j.errors.every((e) => Object.keys(e).join() === "file,reason"));
-});
-
 test("collect: a session of a project that is not on the list is not shown", async () => {
   const { w, p } = seeded("orphan");
   setStatus(w, p, "1", "build", "working");
@@ -751,41 +532,6 @@ test("collect: a session of a project that is not on the list is not shown", asy
   const r = await col(["--data", w.data]);
   assert.deepEqual([r.json().projects, r.json().sessions], [[], []]);
 });
-
-// ── collect.mjs: hostile input, caps, no absolute path ──────────────────────
-test("collect: hostile roadmap text cannot inject control characters or grow without limit", async () => {
-  const evil = ["a", cp(0x1b), "[2J", cp(0x202e), "b", cp(0x200b), cp(0xe0041), cp(0x0d), "c"].join("");
-  const { w } = seeded("hostile", { rows: [row("1", evil, "planned"), row("2", "t".repeat(5000), "planned"), row("3", "Plan", "planned", `${PLANS}/${cp(0x1b)}x.md`), row("4", "Url", "planned", "https://example.invalid/x.md"), row("5", "Colon", "planned", `${PLANS}/a:b.md`)] });
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  const rows = phaseRows(r.json());
-  assert.equal(rows[0].phase, "a [2J b c");
-  assert.equal(rows[1].phase.length, 200);
-  assert.ok(!/[\p{Cc}\p{Cf}]/u.test(r.out.replace(/\n/g, "")), "no control or format character is in the output");
-  assert.ok(r.json().projects[0].errors.some((e) => /not a usable plan file path/.test(e.reason)));
-});
-
-test("collect: the output holds no absolute path, and a project path that appears in a title is removed", async () => {
-  const w = world("nopath");
-  const p = w.proj("zork");
-  const real = realpathSync.native(p);
-  put(p, RM, roadmap([row("1", `see ${real} now`, "planned", "../outside.md"), row("2", `and ${real.split("\\").join("/")} too`, "planned")]));
-  enable(w);
-  setStatus(w, p, "1", "build", "working", ["--name", `at ${real}`]);
-  put(w.data, "sessions/notasession.json", real);
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  JSON.parse(r.out);
-  noPath(w, r.out, "collect output");
-  assert.ok(r.out.includes("[path]"), "the path in a title was removed");
-  noPath(w, r.err, "collect errors");
-  // the failure messages name no path either
-  const bad = await col(["--data", join(w.base, "gone", "deeper")]);
-  noPath(w, bad.err + bad.out, "an absent data folder");
-  const usage = await col(["--out"]);
-  noPath(w, usage.err, "usage");
-});
-
 test("collect: more than 100 session files are capped, and the output stays under 2 MB with many large roadmaps", async () => {
   const w = world("caps");
   enable(w);
@@ -820,7 +566,6 @@ test("collect: more than 100 session files are capped, and the output stays unde
   assert.equal((await col(["--data", w.data])).code, 1);
   assert.ok(STATUS_SRC.includes("MAX_PROJECTS = 100") && COLLECT_SRC.includes("MAX_SESSIONS = 100") && COLLECT_SRC.includes("MAX_OUT_BYTES = 2 * 1024 * 1024"));
 });
-
 test("collect: --out writes atomically; a failed rename leaves the old file whole; a link or folder as the target is refused", async (t) => {
   const { w } = seeded("out");
   const target = join(w.base, "dash.json");
@@ -843,7 +588,6 @@ test("collect: --out writes atomically; a failed rename leaves the old file whol
   assert.equal((await col(["--data", w.data, "--out", join(w.base, "linked.json")])).code, 1);
   assert.equal(readFileSync(join(outside, "x.json"), "utf8"), CANARY);
 });
-
 test("collect: arguments are checked, and an empty or absent data folder gives an empty result", async () => {
   const w = world("collect-args");
   for (const argv of [[], ["--data"], ["--data", w.data, "--now", "abc"], ["--data", w.data, "--bogus"], ["--data", w.data, "extra"], ["--data", w.data, "--data", w.data]]) assert.equal((await col(argv)).code, 2, argv.join(" "));
@@ -870,7 +614,6 @@ function seededData() {
   return w;
 }
 const runScript = (script, data) => spawnSync(process.execPath, [script, "--data", data], { encoding: "utf8" });
-
 test("collect: the roadmap module is found in the plugin layout and in the personal-copy layout, and nowhere else", () => {
   const w = seededData();
   for (const [dash, rm] of [["dashboard", "roadmap"], ["ps-dashboard", "ps-roadmap"]]) {
@@ -893,7 +636,6 @@ test("collect: the roadmap module is found in the plugin layout and in the perso
   assert.equal(lacking.status, 1);
   assert.ok(/lacks parseRoadmap/.test(lacking.stderr));
 });
-
 test("collect: the scripts import only node: built-ins, and the one dynamic import is the roadmap reader chosen by the script's own folder name", () => {
   for (const [name, src] of [["status.mjs", STATUS_SRC], ["collect.mjs", COLLECT_SRC]]) {
     const froms = [...src.matchAll(/^import [^;]*? from "([^"]+)";/gms)].map((m) => m[1]);
@@ -945,7 +687,6 @@ test("sync-personal: ps-dashboard is installed byte for byte, ps-run reaches it,
   assert.equal(s.status, 0, s.stderr);
   assert.ok(s.stdout.includes("dashboard: on"));
 });
-
 test("status and collect run as commands: exit codes and output through the real process", () => {
   const w = world("cli");
   const p = w.proj("zork");
@@ -979,7 +720,6 @@ function statusLineProblems(doc, allowed = ALLOWED_PLACEHOLDERS) {
   }
   return problems;
 }
-
 test("run skill: every status.mjs command line has no --name, no double-quoted free text and only the allowed placeholders", () => {
   assert.deepEqual(statusLineProblems(RUN_SRC), []);
   // the check itself sees the old, unsafe shapes
@@ -1009,13 +749,25 @@ test("run skill: every status.mjs command line has no --name, no double-quoted f
 });
 
 // 2. --data must be an absolute path.
-test("status and collect refuse a --data that is empty or relative (exit 2) and read and write nothing", () => {
+test("status and collect refuse a --data that is empty or relative (exit 2) and read and write nothing", async () => {
   const cwd = tmp("cwd-guard");
   const proj = tmp("cwd-proj");
   put(cwd, "dashboard.json", JSON.stringify({ v: 1, enabled: false, asked: null, warnMin: 90, idleMin: 180 }));
   put(cwd, "projects.json", JSON.stringify({ v: 1, projects: [] }));
   const before = snapshot(cwd);
-  const run = (script, args) => spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { encoding: "utf8", cwd });
+  // The cases run in this process, from the working folder the real command would have had (restored at the end); one real process per
+  // script follows, so the command line itself is still covered.
+  const startedIn = process.cwd();
+  const inProcess = async (script, args) => {
+    process.chdir(cwd);
+    try {
+      const r = script === "status.mjs" ? st(args) : await col(args);
+      return { status: r.code, stdout: r.out, stderr: r.err };
+    } finally {
+      process.chdir(startedIn);
+    }
+  };
+  const realProcess = (script, args) => spawnSync(process.execPath, [join(SCRIPTS, script), ...args], { encoding: "utf8", cwd });
   const bads = [["--data", ""], ["--data="], ["--data", "."], ["--data", "relative-data"], ["--data", ".." + (WIN ? "\\" : "/") + "elsewhere"]];
   const commands = [
     ["status.mjs", ["state"], []],
@@ -1024,16 +776,19 @@ test("status and collect refuse a --data that is empty or relative (exit 2) and 
     ["status.mjs", ["unregister"], ["0".repeat(12)]],
     ["collect.mjs", [], []],
   ];
+  const check = (run, script, args) => async () => {
+    const r = await run(script, args);
+    assert.equal(r.status, 2, `${script} ${JSON.stringify(args)}: ${r.stderr}`);
+    assert.equal(r.stdout, "", `${script} printed nothing`);
+    assert.ok(r.stderr.includes("--data must be an absolute path"), r.stderr);
+    assert.equal(snapshot(cwd), before, `${script} ${JSON.stringify(args)} wrote into or changed the working folder`);
+  };
   for (const bad of bads) {
-    for (const [script, pre, more] of commands) {
-      const args = [...pre, ...bad, ...more];
-      const r = run(script, args);
-      assert.equal(r.status, 2, `${script} ${JSON.stringify(args)}: ${r.stderr}`);
-      assert.equal(r.stdout, "", `${script} printed nothing`);
-      assert.ok(r.stderr.includes("--data must be an absolute path"), r.stderr);
-      assert.equal(snapshot(cwd), before, `${script} ${JSON.stringify(args)} wrote into or changed the working folder`);
-    }
+    for (const [script, pre, more] of commands) await check(inProcess, script, [...pre, ...bad, ...more])();
   }
+  // The real-process smoke: one relative --data for each script.
+  await check(realProcess, "status.mjs", ["state", "--data", "relative-data"])();
+  await check(realProcess, "collect.mjs", ["--data", "relative-data"])();
   assert.deepEqual(listing(proj), [], "the project folder holds nothing new");
 });
 
@@ -1072,27 +827,6 @@ test("collect: the roadmap reader comes from the script's own folder name, and a
   noPath(w, r.stderr, "the folder-name message");
 });
 
-// 4. The JSON is safe to inline and to read back.
-test("collect: HTML and Markdown in roadmap and session text come out as plain text, with < > & written as escapes, on stdout and in --out", async () => {
-  const hostile = ["</script><img src=x onerror=alert(1)>", "[x](javascript:alert(1))", "a & b <b>bold</b> &amp; &lt;"];
-  const { w, p } = seeded("escape", { rows: hostile.map((h, i) => row(String(i + 1), h, "planned")) });
-  setStatus(w, p, "1", "build", "working", ["--name", "<img src=x onerror=1> & more"]);
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  assert.ok(!/[<>&]/.test(r.out), "no raw < > & anywhere in the output");
-  assert.ok(r.out.includes("\\u003c/script\\u003e\\u003cimg src=x onerror=alert(1)\\u003e"), "the script closer is escaped");
-  assert.ok(r.out.includes("\\u0026"));
-  const j = r.json();
-  assert.deepEqual(phaseRows(j).map((x) => x.phase), hostile, "the values read back as written");
-  assert.equal(j.sessions[0].phase_name, "<img src=x onerror=1> & more");
-  const target = join(w.base, "page.json");
-  const o = await col(["--data", w.data, "--out", target]);
-  assert.equal(o.code, 0, o.err);
-  const file = readFileSync(target, "utf8");
-  assert.ok(!/[<>&]/.test(file), "no raw < > & in the --out file");
-  assert.deepEqual(JSON.parse(file), j);
-});
-
 // 5. Phase ids that differ only in letter case are one session.
 test("status: phase ids that differ only in letter case share one session file, in both orders, and clear finds it; collect compares them without case", async () => {
   const w = world("case");
@@ -1113,45 +847,6 @@ test("status: phase ids that differ only in letter case share one session file, 
   const old = await col(["--data", w.data]);
   assert.deepEqual(old.json().sessions, []);
   assert.deepEqual(old.json().errors, [{ file: `${id}-9B.json`, reason: "not a session file name" }]);
-});
-
-// 6. Paths inside text copied from a file, and keys.
-test("collect: this machine's project, data and home folder paths inside a roadmap cell become [path] in values only", async () => {
-  const w = world("cellpath");
-  const p = w.proj("zork");
-  const real = realpathSync.native(p);
-  const home = homedir();
-  const slashed = (s) => s.split("\\").join("/");
-  const cells = [`in ${real} and ${home} too`, `${slashed(real)}/sub and ${slashed(home)}/x`, `${w.data} then ${real}`];
-  if (WIN) cells.push(`${real.toUpperCase()} and ${home.toLowerCase()}`);
-  put(p, RM, roadmap(cells.map((c, i) => row(String(i + 1), c, "planned", "", `see ${real}`))));
-  enable(w);
-  assert.equal(register(w, p).code, 0);
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  const rows = phaseRows(r.json());
-  assert.equal(rows[0].phase, "in [path] and [path] too");
-  assert.equal(rows[1].phase, "[path]/sub and [path]/x");
-  assert.equal(rows[2].phase, "[path] then [path]");
-  if (WIN) assert.equal(rows[3].phase, "[path] and [path]", "letter case does not matter on Windows");
-  const lower = r.out.toLowerCase();
-  for (const form of [real, slashed(real), home, slashed(home), JSON.stringify(real).slice(1, -1), JSON.stringify(home).slice(1, -1), w.data, JSON.stringify(w.data).slice(1, -1)]) assert.ok(!lower.includes(form.toLowerCase()), `a path is left in the output: ${form.slice(0, 12)}`);
-  assert.ok(rows.every((x) => x.phase.includes("[path]")));
-});
-
-test("collect: a hand-edited project path such as a plain word cannot rename a key in the output", async () => {
-  const w = world("keys");
-  const dataDir = w.data;
-  mkdirSync(dataDir);
-  const entry = { id: "0123456789ab", path: "name", name: "name", labels: ["status"], roadmaps: [RM], added: "2026-10-27T00:00:00.000Z" };
-  writeFileSync(join(dataDir, "projects.json"), JSON.stringify({ v: 1, projects: [entry, { ...entry, id: "ba9876543210", path: "ok", name: "errors" }] }));
-  const r = await col(["--data", dataDir]);
-  assert.equal(r.code, 0, r.err);
-  const j = r.json();
-  for (const proj of j.projects) assert.equal(Object.keys(proj).join(), "id,name,status,roadmaps,history,errors,summary");
-  assert.deepEqual(j.projects.map((x) => x.name), ["name", "errors"], "a value that is not an absolute path is left as it is");
-  assert.equal(Object.keys(j).join(), "v,generatedAt,thresholds,projects,sessions,warnings,errors");
-  assert.ok(r.out.includes('"name": "name"'));
 });
 
 // 7. One open, the descriptor is the one that is checked.
@@ -1256,19 +951,11 @@ test("collect: a plan file whose resolved path has a .git, node_modules or .road
   assert.ok(!r.reads.some((x) => /[\\/](\.git|node_modules|\.roadmap-backups)[\\/]/.test(x)), "nothing under those folders was opened");
   if (!linked) t.diagnostic("no junctions here; the linked case did not run");
 });
-
-// ── fix round 2 (second review) ─────────────────────────────────────────────
-const BS = String.fromCharCode(92);
-const ZW = cp(0x200b);
-// Folder prefixes of other users, kept in variables so no machine path is written out in this file.
-const SLU = "/Users/";
-const SLH = "/home/";
 const DOC_SPAN = /`[^`\n]*(?:status|collect)\.mjs[^`\n]*`/g;
 
 // 1 and 3. The dashboard skill's command lines follow the same rule as the run skill's.
 const DASH_SRC = readFileSync(join(PS, "skills", "dashboard", "SKILL.md"), "utf8");
 const DASH_PLACEHOLDERS = ["project folder", "id", "history label", "relative path", "output file"];
-
 test("dashboard skill: its command lines have no double-quoted free text and only the allowed placeholders; both skills skip a folder that could end single quotes", () => {
   assert.deepEqual(statusLineProblems(DASH_SRC, DASH_PLACEHOLDERS), []);
   for (const bad of [`--root "<project folder>"`, `--label "<history label>"`, `--roadmap "<relative path>"`, `unregister "<id>"`, `--out "<output file>"`]) {
@@ -1324,69 +1011,6 @@ test("docs: status.md writes the escape names as visible text; the README and sk
   for (const doc of [readme, readFileSync(join(PS, "CHANGELOG.md"), "utf8"), ref, DASH_SRC]) assert.ok(doc.toLowerCase().includes("other spellings of a path may remain"), "the redaction wording says other spellings may remain");
   assert.ok(!RUN_SRC.includes("{1,60}") && RUN_SRC.includes("{1,40}"), "the run skill says 40, as the script does");
   assert.ok(COLLECT_SRC.includes("other spellings of a path may remain"));
-});
-
-// 4. Redaction of more spellings of a path.
-test("collect: known spellings of this machine's paths become [path]: mixed and doubled separators, URL-encoded, 8.3 and Git Bash user folders, a hidden character inside", async () => {
-  const w = world("spell");
-  const p = w.proj("zork");
-  const real = realpathSync.native(p);
-  const lead = real.startsWith("/") ? "/" : "";
-  const segs = real.split(/[\\/]+/).filter(Boolean);
-  const enc = (s) => s.split(":").join("%3A");
-  const forms = [
-    lead + segs.join("/"),
-    lead + segs.join(BS),
-    lead + segs.join(BS + BS),
-    lead + segs.join("//"),
-    lead + segs.map((s, i) => (i === 0 ? s : `${i % 2 ? "/" : BS}${s}`)).join(""),
-    (lead ? "%2F" : "") + segs.map(enc).join("%5C"),
-    (lead ? "%2f" : "") + segs.map((s) => s.split(":").join("%3a")).join("%5c"),
-    real.slice(0, 12) + ZW + real.slice(12),
-    real.slice(0, 20) + cp(0x202e) + cp(7) + real.slice(20),
-  ];
-  const users = [
-    [`C:${BS}Users${BS}quuxuser${BS}Documents`, `[path]${BS}Documents`],
-    [`C:${BS}Users${BS}QUUXUS~1.YY${BS}AppData`, `[path]${BS}AppData`],
-    [`/c${SLU}quuxuser/x`, "[path]/x"],
-    [`/mnt/c${SLU}quuxuser/x`, "[path]/x"],
-    [`${SLU}quuxuser/x`, "[path]/x"],
-    [`${SLH}quuxuser/x`, "[path]/x"],
-    [`C:${BS}Users/quuxuser/x`, "[path]/x"],
-    [`C:${BS}${BS}Users${BS}${BS}quuxuser${BS}${BS}x`, `[path]${BS}${BS}x`],
-    ["C%3A%5CUsers%5Cquuxuser%5Cx", "[path]%5Cx"],
-    ["c%3a%5cusers%5cquuxuser%5cx", "[path]%5cx"],
-    ["D:/users/quuxuser/x", "[path]/x"],
-    [`file:///C:${SLU}quuxuser/x`, "file:///[path]/x"],
-    [`C:${BS}Users${BS}quu${ZW}xuser${BS}x`, `[path]${BS}x`],
-    [`"C:${BS}Users${BS}quuxuser", ok`, `"[path]", ok`],
-  ];
-  const kept = [`C:${BS}Users alone`, "no path /home here", "a /Users/ folder", "see /homes/x and /home", `C:${BS}Users${BS} gap`];
-  const titles = [...forms.map((f) => `see ${f}/sub now`), ...users.map(([f]) => `at ${f} end`), ...kept];
-  put(p, RM, roadmap(titles.map((t, i) => row(String(i + 1), t, "planned"))));
-  enable(w);
-  assert.equal(register(w, p).code, 0);
-  const r = await col(["--data", w.data]);
-  assert.equal(r.code, 0, r.err);
-  const got = phaseRows(r.json()).map((x) => x.phase);
-  forms.forEach((f, i) => assert.equal(got[i], "see [path]/sub now", `spelling ${i}`));
-  users.forEach(([, expected], i) => assert.equal(got[forms.length + i], `at ${expected} end`, `user form ${i}`));
-  kept.forEach((k, i) => assert.equal(got[forms.length + users.length + i], k, `left alone: ${k}`));
-  assert.ok(!r.out.includes("quuxuser") && !r.out.toLowerCase().includes("roadmap-test-dash-"), "no user name and no temp folder name is left");
-  // this run's own short (8.3) temp folder name is not left either
-  const short = w.base.match(/[\\/]Users[\\/]([^\\/]+)/i)?.[1];
-  put(p, RM, roadmap([row("1", `in ${w.base}${BS}x`, "planned"), row("2", `in ${real}${BS}x`, "planned")]));
-  const again = await col(["--data", w.data]);
-  assert.equal(again.code, 0, again.err);
-  if (short) {
-    assert.ok(!again.out.includes(short), "the user folder in the temp path is not left");
-    // only where the temp folder sits under a user folder (Windows) is the temp base itself redacted
-    assert.ok(phaseRows(again.json())[0].phase.startsWith("in [path]"), "the user folder of a temp base under it becomes [path]");
-  }
-  // on every platform the registered project path becomes [path]
-  const rows2 = phaseRows(again.json());
-  assert.equal(rows2[1].phase, "in [path]" + BS + "x", "the registered project path becomes [path]");
-  assert.ok(again.out.includes("[path]"));
 });
 
 // 5. --out never lands in the data folder.
@@ -1480,7 +1104,6 @@ test("status: every file of ours is opened once and checked on the open descript
   assert.deepEqual([...closed].sort(), [...opened].sort());
   assert.ok(!STATUS_SRC.includes("readFileSync"), "no read goes around the descriptor");
 });
-
 test("collect: a data folder file is checked again after the read: a folder swapped for a link during the read drops what was read", async (t) => {
   const { w, p } = seeded("recheck");
   setStatus(w, p, "1", "build", "working");
@@ -1515,22 +1138,7 @@ test("collect: a data folder file is checked again after the read: a folder swap
 // Every folder is a temp folder; the home folder the climb stops at is injected (io.homedir), so no real .git above the
 // temp area can change a result. Expectations use the same id algorithm the script documents.
 const idOfPath = (p) => createHash("sha256").update(WIN ? realpathSync.native(p).toLowerCase() : realpathSync.native(p)).digest("hex").slice(0, 12);
-const shipped = roadmap([row("1", "Zork thing", "shipped"), row("2", "Zork next", "planned")]);
-function repoWorld(label, { git = true } = {}) {
-  const w = world(label);
-  const repo = w.proj("repo");
-  if (git) mkdirSync(join(repo, ".git"));
-  const home = { homedir: w.base };
-  const sub = (rel, withRoadmap = true) => {
-    const p = join(repo, ...rel.split("/"));
-    mkdirSync(p, { recursive: true });
-    if (withRoadmap) writeFileSync(join(p, RM), shipped);
-    return p;
-  };
-  return { w, repo, home, sub };
-}
 const registryOf = (w) => readJson(w.data, "projects.json").projects;
-
 test("status: a run in the repository root keeps the folder as the project, as before", () => {
   const { w, repo, home } = repoWorld("repo-root");
   writeFileSync(join(repo, RM), shipped);
@@ -1542,7 +1150,6 @@ test("status: a run in the repository root keeps the folder as the project, as b
   assert.deepEqual(e.roadmaps, [RM]);
   assert.deepEqual(sessionFiles(w), [sname(e.id, "1")]);
 });
-
 test("status: a run in docs/roadmap inside a repository makes the repository the project, adds the roadmap path and attaches the session to the repository id", async () => {
   const { w, repo, home, sub } = repoWorld("repo-sub");
   const given = sub("docs/roadmap");
@@ -1567,7 +1174,6 @@ test("status: a run in docs/roadmap inside a repository makes the repository the
   assert.equal(proj.roadmaps[0].file, `docs/roadmap/${RM}`);
   assert.deepEqual(proj.roadmaps[0].phases.map((p) => p.id), ["1", "2"]);
 });
-
 test("status: two roadmap folders in one repository give one project with two roadmaps and one id; --roadmap is relative to the project root", () => {
   const { w, repo, home, sub } = repoWorld("repo-two");
   const a = sub("docs/a");
@@ -1587,7 +1193,6 @@ test("status: two roadmap folders in one repository give one project with two ro
   assert.deepEqual(registryOf(w)[0].roadmaps, [`docs/a/${RM}`, `docs/b/${RM}`, `notes/${RM}`]);
   assert.equal(registryOf(w).length, 1);
 });
-
 test("status: with no .git anywhere the folder itself is the project; a .git that is a file (worktree style) counts", () => {
   const w = world("no-git");
   const p = w.proj("zork");
@@ -1609,7 +1214,6 @@ test("status: with no .git anywhere the folder itself is the project; a .git tha
   assert.equal(reg[1].id, idOfPath(p));
   assert.deepEqual(reg[1].roadmaps, [`docs/roadmap/${RM}`]);
 });
-
 test("status: a .git at the home folder is ignored (a dotfiles repository does not swallow everything), wherever the home folder is", () => {
   const w = world("home-git");
   mkdirSync(join(w.base, ".git"));
@@ -1631,7 +1235,6 @@ test("status: a .git at the home folder is ignored (a dotfiles repository does n
   assert.equal(setStatus(w, q2, "3", "build", "working", [], { homedir: other }).code, 0);
   assert.equal(registryOf(w).at(-1).id, idOfPath(q2));
 });
-
 test("status: a nested repository wins: the nearest .git is the project root", () => {
   const { w, repo, home, sub } = repoWorld("nested");
   const inner = sub("tools/inner", false);
@@ -1645,7 +1248,6 @@ test("status: a nested repository wins: the nearest .git is the project root", (
   assert.equal(e.name, "inner");
   assert.deepEqual(e.roadmaps, [`docs/${RM}`]);
 });
-
 test("status: a repository that holds the data folder is not used (the folder itself is), and a folder inside the data folder is refused", () => {
   const w = world("data-in-repo");
   const repo = w.proj("repo");
@@ -1668,7 +1270,6 @@ test("status: a repository that holds the data folder is not used (the folder it
   assert.ok(inside.err.includes("data folder"));
   assert.equal(snapshot(data), before);
 });
-
 test("status: a repository root that was already registered keeps its id and entry when a run comes from a subfolder", () => {
   const w = world("keep-id");
   const repo = w.proj("repo");
@@ -1687,7 +1288,6 @@ test("status: a repository root that was already registered keeps its id and ent
   assert.deepEqual(reg[0].roadmaps, [RM, `docs/${RM}`]);
   assert.deepEqual(sessionFiles(w), [sname(oldId, "1", `docs/${RM}`)]);
 });
-
 test("status: the climb looks at 40 folders at most: the repository at the 40th folder is found, one level further is not", () => {
   const w = world("climb");
   const top = w.proj("top");
@@ -1701,7 +1301,6 @@ test("status: the climb looks at 40 folders at most: the repository at the 40th 
   assert.equal(setStatus(w, far, "2", "build", "working", [], { homedir: w.base }).code, 0);
   assert.equal(registryOf(w).at(-1).id, idOfPath(far), "41 folders: no repository, the folder itself");
 });
-
 test("status: a link or junction in the given path is resolved by real path first, so the repository behind it is found", (t) => {
   const { w, repo, home, sub } = repoWorld("linked");
   const real = sub("docs/roadmap");
@@ -1714,7 +1313,6 @@ test("status: a link or junction in the given path is resolved by real path firs
   assert.equal(e.id, idOfPath(repo));
   assert.deepEqual(e.roadmaps, [`docs/roadmap/${RM}`]);
 });
-
 test("status: the .git entry is never read or followed: only its name is looked at (a file, a folder and a dangling link all count)", (t) => {
   const { w, repo, home, sub } = repoWorld("git-unread");
   writeFileSync(join(repo, ".git", "config"), "[core]\n");
@@ -1735,16 +1333,4 @@ test("status: the .git entry is never read or followed: only its name is looked 
   enable(w2);
   assert.equal(setStatus(w2, g, "1", "build", "working", [], { homedir: w2.base }).code, 0);
   assert.equal(registryOf(w2)[0].id, idOfPath(p2));
-});
-
-test("status: while the dashboard is off, a run from a repository subfolder writes nothing", () => {
-  const { w, repo, home, sub } = repoWorld("off-sub");
-  const given = sub("docs/roadmap");
-  const r = setStatus(w, given, "1", "build", "working", [], home);
-  assert.equal(r.code, 0);
-  assert.ok(r.out.includes("nothing written"));
-  assert.ok(!existsSync(w.data));
-  assert.equal(st(["clear", "--data", w.data, "--root", given, "--phase", "1"], home).code, 0);
-  assert.ok(!existsSync(w.data));
-  assert.deepEqual(listing(repo).filter((f) => f.includes("projects.json") || f.includes("sessions")), []);
 });
