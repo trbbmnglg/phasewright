@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 40], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.1");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -168,10 +168,10 @@ test("the checker runs the probe first when the brief has it, and it is never a 
 
 test("phase 7: run records the preview, checks it on approve and push, and a mismatch is a hard stop", () => {
   const run = text("skills", "run", "SKILL.md");
-  assert.match(run, /commands-hash\.mjs" "<plan>" --check planned --data/);
-  assert.match(run, /commands-hash\.mjs" "<plan>" --record previewed --data/);
-  assert.match(run, /commands-hash\.mjs" "<plan>" --check previewed --data/);
-  assert.doesNotMatch(run, /commands-hash\.mjs" <plan>/, "the plan path is always quoted");
+  assert.match(run, /commands-hash\.mjs" '<plan>' --check planned --data/);
+  assert.match(run, /commands-hash\.mjs" '<plan>' --record previewed --data/);
+  assert.match(run, /commands-hash\.mjs" '<plan>' --check previewed --data/);
+  assert.doesNotMatch(run, /commands-hash\.mjs" ("<plan>"|<plan>)/, "the plan path is always in single quotes");
   assert.match(run, /Commands changed since planning/);
   assert.match(run, /no planning record \(plan made elsewhere or before 0\.5\.0\)/);
   assert.match(run, /Exit 3: hard stop/);
@@ -241,8 +241,8 @@ test("phase 7 fix round 2: README and CHANGELOG say exactly what is protected an
 
 test("phase 7: plan records `planned` and adds the Commands hash line; the shipper reports the hash", () => {
   const plan = text("skills", "plan", "SKILL.md");
-  assert.match(plan, /commands-hash\.mjs" "<phase plan path>" --record planned --data/);
-  assert.doesNotMatch(plan, /commands-hash\.mjs" <phase plan path>/, "the plan path is always quoted");
+  assert.match(plan, /commands-hash\.mjs" '<phase plan path>' --record planned --data/);
+  assert.doesNotMatch(plan, /commands-hash\.mjs" ("<phase plan path>"|<phase plan path>)/, "the plan path is always in single quotes");
   assert.match(plan, /If it doesn't print `recorded planned`, stop and show the output/);
   assert.match(plan, /\*\*Commands hash:\*\* <12 hex> \(planned\)/);
   assert.match(text("skills", "plan", "references", "templates.md"), /^\*\*Commands hash:\*\* <12 hex> \(planned\)$/m);
@@ -405,8 +405,8 @@ test("phase 7d1: the roadmap skill is owner-invoked, on sonnet at low effort, an
   assert.match(fm, /^model: sonnet$/m);
   assert.match(fm, /^effort: low$/m);
   assert.match(fm, /^argument-hint: "\[check \| standardize \| adopt \| restore\] \[path\/to\/PHASES\.md or the project folder\]"$/m);
-  assert.match(skill, /node "\$\{CLAUDE_SKILL_DIR\}\/scripts\/roadmap\.mjs" check "<file>" --root "<project folder>"/);
-  assert.match(skill, /Always pass it as `--root "<project folder>"`/);
+  assert.match(skill, /node "\$\{CLAUDE_SKILL_DIR\}\/scripts\/roadmap\.mjs" check '<file>' --root '<project folder>'/);
+  assert.match(skill, /Always pass it as `--root '<project folder>'`/);
   assert.match(skill, /never gives `--write` without the owner's explicit yes, asked with AskUserQuestion/);
   assert.match(skill, /even if the owner's message says "don't ask"/);
   assert.match(skill, /Never edit the file in this mode/);
@@ -421,7 +421,7 @@ test("phase 7d1c part A: the roadmap skill has the adopt mode, asks before it wr
   const skill = text("skills", "roadmap", "SKILL.md");
   assert.match(skill, /^# Roadmap: check, standardize, adopt or restore$/m);
   assert.match(skill, /^## adopt \(adds rows to a roadmap, only after a yes\)$/m);
-  assert.match(skill, /roadmap\.mjs" adopt "<project folder>" --root "<project folder>"/);
+  assert.match(skill, /roadmap\.mjs" adopt '<project folder>' --root '<project folder>'/);
   assert.match(skill, /never gives `--write` without the owner's explicit yes, asked with AskUserQuestion, in this same turn/);
   assert.match(skill, /Show the owner the proposed table first, before asking anything/);
   assert.match(skill, /Ask about each one separately, with AskUserQuestion, with these options: `planned`, `in progress`, `shipped`, `parked` and `leave out`\. `leave out` is the default/);
@@ -435,17 +435,17 @@ test("phase 7d1c part A: the roadmap skill has the adopt mode, asks before it wr
   assert.match(format, /Nothing is merged across files/);
   assert.match(format, /\*\*no Timestamps line\*\*/);
   const header = text("skills", "roadmap", "scripts", "roadmap.mjs").split("\n").slice(0, 80).join("\n");
-  assert.match(header, /node roadmap\.mjs adopt <project folder>/);
+  assert.match(header, /node roadmap\.mjs adopt '<project folder>'/);
 });
 
 test("phase 7d1: plan and run reach the roadmap script the same way they reach commands-hash.mjs", () => {
   const plan = text("skills", "plan", "SKILL.md");
   const run = text("skills", "run", "SKILL.md");
   assert.match(plan, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/run\/scripts\/commands-hash\.mjs"/, "the pattern being copied");
-  assert.match(plan, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" check "<PHASES\.md path>" --root "<project folder>"/);
+  assert.match(plan, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" check '<PHASES\.md path>' --root '<project folder>'/);
   assert.match(plan, /fix every error it reports/);
-  assert.match(run, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" set "<PHASES\.md>" <phase id> --status "in progress" --root "<folder of PHASES\.md>"/);
-  assert.match(run, /roadmap\.mjs" set "<PHASES\.md>" <phase id> --status shipped --commit <sha> --actual <hours> --root/);
+  assert.match(run, /node "\$\{CLAUDE_SKILL_DIR\}\/\.\.\/roadmap\/scripts\/roadmap\.mjs" set '<PHASES\.md>' <phase id> --status "in progress" --root '<folder of PHASES\.md>'/);
+  assert.match(run, /roadmap\.mjs" set '<PHASES\.md>' <phase id> --status shipped --commit <commit> --actual <hours> --root/);
   assert.match(run, /run standardize first/);
   assert.match(run, /update the row by hand as before/);
   // Neither skill ever runs standardize or --write itself.
@@ -487,8 +487,8 @@ test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_
 
 test("phase 7d1 to 7d1c: the guard rules file changed only its version", () => {
   const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
-  assert.match(rules, /^export const GUARD_VERSION = "0\.11\.0";$/m);
-  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.0";', "line 16");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.11\.1";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.1";', "line 16");
 });
 
 test("phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes", () => {
@@ -531,7 +531,7 @@ test("phase 7d1b: the roadmap skill has the restore mode, still owner-invoked, a
   const fm = frontmatter(skill);
   assert.match(fm, /^disable-model-invocation: true$/m);
   assert.match(skill, /^## restore \(edits the owner's file, only after a yes\)$/m);
-  assert.match(skill, /restore "<file>" --root "<project folder>"/);
+  assert.match(skill, /restore '<file>' --root '<project folder>'/);
   const restoreSection = skill.slice(skill.indexOf("## restore"), skill.indexOf("## Limits"));
   assert.match(restoreSection, /never gives `--write` without the owner's explicit yes, asked with AskUserQuestion, in this same turn/);
   assert.match(skill, /even if the owner's message says "don't ask", "just restore it"/);
@@ -541,7 +541,7 @@ test("phase 7d1b: the roadmap skill has the restore mode, still owner-invoked, a
   assert.doesNotMatch(skill, /`<file>\.bak-<timestamp>` \(and refuses if that name exists\)/);
   const format = text("skills", "roadmap", "references", "format.md");
   assert.match(format, /^## Backups$/m);
-  assert.match(format, /\| `restore <file>` \|/);
+  assert.match(format, /\| `restore '<file>'` \|/);
   assert.doesNotMatch(format, /makes no backup/);
 });
 
@@ -647,7 +647,7 @@ test("phase 7d1c: the plan skill offers onboarding once, remembers a no, uses a 
   assert.ok(step.includes("AskUserQuestion"));
   assert.ok(step.includes('"${CLAUDE_SKILL_DIR}/../onboard/scripts/survey.mjs" show --root'));
   assert.ok(step.includes('"${CLAUDE_SKILL_DIR}/../onboard/scripts/survey.mjs" decline --root'));
-  assert.ok(step.includes('{ "declined": "<date>" }'));
+  assert.ok(step.includes('{ "declined": "the date" }'));
   assert.ok(step.includes(".phased-shipping/state.json"));
   assert.ok(step.includes("**proposed**"));
   assert.ok(step.includes("Never run a command found in the survey"));
@@ -742,7 +742,7 @@ test("phase 7d1c: the wiki has the Onboarding page with the five feature heading
   for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
   assert.ok(repoText("docs", "wiki", "Home.md").includes("(Onboarding)"));
   assert.ok(repoText("scripts", "publish-wiki.mjs").includes('{ page: "Onboarding", title: "Onboarding" }'));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
   assert.ok(page.includes("Plugin version 0.8.0"));
 });
 
@@ -790,10 +790,10 @@ test("phase 7d2: the CHANGELOG keeps 0.9.0 above 0.8.0 with Date, Summary, Added
 test("phase 7p: the What's new block lists 0.11.0, 0.10.0 and 0.9.0, newest first", () => {
   const readme = repoText("README.md");
   const block = readme.slice(readme.indexOf("<!-- whats-new:start -->"), readme.indexOf("<!-- whats-new:end -->"));
-  const at = ["0.11.0", "0.10.0", "0.9.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
+  const at = ["0.11.1", "0.11.0", "0.10.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
   assert.ok(at.every((i) => i >= 0), "all three are listed");
   assert.ok(at[0] < at[1] && at[1] < at[2], "newest first");
-  assert.ok(!block.includes("**phased-shipping 0.8.0**"), "only the newest three");
+  assert.ok(!block.includes("**phased-shipping 0.9.0**"), "only the newest three");
 });
 
 test("phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes", () => {
@@ -859,12 +859,12 @@ test("phase 7d2: the README and the wiki describe the dashboard data, what it wr
   for (const phrase of ["**The dashboard data**", "**The dashboard files**", "`dashboard.json`", "`projects.json`", "`sessions/<id>-<tag>+<phase>.json`", "**absolute path**", "the only file with an absolute path", "never print it except `list --paths`", "makes no network calls", "a link, a junction or a hard link makes the script stop and write nothing", "at most 16 KB", "`collect --out` writes the one file you name", "is refused inside the data folder"]) assert.ok(touches.includes(phrase), phrase);
   assert.ok(touches.includes("The status script (`status.mjs`)"), "the commands it runs list the status script");
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.0"));
+  assert.ok(wiki.includes("The current plugin version is 0.11.1"));
   assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
   assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(wiki), "the version row");
   const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
-  assert.ok(release.includes("plugin version 0.11.0") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
+  assert.ok(release.includes("plugin version 0.11.1") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
 });
 
 // ---------- phase 7d3: the dashboard page (plugin version 0.10.0) ----------
@@ -920,9 +920,12 @@ test("phase 7d3: the README describes the page, its fonts and what it touches, a
 
 // ---------- phase 7p: faster runs by default (plugin version 0.11.0) ----------
 test("phase 7p: the plugin is at 0.11.0 everywhere and the CHANGELOG has 0.11.0 above 0.10.0 with Date, Summary, Added, Changed and No guard rule changed", () => {
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.0");
-  assert.ok(repoText("library.json").includes('"version": "0.11.0"'), "library.json carries the plugin version");
-  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.0";');
+  // the plugin is at 0.11.0 or later (the exact current version is pinned by the newest phase's test), and the guard version follows it
+  const version = JSON.parse(text(".claude-plugin", "plugin.json")).version;
+  const [major, minor] = version.split(".").map(Number);
+  assert.ok(major > 0 || minor >= 11, version);
+  assert.ok(repoText("library.json").includes(`"version": "${version}"`), "library.json carries the plugin version");
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], `export const GUARD_VERSION = "${version}";`);
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.11.0").length, 2, "one 0.11.0 block");
   assert.ok(log.indexOf("## 0.11.0") < log.indexOf("## 0.10.0"), "newest first");
@@ -949,7 +952,7 @@ test("phase 7p: the plan template and the plan skill have both verify sets and t
 test("phase 7p: the run skill reuses a baseline only from a green full verify, never previews on a fast result, and reviews the first time at full depth", () => {
   const run = text("skills", "run", "SKILL.md");
   const tree = run.slice(run.indexOf("## Tree state"), run.indexOf("## Baseline"));
-  for (const phrase of ['scripts/tree-state.mjs" id --root', 'scripts/tree-state.mjs" check --root', 'scripts/tree-state.mjs" record --root', "never records a red result", "`reuse <tree> <date>`", "`no reuse: <reason>`", "never after a red, partial or \"proceed with pre-existing failures\" result", "U+2018 to U+201B", "no reuse and a full baseline", "single quote, a control character"]) assert.ok(tree.includes(phrase), phrase);
+  for (const phrase of ['scripts/tree-state.mjs" id --root', 'scripts/tree-state.mjs" check --root', 'scripts/tree-state.mjs" record --root', "never records a red result", "`reuse <tree> <date>`", "`no reuse: <reason>`", "never after a red, partial or \"proceed with pre-existing failures\" result", "unsafe by the quoting rule above", "no reuse and a full baseline"]) assert.ok(tree.includes(phrase), phrase);
   assert.ok(run.includes("**Baseline: reused (green full verify on this exact tree, <date>)**"));
   assert.ok(run.includes("reuse can only make a compare stricter: a failure that is not in a green baseline is new and blocks"));
   assert.ok(run.includes("A baseline with pre-existing failures is not green and is not recorded."));
@@ -1018,13 +1021,13 @@ test("phase 7p: the README has the Speed section with the honest limits, and the
 
 test("phase 7p: the wiki pages say 0.11.0 where they name the current version", () => {
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.0"));
+  assert.ok(wiki.includes("The current plugin version is 0.11.1"));
   assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|.*fast and a full verify set/m.test(wiki), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.0: faster runs without a lower bar"));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
   const hist = repoText("docs", "wiki", "Phase-history-and-estimates.md");
   for (const phrase of ["`timings`", "`baseline_reused`", "security reviewers", "Version 0.11.0 added", "the median full runs per phase"]) assert.ok(hist.includes(phrase), phrase);
-  assert.ok(repoText("docs", "wiki", "Roadmap-standard.md").includes("Plugin version 0.11.0 changed nothing in the format"));
+  assert.ok(repoText("docs", "wiki", "Roadmap-standard.md").includes("Plugin version 0.11.1 changed nothing in the format"));
 });
 
 // ---------- phase 7p fix round 1: what the run skill, the checker and the docs say after the review ----------
@@ -1152,4 +1155,87 @@ test("phase 7p fix 5: the README and the Speed page name the two limits of the t
     assert.ok(doc.includes("the git diff is the trace"));
     assert.ok(doc.includes("tripwire, not a proof") && doc.includes("`shell:`, `env:` or trigger filters such as branches or paths"));
   }
+});
+
+// ---------- phase 7q: every script command line quotes its paths the same safe way (plugin version 0.11.1) ----------
+const UNSAFE_RULE = ["a single quote", "a double quote", "a control or format character", "Unicode categories Cc, Cf, Zl and Zp", "U+2018 to U+201B", "never ends in `" + String.fromCharCode(92) + "` or `/`", "drop a trailing separator", "is a drive or file-system root (`C:" + String.fromCharCode(92) + "` or `/`), is not run", "with the Bash tool when there is one", "PowerShell 5.1"];
+const FR = join(HERE, "..", "plugins", "free-resources", "skills", "free-resources", "SKILL.md");
+
+test("phase 7q: each skill with script lines states the same unsafe-path rule, and keeps ${CLAUDE_SKILL_DIR} in double quotes", () => {
+  const docs = {
+    run: text("skills", "run", "SKILL.md"), plan: text("skills", "plan", "SKILL.md"), roadmap: text("skills", "roadmap", "SKILL.md"),
+    onboard: text("skills", "onboard", "SKILL.md"), dashboard: text("skills", "dashboard", "SKILL.md"), "free-resources": readFileSync(FR, "utf8"),
+  };
+  for (const [name, doc] of Object.entries(docs)) {
+    for (const phrase of UNSAFE_RULE) assert.ok(doc.includes(phrase), `${name}: ${phrase}`);
+    assert.ok(/single quotes/.test(doc), `${name}: names single quotes`);
+    assert.ok(doc.includes("Never put any other text from a file") || doc.includes("Never put a title, a name or any other text from a file"), `${name}: no other file text on a command line`);
+    assert.ok(doc.includes('"${CLAUDE_SKILL_DIR}"'), `${name}: the skill variable stays in double quotes`);
+  }
+  for (const name of ["run", "dashboard"]) assert.ok(docs[name].includes('"${CLAUDE_PLUGIN_DATA}"') && docs[name].includes("Claude Code sets them"), name);
+  // the patterns for the bare values
+  assert.ok(docs.run.includes("`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`") && docs.run.includes("`^[0-9a-f]{7,40}$`") && docs.run.includes("`^\\d{1,3}(\\.\\d{1,2})?$`"));
+  assert.ok(docs.onboard.includes("`^[0-9a-f]{12,64}$`"));
+  assert.ok(docs.dashboard.includes("`^[0-9a-f]{12}$`"));
+});
+
+test("phase 7q: the run skill stops when a commands-hash path is unsafe, skips roadmap set, and picks another temp path for the history file", () => {
+  const run = text("skills", "run", "SKILL.md");
+  assert.ok(run.includes("the `commands-hash` calls **stop** the phase"));
+  const preview = run.slice(run.indexOf("## Preview, then stop"), run.indexOf("## On `approve`"));
+  assert.ok(preview.includes("If the plan's path is unsafe by the quoting rule above, stop and say why"));
+  assert.ok(preview.includes("don't skip them"));
+  const approve = run.slice(run.indexOf("## On `approve`"), run.indexOf("## Close the phase"));
+  assert.ok(approve.includes("If its path is unsafe by the quoting rule, stop: the approval can't be bound to the commands the user saw."));
+  assert.ok(approve.includes("Run the same `--check previewed` step first, with the same stops"));
+  assert.ok(run.includes("skip the call, say so once, and set the row's status to `in progress` with the file-editing tool"));
+  const close = run.slice(run.indexOf("## Close the phase"));
+  assert.ok(close.includes("do not pass the quoting rule, skip the call, say so once, and update the row with the file-editing tool, as for a legacy roadmap below"));
+  assert.ok(close.includes("--from '<temp-file>'") && close.includes("If it is unsafe by the quoting rule, pick another."));
+});
+
+test("phase 7q: the plan skill stops at the record step and the roadmap check, and skips the survey, when a path is unsafe", () => {
+  const plan = text("skills", "plan", "SKILL.md");
+  assert.ok(plan.includes("the survey calls are skipped (and the survey offer with them, saying why), the roadmap check stops (say why), and the commands record stops (the plan can't be bound)"));
+  assert.ok(plan.includes("the plan can't be bound, so don't skip this step"));
+  assert.ok(plan.includes("(if either path is unsafe by the rule above, stop and say why)"));
+  assert.ok(plan.includes("If the folder's path is unsafe by the rule above, skip the survey and the offer, and say why."));
+});
+
+test("phase 7q: the roadmap, onboard and free-resources skills stop and say why; format.md names the single-quoted form", () => {
+  const roadmap = text("skills", "roadmap", "SKILL.md");
+  assert.ok(roadmap.includes("don't run the call: stop and tell the owner which value was refused"));
+  assert.ok(roadmap.includes("--set-status '<id>=<status>'") && roadmap.includes("--from '<choice>'") && roadmap.includes("--plans '<folder>'") && roadmap.includes("--into '<roadmap file>'") && roadmap.includes("--project '<label>'"));
+  const onboard = text("skills", "onboard", "SKILL.md");
+  assert.ok(onboard.includes("don't run the call: stop and tell the owner which path was refused"));
+  assert.ok(onboard.includes("--list-digest <list digest> [--exclude '<path>']... --root '<project folder>'"));
+  const fr = readFileSync(FR, "utf8");
+  assert.ok(fr.includes("don't run the call: stop and tell the user which value was refused"));
+  assert.ok(fr.includes("--task '<name>'") && fr.includes("--project '<dir>'"));
+  assert.ok(fr.includes("the user's own command, given in this conversation"));
+  const format = text("skills", "roadmap", "references", "format.md");
+  assert.ok(format.includes("node roadmap.mjs <command> '<file>' ..."));
+  const dash = text("skills", "dashboard", "SKILL.md");
+  assert.ok(dash.includes("A project id is written bare, without quotes, and only when it matches `^[0-9a-f]{12}$`"));
+  assert.ok(dash.includes("`page.mjs --out '<output file>'`"));
+});
+
+test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added", () => {
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.1");
+  assert.equal(JSON.parse(readFileSync(join(HERE, "..", "plugins", "free-resources", ".claude-plugin", "plugin.json"), "utf8")).version, "0.1.1");
+  assert.ok(repoText("library.json").includes('"version": "0.11.1"') && repoText("library.json").includes('"version": "0.1.1"'), "library.json carries both plugin versions");
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.1";');
+  const log = text("CHANGELOG.md");
+  assert.equal(log.split("## 0.11.1").length, 2, "one 0.11.1 block");
+  assert.ok(log.indexOf("## 0.11.1") < log.indexOf("## 0.11.0"), "newest first");
+  const lines = log.split(/\r?\n/);
+  const at = lines.indexOf("## 0.11.1");
+  assert.equal(lines[at + 2], "Date: 2026-10-29");
+  assert.match(lines[at + 3], /^Summary: [\p{L}\p{Nd} .,;:'"()/+&!?`-]{20,160}$/u);
+  const entry = log.slice(log.indexOf("## 0.11.1"), log.indexOf("## 0.11.0"));
+  for (const heading of ["### Changed", "### Added"]) assert.ok(entry.includes(heading), heading);
+  for (const word of ["single quotes", "U+2018 to U+201B", "commands-hash", "tests/command-lines.test.mjs", "No guard rule changed", "free-resources plugin is at 0.1.1"]) assert.ok(entry.includes(word), word);
+  assert.ok(repoText("docs", "wiki", "Free-resources.md").includes("Plugin version 0.1.1") && repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("free-resources, plugin version 0.1.1"));
+  assert.ok(/^\| 0\.11\.1 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
+  assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.1: every script command line"));
 });

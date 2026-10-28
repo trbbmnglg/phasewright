@@ -2,7 +2,7 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.11.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.11.1 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
@@ -58,6 +58,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.9.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:dashboard` skill, opt-in status files that the run writes at each step, a local project list, and one merged JSON for a dashboard page. Off until you say yes. |
 | 0.10.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The dashboard page: projects, sessions and the loops back in a phase, one local file rebuilt at every step, no network. See [Dashboard](Dashboard). |
 | 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
+| 0.11.1 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. |
 
 ## Limits
 

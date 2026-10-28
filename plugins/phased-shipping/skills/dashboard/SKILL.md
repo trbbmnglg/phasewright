@@ -18,11 +18,13 @@ The scripts are `node "${CLAUDE_SKILL_DIR}/scripts/status.mjs"`, `node "${CLAUDE
 ## Writing a command line
 
 You build each command line, and some values come from the owner or from files, so they are written by these rules and no other:
-- An id, a history label, a phase id and a step are written bare, without quotes, and only when the value matches `^[A-Za-z0-9._-]{1,40}$`. If one does not match, don't run the call: tell the owner which value was refused.
-- A project folder is written `.` when it is the working directory, and otherwise in single quotes. If the path holds a single quote, a control character or any of U+2018 to U+201B (the curly quote marks), don't run the call: tell the owner to rename the folder or give another one.
+- A project id is written bare, without quotes, and only when it matches `^[0-9a-f]{12}$`, the form `list` prints. A history label, a phase id and a step are written bare, and only when the value matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`. If one does not match, don't run the call: tell the owner which value was refused.
+- A project folder is written `.` when it is the working directory, and otherwise in single quotes. If the path holds a single quote, a double quote, a control or format character (Unicode categories Cc, Cf, Zl and Zp: this covers U+0000 to U+001F, U+007F to U+009F, U+2028, U+2029, bidi controls and zero-width characters) or any of U+2018 to U+201B (the curly quote marks, which PowerShell also reads as a quote), don't run the call: tell the owner to rename the folder or give another one. A path never ends in `\` or `/`: drop a trailing separator, and if the value still ends in one, don't run the call. A value that is empty, or is a drive or file-system root (`C:\` or `/`), is not run.
 - A `--roadmap` value is written bare, only when it matches `^[A-Za-z0-9._/-]{1,100}$` and ends in `.md`. If it does not, don't run the call.
 - An `--out` file is written in single quotes under the same rule as a project folder.
+- Run the `.mjs` calls with the Bash tool when there is one: Windows PowerShell 5.1 passes arguments differently, and one value could become several.
 - `--refresh-s` takes a bare whole number from 5 to 300, and only when the owner gave one. If the value is anything else, don't run the call: tell the owner the range.
+- `"${CLAUDE_PLUGIN_DATA}"` and `"${CLAUDE_SKILL_DIR}"` stay in double quotes: Claude Code sets them, and no repository does.
 - Never put a title, a name or any other text from a file into a command line.
 
 ## Modes
@@ -38,7 +40,7 @@ You build each command line, and some values come from the owner or from files, 
 
 ## Where it writes
 
-The status and list files go to the data folder only. `collect --out` writes the one file you name, and is refused inside the data folder (under any name or route) and as a network path; `page` writes `dashboard.html` in the data folder, and `status.mjs` rewrites that same file after a `set`, `clear` or `unregister` while the dashboard is on; `page.mjs --out <file>` writes the one file you name, under the same refusals; the tool writes nothing else. Do not point `--data` at a folder that git tracks: `projects.json` holds the absolute paths of your projects.
+The status and list files go to the data folder only. `collect --out` writes the one file you name, and is refused inside the data folder (under any name or route) and as a network path; `page` writes `dashboard.html` in the data folder, and `status.mjs` rewrites that same file after a `set`, `clear` or `unregister` while the dashboard is on; `page.mjs --out '<output file>'` writes the one file you name, under the same refusals; the tool writes nothing else. Do not point `--data` at a folder that git tracks: `projects.json` holds the absolute paths of your projects.
 
 ## Don't
 

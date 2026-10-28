@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 922
+# tests: 948
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
 linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
 linux:skip,win32:run	measure CLI: a command's stdout is passed through untouched, and --json goes to stderr
@@ -46,6 +46,7 @@ run	a .original that appears between the check and the link is kept as it is (tr
 run	a BOM in front of the marker on the first line is allowed: the table is standard, set works and keeps the BOM; a BOM anywhere else does not count
 run	a Summary must be 20 to 160 characters
 run	a Summary with a character outside the allowlist is an error that names the version and the code point, never the character
+run	a bare placeholder fails unless it is on the validated list and the file states its pattern
 run	a before that is not an ancestor of the new head returns only the new head
 run	a before that is not in the repository returns only the new head
 run	a broken relative link fails, but a link inside a code block does not
@@ -56,8 +57,11 @@ run	a clean plugin agent and skill pass, with no metadata block needed
 run	a damaged or foreign record file means no record, and record replaces it with a valid one
 run	a date must be written YYYY-MM-DD and be a real calendar date
 run	a description with no sentence end: short stays whole, long is cut
+run	a double-quoted placeholder fails, named by file and line, in a span and in a fenced block
+run	a double-quoted string is allowed only around a Claude Code variable or fixed lowercase text
 run	a drifted generated page fails
 run	a fallback publish that fails with something left at the final name keeps its marker: the next write refuses, and nothing is written
+run	a fenced command that continues on the next line is checked as one line
 run	a file turned into a hard link after the list is caught at the read, and the read-time check is what catches it
 run	a file with an allowlisted name that holds binary bytes or is not text is skipped and never printed
 run	a first sentence longer than 200 characters is cut at a word boundary with an ellipsis
@@ -159,6 +163,7 @@ run	both case: a legacy table refuses to propose until it is standard, unless --
 run	both case: a standard table lists only the plan files whose ids are not in it; with no --into a write is refused
 run	both case: several roadmap files are listed, --into picks one, nothing is merged across files
 run	both marketplace files list phased-shipping, and the Cursor entry says what is Claude Code only
+run	bracketed options, positional-only spans and spans with a quote or a $ are script lines too
 run	builder and checker share their rules, the builder has two more (the plan files, the plugin files), and shipper has its own
 run	caps: 200 files in the list, 64 KB of text per file, 400 KB for the survey
 run	cell escapes the backslash first and then the pipe, so the text reads back unchanged and a pipe never splits a cell
@@ -269,9 +274,11 @@ run	every install line in a tracked file names the marketplace and an existing p
 run	every path that is not a plain regular .gitignore, or has other content, is dealt with before .original (no .original after a refusal)
 run	every relative link and image points at a file that exists, and every anchor at a heading in the target
 run	every rule denies with the documented output (the decision the script prints)
+run	every scan is linear: 32,000 repeats of the shapes that made a regex rescan the text finish at once
 run	every shipped or in-progress release has a page, and the in-progress one says so
 run	every summary in the real library.json is within 240 characters
 run	every tokenizer loop is linear: 80000-word inputs are split in well under a second
+run	exempt: "${CLAUDE_SKILL_DIR}" and "${CLAUDE_PLUGIN_DATA}" in double quotes, with or without a path after them
 run	exotic syntax is flagged on the command that uses it
 run	fail closed: .phased-shipping is a file, a link, or has a .gitignore that is not '*': nothing is written
 run	fewer than three entries are all shown; no version heading is an error
@@ -348,6 +355,7 @@ run	headroom: short by 600 MB with Suggest groups of 400, 275 and 100 picks 400 
 run	headroom: the rendered text never offers a command to close anything and always ends with the read-only line
 run	headroom: the reserve of 10% of total memory is subtracted from the available memory
 run	heredocs: a quoted body is text, an unquoted body runs its substitutions, a shell runs the body
+run	hidden forms fail: curly quotes, entities, <code> and <pre> with attributes, <pre> blocks, indented code with a backtick, double-backtick spans
 run	history: the joined text is one line in one cell and never carries a pipe or a newline into the table
 run	history: the plugin data folder's history.jsonl is the default, only when it exists
 run	history: with --project it joins Actual and the deploy text; the newest record wins and the Note says so
@@ -447,6 +455,9 @@ run	model-scout regression: another folder, a subfolder, a .claude path, a missi
 run	modes: the roadmap keeps its mode, copies are owner-only and the folder 0700 where the system has modes; on Windows nothing throws
 run	more wrappers: busybox, script, su, winpty, flock, strace, ltrace, parallel, start
 run	mutation proof on a temp copy: removing a marker or a CHANGELOG line makes --check fail with a clear message
+run	mutation proof on synthetic text: the good form passes, and each bad form of it fails with the file and line
+run	mutation proof on the real skills: the lines the first review found fail when written the old way
+run	mutation proof on the real skills: turning one single-quoted path into a double-quoted one fails in that file
 run	mutation sweeps: the mutant count of each sweep in dashboard-page-sweeps-6.test.mjs is unchanged
 run	mutation sweeps: the mutant count of each sweep in dashboard-page-sweeps.test.mjs is unchanged
 run	mutation sweeps: the second part of the round 6 sweep is the cases after the first part
@@ -568,6 +579,11 @@ run	phase 7p: the run skill reuses a baseline only from a green full verify, nev
 run	phase 7p: the shipper has 40 turns and the README says so
 run	phase 7p: the three new evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders
 run	phase 7p: the wiki pages say 0.11.0 where they name the current version
+run	phase 7q: each skill with script lines states the same unsafe-path rule, and keeps ${CLAUDE_SKILL_DIR} in double quotes
+run	phase 7q: the plan skill stops at the record step and the roadmap check, and skips the survey, when a path is unsafe
+run	phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added
+run	phase 7q: the roadmap, onboard and free-resources skills stop and say why; format.md names the single-quoted form
+run	phase 7q: the run skill stops when a commands-hash path is unsafe, skips roadmap set, and picks another temp path for the history file
 run	plugin agent names must match the file and have no colon
 run	plugin agents: bad effort and maxTurns fail
 run	plugin agents: fields that plugins ignore fail
@@ -577,6 +593,7 @@ run	pressure verdict: each threshold and its boundary
 run	prints the full hash, or 12 hex characters with --short
 run	programName reduces paths, extensions and case
 run	publish-wiki.mjs imports cell from releases-table.mjs and defines none of its own
+run	quotes are paired left to right in three states, so a quote inside the other kind does not end it
 run	read: prints JSON with the file's base name only
 run	reader: a legacy table with the real-world status forms places them, and only the unknown words stay blocked, with the exact --set-status hint
 run	real process: the script reached through a symbolic link or junction to its folder still runs and records
@@ -669,6 +686,7 @@ run	sampler: descendants are the root and everything below it, never a sibling, 
 run	sampler: macOS ps output parses into the tree (fixture only; Mac is untested on a real machine)
 run	sampler: peak tree MB counts descendants only, and CPU cores come from CPU-second deltas over wall time
 run	sampler: streaming typeperf lines parse, including a partial last line, and the drop is first minus lowest
+run	scope: the .md files under plugins/*/skills, plugins/*/agents, skills and agents, and nothing else
 run	secrets are looked for in the parsed values too: a JSON escape, an escaped slash or a zero-width split cannot hide one
 run	separators inside quotes do not split
 run	set: a standard table's id is found even when the same id is in a legacy table
@@ -681,6 +699,7 @@ run	shipper: force, skip-checks and history rewrites are denied
 run	show keeps a command, an action, a stack entry and a manifest or deploy file only in the forms the script writes, and strips invisible characters
 run	show keeps only known fields from a survey.json on disk, cleans and caps them, and says it was read from disk
 run	show refuses a survey that is not schema v 1
+run	single-quoted placeholders need the unsafe-character rule in the same file, each piece of it
 run	source: adopt builds no regular expression from text and reads no folder it should not
 run	stale banner: 90 minutes, from one value in the page, the placeholder and the script
 run	standardize --write: LF and CRLF files keep their line endings and the last-newline state
@@ -796,6 +815,7 @@ run	the changelog has a 0.3.0 entry with Added, Changed and Fixed
 run	the changelog has a 0.4.0 entry above 0.3.0 that describes the guard honestly
 run	the checker has no file-editing tools, proposes commands and never runs them
 run	the checker runs the probe first when the brief has it, and it is never a check failure
+run	the classes the first version of this test missed all fail now
 run	the command line: unknown commands and options are usage errors that read nothing
 run	the command that invokes a script follows the package manager: pnpm and yarn lockfiles change it, npm is the default
 run	the compatibility table has the five columns and the three tool rows, macOS is said to be untested, and the plugin READMEs agree
@@ -804,6 +824,7 @@ run	the feature pages listed in the script all exist
 run	the files are flushed before they are published or closed
 run	the first screen (tagline to the end of Quick start, without the generated What's new block) is 60 to 250 words
 run	the first three secret patterns are the ones in scripts/lint.mjs
+run	the format page's table rows are checked: the adopt row with a double-quoted bracketed option fails
 run	the four SVGs exist, are at most 12 KB and have a viewBox
 run	the fourth and older entries need no lines, and a heading with extra text is not an entry
 run	the generated What's new block is at most 110 words and sits between the tagline and The problem
@@ -827,6 +848,7 @@ run	the marketplace name is the project name in both marketplace files
 run	the message for a missing line says what to write and where
 run	the newest entry must be the plugin version
 run	the old required-field check still works
+run	the old unsafe command lines are all caught
 run	the page versions follow plugin.json, and no page says the guard has not been seen firing
 run	the pages make no claim that drifts or that the plugins cannot keep
 run	the placeholder end check is what catches true-Xy7pq9Lm2: with it loosened to a word boundary the value passes
@@ -841,6 +863,7 @@ run	the real repo lints with no errors, including the plugin files
 run	the real repo passes lint and its manifest is current
 run	the real script, run as a process: deny output, allow output, exit codes and --agent
 run	the real script: id prints one line equal to HEAD^{tree}, and check with no record exits 1
+run	the real tree: every script command line in every skill and agent file follows the quoting rule
 run	the recovery message names the cut-short copy: .original is compared and may be deleted too; any other marker names its own copy, not .original
 run	the release note claims provenance only when the workflow makes it
 run	the release table lists only releases that are shipped or in progress
@@ -850,6 +873,7 @@ run	the roadmap's temp file lives in the backup folder; nothing named .tmp is ev
 run	the role comes from agent_type (plugin names only) or from --agent
 run	the root plugin name is the project name in both plugin files
 run	the root: .git is found from a subfolder, a folder outside any repository is its own root, --root wins, and nothing above the root is read
+run	the rule has the empty-value and root piece, and each skill states it
 run	the same section gives the same hash, whatever the line endings or trailing spaces
 run	the script imports only node: built-ins
 run	the script imports only node: built-ins and never calls require or a dynamic import
@@ -879,6 +903,7 @@ run	trail: the newest 40 entries are kept
 run	trailing punctuation and spaces are trimmed before the ellipsis
 run	tree-state.mjs and commands-hash.mjs reached through a link to their folder still run and print
 run	two Summary lines or two Date lines are an error
+run	unbracketed placeholders and loose double quotes fail: {name}, ALL_CAPS, [bracketed words], and any fixed word not on the list
 run	unreadable or invalid input allows when no role is known, with no output and exit 0
 run	unregister: a malformed session file of the removed project is neither read nor reported, and the page has no trace of it
 run	unregister: the command line (a real process) rebuilds the page
@@ -911,6 +936,7 @@ run	verifyText skips fenced lines, refuses two Full verify bullets or none with 
 run	verifyText takes the Full verify bullet with its indented lines, falls back to the Baseline line, and is null without either
 run	verifyText: an empty or blank backtick span is not a command, and any mention of fast points at the one Fast verify bullet
 run	versions must go down and dates must not go up, down the file
+run	what counts as a script line: a span or a fenced line that runs a .mjs script, not prose or other spans
 run	what the README says each agent can use matches the agent files
 run	where a link cannot be made, the copy is written under its final name between a marker and its removal; no marker and no temp file remain
 run	whitespace is collapsed before the sentence is taken

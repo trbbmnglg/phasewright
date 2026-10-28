@@ -729,17 +729,17 @@ test("run skill: every status.mjs command line has no --name, no double-quoted f
   assert.ok(statusLineProblems(old("--phase <phase title>")).length >= 1, "a placeholder that is not allowed");
   assert.ok(statusLineProblems("no command here").length >= 1, "a doc with no status line is a problem, not a pass");
   // the rule is in the skill: the pattern, the skip, and never --name
-  assert.ok(RUN_SRC.includes("^[A-Za-z0-9._-]{1,40}$") && !RUN_SRC.includes("{1,60}"), "the pattern for the phase id and the label is the script's 40");
+  assert.ok(RUN_SRC.includes("^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$") && !RUN_SRC.includes("{1,60}") && !RUN_SRC.includes("^[A-Za-z0-9._-]{1,40}$"), "the pattern for the phase id and the label is the script's 40 characters, and starts with a letter or a digit");
   assert.ok(RUN_SRC.includes("skip that status call") && RUN_SRC.includes("leave out `--label`"));
   assert.ok(RUN_SRC.includes("never pass `--name`"));
   assert.ok(RUN_SRC.includes("Never put a title, a name or any other text from a roadmap, a plan file, an issue or a commit into a status command line"));
   // a value that matches the pattern holds no character the shell treats as special
-  const pattern = /^[A-Za-z0-9._-]{1,40}$/;
+  const pattern = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
   for (let c = 0; c < 0x250; c++) {
     const ch = String.fromCodePoint(c);
     if (pattern.test(ch)) assert.ok(!" \t\n\r\"'`$\\;&|<>()[]{}*?!#~=%^,:@+".includes(ch), `U+${c.toString(16)} is allowed by the pattern but special to a shell`);
   }
-  for (const evil of ["`echo hi`", "$(echo hi)", "a b", "a;b", "a\"b", "x".repeat(41), ""]) assert.ok(!pattern.test(evil), JSON.stringify(evil));
+  for (const evil of ["`echo hi`", "$(echo hi)", "a b", "a;b", "a\"b", "x".repeat(41), "", "-x", "--write", ".x"]) assert.ok(!pattern.test(evil), JSON.stringify(evil));
   // the other docs do not show the run passing --name
   for (const doc of [join(PS, "skills", "dashboard", "references", "status.md"), join(PS, "skills", "dashboard", "SKILL.md"), join(PS, "README.md")]) {
     const text = readFileSync(doc, "utf8");
@@ -970,9 +970,9 @@ test("dashboard skill: its command lines have no double-quoted free text and onl
     assert.equal((span.match(/--(?:root|out) (?:'<[^'>]*>'|\.)(?=[ `])/g) ?? []).length, (span.match(/--(?:root|out)\b/g) ?? []).length, `a folder or file is single-quoted: ${span.slice(0, 80)}`);
     assert.equal((span.match(/--(?:label|roadmap) <[^">]*>/g) ?? []).length, (span.match(/--(?:label|roadmap)\b/g) ?? []).length, `a label or roadmap is bare: ${span.slice(0, 80)}`);
   }
-  for (const phrase of ["^[A-Za-z0-9._-]{1,40}$", "^[A-Za-z0-9._/-]{1,100}$", "ends in `.md`", "written `.` when it is the working directory", "otherwise in single quotes", "a single quote, a control character or any of U+2018 to U+201B", "An `--out` file is written in single quotes under the same rule", "Never put a title, a name or any other text from a file into a command line"]) assert.ok(DASH_SRC.includes(phrase), phrase);
-  const skip = "a single quote, a control character or any of U+2018 to U+201B";
-  assert.ok(RUN_SRC.includes(skip) && RUN_SRC.includes("skip the status call"), "the run skill skips the call for the same characters");
+  for (const phrase of ["^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$", "^[A-Za-z0-9._/-]{1,100}$", "ends in `.md`", "written `.` when it is the working directory", "otherwise in single quotes", "a single quote, a double quote, a control or format character", "An `--out` file is written in single quotes under the same rule", "Never put a title, a name or any other text from a file into a command line"]) assert.ok(DASH_SRC.includes(phrase), phrase);
+  for (const piece of ["a single quote, a double quote, a control or format character", "any of U+2018 to U+201B"]) assert.ok(RUN_SRC.includes(piece) && DASH_SRC.includes(piece), `both skills refuse the same characters: ${piece}`);
+  assert.ok(RUN_SRC.includes("unsafe by the quoting rule above (an empty value and a root count), skip the status call"), "the run skill skips the status call for them");
   assert.ok(!RUN_SRC.includes("holds a single quote, skip") && !RUN_SRC.includes("only a single quote"));
   // the claims are only as strong as what is true
   for (const doc of [RUN_SRC, DASH_SRC, readFileSync(join(PS, "README.md"), "utf8"), readFileSync(join(PS, "CHANGELOG.md"), "utf8"), readFileSync(join(PS, "skills", "dashboard", "references", "status.md"), "utf8")]) {
@@ -980,9 +980,9 @@ test("dashboard skill: its command lines have no double-quoted free text and onl
   }
   assert.ok(RUN_SRC.includes("The folder is the one value that can"), "the run skill says the folder is the one value that can hold a special character");
   // what the patterns accept
-  const bare = /^[A-Za-z0-9._-]{1,40}$/;
+  const bare = /^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$/;
   const road = /^[A-Za-z0-9._/-]{1,100}$/;
-  for (const evil of ["proj$(touch pwned)", "a b", "a;b", "`id`", "a'b", `a${cp(0x2019)}b`, "x".repeat(41), ""]) assert.ok(!bare.test(evil), JSON.stringify(evil));
+  for (const evil of ["proj$(touch pwned)", "a b", "a;b", "`id`", "a'b", `a${cp(0x2019)}b`, "x".repeat(41), "", "-x", "--write"]) assert.ok(!bare.test(evil), JSON.stringify(evil));
   for (const evil of ["a b.md", "$(x).md", "a;b.md", "x/".repeat(60)]) assert.ok(!road.test(evil), JSON.stringify(evil));
   assert.ok(bare.test("zork-app_1.2") && road.test("docs/PHASES.md"));
   // PowerShell ends a single-quoted string at U+2018 to U+201B, so each of them must be on the skip list
@@ -1009,7 +1009,7 @@ test("docs: status.md writes the escape names as visible text; the README and sk
   assert.ok(ref.includes("Do not point `--data` at a folder that git tracks") && ref.includes("`collect --out` writes the one file you name"));
   assert.ok(DASH_SRC.includes("Do not point `--data` at a folder that git tracks") && DASH_SRC.includes("`collect --out` writes the one file you name, and is refused inside the data folder"));
   for (const doc of [readme, readFileSync(join(PS, "CHANGELOG.md"), "utf8"), ref, DASH_SRC]) assert.ok(doc.toLowerCase().includes("other spellings of a path may remain"), "the redaction wording says other spellings may remain");
-  assert.ok(!RUN_SRC.includes("{1,60}") && RUN_SRC.includes("{1,40}"), "the run skill says 40, as the script does");
+  assert.ok(!RUN_SRC.includes("{1,60}") && RUN_SRC.includes("{0,39}"), "the run skill says 40, as the script does");
   assert.ok(COLLECT_SRC.includes("other spellings of a path may remain"));
 });
 

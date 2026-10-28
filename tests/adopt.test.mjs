@@ -187,7 +187,7 @@ test("adopt plan: a file with no Timestamps line, placeholders only, a duplicate
   const r = adopt(root);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /undecided \(1\)/);
-  assert.ok(r.out.split("\n").some((l) => l.includes("I1a") && l.includes(".plans/phases/phase-I1a-intake.md") && l.includes("--set-status I1a=planned")), "placeholders give no status, with the exact hint");
+  assert.ok(r.out.split("\n").some((l) => l.includes("I1a") && l.includes(".plans/phases/phase-I1a-intake.md") && l.includes("--set-status 'I1a=planned'")), "placeholders give no status, with the exact hint");
   assert.match(r.out, /duplicate-id \(2 files\)/);
   assert.ok(r.out.split("\n").some((l) => l.includes("2: docs/phases/phase-2-graph-core.md")));
   assert.ok(r.out.split("\n").some((l) => l.includes("2: docs/phases/phase-2-code-map.md")), "the code map with no Timestamps and the shipped plan are both left out");

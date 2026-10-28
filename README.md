@@ -7,9 +7,9 @@ Skills, agents and plugins that keep AI-assisted coding work small, checked and 
 
 ## What's new
 
+- **phased-shipping 0.11.1** (2026-10-29): Every script command line in every skill now writes its paths in single quotes, and a call whose path holds an unsafe character is not run.
 - **phased-shipping 0.11.0** (2026-10-28): Faster runs without a lower bar: fast and full verify sets, reusable green baselines, review briefs and visible timings.
 - **phased-shipping 0.10.0** (2026-10-27): The dashboard page: projects, sessions and current phase with its loops, one local file rebuilt at every step, no network.
-- **phased-shipping 0.9.0** (2026-10-27): Dashboard data: opt-in status files at each gate, a local project list, and one merged JSON.
 
 Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
 <!-- whats-new:end -->

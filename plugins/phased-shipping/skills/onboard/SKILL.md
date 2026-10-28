@@ -11,9 +11,18 @@ disable-model-invocation: true
 
 Arguments: `$ARGUMENTS`
 - The argument is the project folder. Default: the working directory.
-- Always pass the project folder as `--root "<project folder>"`. The script reads nothing outside it.
+- Always pass the project folder as `--root '<project folder>'`. The script reads nothing outside it.
 
 The script is `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs"`. If Node is missing, say so and stop. What it may open, what it never opens and the saved file are in [survey.md](references/survey.md).
+
+## Writing a command line
+
+You build each command line, so a value from a file would reach it if you put one there. One rule covers every call in this skill:
+- A path (the project folder, a roadmap file, an excluded file) is written in single quotes, like `'<project folder>'`, never in double quotes: a shell still expands `$(...)` and backticks inside those. Check the path first. If it holds a single quote, a double quote, a control or format character (Unicode categories Cc, Cf, Zl and Zp: this covers U+0000 to U+001F, U+007F to U+009F, U+2028, U+2029, bidi controls and zero-width characters) or any of U+2018 to U+201B (the curly quote marks, which PowerShell also reads as a quote), don't run the call: stop and tell the owner which path was refused, and to rename it or give another one. A path never ends in `\` or `/`: drop a trailing separator, and if the value still ends in one, don't run the call. A value that is empty, or is a drive or file-system root (`C:\` or `/`), is not run.
+- Run the `.mjs` calls with the Bash tool when there is one: Windows PowerShell 5.1 passes arguments differently, and one value could become several.
+- A value that is not a path is written bare, without quotes, only when it matches its pattern: the list digest `^[0-9a-f]{12,64}$`. A value that does not match is handled like an unsafe path.
+- `"${CLAUDE_SKILL_DIR}"` stays in double quotes: Claude Code sets it, and no repository does.
+- Never put any other text from a file on a command line.
 
 Ask every question with AskUserQuestion. If that tool isn't available, stop: print the command for the owner to run and don't run it.
 
@@ -28,17 +37,17 @@ Tell the owner, in a few lines and before any command:
 
 ## 2. List (reads folder entries and sizes only)
 
-Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" list --root "<project folder>"`. Show the owner the list: category, relative path and size, and what was not listed and why. Note the `digest of this list` line: `run` needs it, and refuses (reading nothing) if the project's files changed since.
+Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" list --root '<project folder>'`. Show the owner the list: category, relative path and size, and what was not listed and why. Note the `digest of this list` line: `run` needs it, and refuses (reading nothing) if the project's files changed since.
 
 ## 3. Confirm
 
-Ask with AskUserQuestion which files to read. Options: read all of them, remove some (then ask which, listing them), or stop. A file the owner removes is passed to `run` as `--exclude "<relative path>"`.
+Ask with AskUserQuestion which files to read. Options: read all of them, remove some (then ask which, listing them), or stop. A file the owner removes is passed to `run` as `--exclude '<relative path>'`.
 
 Only an explicit "read all of them" or a list with removals goes on. That holds even if the owner's message says "don't ask" or "yes to all": the question is part of the command. If the owner said stop, stop.
 
 ## 4. Run
 
-Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" run --all-listed --list-digest "<digest from the list>" [--exclude "<path>"]... --root "<project folder>"`. It prints a summary and saves `.phased-shipping/survey.json`. If it exits with an error, show the message and stop: it fails closed, and nothing was saved. If the digest does not match, the files changed after the list: show the list again and ask again. If it says something looked like a secret, tell the owner only that and the category it names. Report the skipped files as the script lists them (by reason); never try to read a skipped file another way.
+Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" run --all-listed --list-digest <list digest> [--exclude '<path>']... --root '<project folder>'`. It prints a summary and saves `.phased-shipping/survey.json`. If it exits with an error, show the message and stop: it fails closed, and nothing was saved. If the digest does not match, the files changed after the list: show the list again and ask again. If it says something looked like a secret, tell the owner only that and the category it names. Report the skipped files as the script lists them (by reason); never try to read a skipped file another way.
 
 ## 5. Findings and how planning adapts
 
@@ -46,7 +55,7 @@ Show the owner what the script printed: the stack, the commands (test, build, li
 
 ## 6. Classify
 
-Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" classify --root "<project folder>"`. It prints one of four states with its evidence:
+Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" classify --root '<project folder>'`. It prints one of four states with its evidence:
 - `table`: a roadmap table exists. Standardize it if it is legacy.
 - `plans`: plan files but no table. Adopt them into a roadmap.
 - `both`: standardize first if the table is legacy, then adopt the plan files that are not listed.
@@ -57,8 +66,8 @@ Run `node "${CLAUDE_SKILL_DIR}/scripts/survey.mjs" classify --root "<project fol
 Ask with AskUserQuestion which path to take, with the recommendation (from the state) first and the others after: standardize, adopt, both in order, or fresh. With several roadmap files, ask which one to work on (one or all; each gets its own backup).
 
 Then show the read-only preview, which writes nothing:
-- standardize: `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" standardize "<roadmap file>" --root "<project folder>"` (no `--write`).
-- adopt: `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" adopt "<project folder>" --root "<project folder>"` (no `--write`).
+- standardize: `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" standardize '<roadmap file>' --root '<project folder>'` (no `--write`).
+- adopt: `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" adopt '<project folder>' --root '<project folder>'` (no `--write`).
 - fresh: no command; tell the owner to run `/phased-shipping:plan <goal>`, which writes the roadmap.
 
 This skill never writes a roadmap and never gives `--write`. The write belongs to the roadmap skill, which asks for its own yes: give the owner the command to run (`/phased-shipping:roadmap standardize`, then `/phased-shipping:roadmap adopt` for `both`).

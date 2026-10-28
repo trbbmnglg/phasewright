@@ -2,6 +2,23 @@
 
 Newest first. Each version starts with a `Date:` and a `Summary:` line; the README's What's new list is written from the newest three. Older entries have none.
 
+## 0.11.1
+
+Date: 2026-10-29
+Summary: Every script command line in every skill now writes its paths in single quotes, and a call whose path holds an unsafe character is not run.
+
+### Changed
+- Every command line that runs a script, in the run, plan, roadmap, onboard and dashboard skills and in the free-resources skill, now writes each path in single quotes, like `'<plan>'`, where several used double quotes. A path is checked before the call: if it holds a single quote, a double quote, a control or format character (Unicode categories Cc, Cf, Zl and Zp, which covers U+0000 to U+001F, U+007F to U+009F, U+2028, U+2029, bidi controls and zero-width characters) or any of U+2018 to U+201B, the call is not run. A path never ends in `\` or `/`: a trailing separator is dropped, and a value that still ends in one is refused. A value that is empty, or is a drive or file-system root, is not run either. The skills also say to run the `.mjs` calls with the Bash tool when there is one, because Windows PowerShell 5.1 passes arguments differently. A value that is not a path is written bare only when it matches a stated pattern (a phase id, a commit, hours, a list digest, a project id). `${CLAUDE_SKILL_DIR}` and `${CLAUDE_PLUGIN_DATA}` stay in double quotes. No other text from a file goes on a command line. Each skill states the rule beside its first command line, so the personal copies stand alone.
+- What a call that is not run means is set per call. In the run skill the three `commands-hash` calls (check planned and record previewed at the preview, check previewed at approve and push) stop, because approval can't be bound to the commands the user saw. In the plan skill the `commands-hash` record stops and so does the roadmap check, and the survey calls are skipped, saying why. The `roadmap set` calls at start and close are skipped with a note and the row is updated by hand. The history record picks another temp path. The roadmap, onboard and free-resources skills stop and say why.
+- The run skill's `--commit` placeholder is `<commit>` (it was `<sha>`), and the dashboard skill's project id is written bare only when it matches `^[0-9a-f]{12}$`, the form `list` prints. A phase id or label written bare must now start with a letter or a digit (`^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`), so a value can never look like an option.
+- The roadmap format page, the dashboard status page and the roadmap script's hints and usage text now show single-quoted values (`--set-status '<id>=<status>'`, `'<file>'`, `'<note>'`), and two lines in the dashboard references that named an option with a placeholder no longer show one.
+
+### Added
+- A test, `tests/command-lines.test.mjs`, with a checker in `tests/helpers/command-lines.mjs`. It reads every Markdown file under `skills` and `agents` (top level and in each plugin): code spans, `<code>` elements, fenced blocks (a line ending in a backslash joins the next, `~~~` fences too) and indented code that run a `.mjs` script or put a placeholder beside an option. Quotes are paired left to right, and a double-quoted string must be a Claude Code variable or one listed fixed word. It fails on a `$` or a backtick outside single quotes, an unbalanced quote, a curly quote, an HTML entity, a `{name}`, ALL_CAPS or `[bracketed words]` placeholder, a `<code>` or `<pre>` element with attributes, an indented code line that also holds a backtick, a bare placeholder that is not on the validated list, is not beside its own option, or whose pattern the same file does not state, and on a file with single-quoted placeholders that does not state every piece of the unsafe-character rule. It is proved on synthetic text and on the real skills.
+- The free-resources plugin is at 0.1.1 for the same change to its skill.
+
+No guard rule changed. The guard version is 0.11.1, kept equal to the plugin version, and the guard still has four roles (`builder`, `checker`, `shipper` and `model-scout`).
+
 ## 0.11.0
 
 Date: 2026-10-28

@@ -1,7 +1,7 @@
 {
   "name": "phased-shipping",
   "description": "Ship in small phases, one deploy each, with priority, urgency, estimates, and the right model and effort for every task type.",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "author": {
     "name": "trbbmnglg"
   },

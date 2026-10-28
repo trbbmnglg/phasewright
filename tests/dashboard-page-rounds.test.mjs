@@ -70,8 +70,8 @@ test("docs: the two size limits, the need for JavaScript, the path wording and t
   for (const [name, text] of Object.entries({ status, change, wiki, pageSrc })) assert.ok(text.includes("do not put paths in plan text"), name);
   assert.ok(readme.includes("No path the tool builds appears in the page") && status.includes("no path the tool builds appears in it"));
   // (d) the one exception to "nothing else is written"
-  assert.ok(status.includes("with `page.mjs --out <file>`, to the one file you name"), "status.md names the page --out file");
-  assert.ok(skill.includes("`page.mjs --out <file>` writes the one file you name"), "SKILL.md names the page --out file");
+  assert.ok(status.includes("with `page.mjs --out`, to the one file you name"), "status.md names the page --out file");
+  assert.ok(skill.includes("`page.mjs --out '<output file>'` writes the one file you name"), "SKILL.md names the page --out file");
 });
 // The page without its stylesheet, so a class name is looked for in the markup only.
 const mu = (projects, sessions = [], o = {}) => htmlOf(projects, sessions, o).replace(/<style>[\s\S]*?<\/style>/, "");

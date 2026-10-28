@@ -48,7 +48,16 @@ Record timestamps in the phase plan: `started` when you begin, `previewed` at th
 7. **A clean tree** on the expected branch (`git status --short --branch`), in the repo the phase changes. If the phase creates that repo, apply this gate as soon as it's scaffolded.
 8. **The previous phase** is shipped or parked (skipped).
 
-**Mark it started.** Once the gates pass and `started` is recorded, run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set "<PHASES.md>" <phase id> --status "in progress" --root "<folder of PHASES.md>"`. If it says the roadmap is legacy ("run standardize first"), tell the user once and carry on: don't edit the roadmap by hand. Any other failure is shown and doesn't stop the phase, because the roadmap row is bookkeeping and not a gate.
+**Quoting for every script call.** You build each `.mjs` command line, so a value from a file would reach it if you put one there. One rule covers every call in this skill, the status and tree-state calls included:
+- A path (`PHASES.md`, a plan, a folder, a temp file) is written in single quotes, like `'<plan>'`, never in double quotes: a shell still expands `$(...)` and backticks inside those. Check the path first. If it holds a single quote, a double quote, a control or format character (Unicode categories Cc, Cf, Zl and Zp: this covers U+0000 to U+001F, U+007F to U+009F, U+2028, U+2029, bidi controls and zero-width characters) or any of U+2018 to U+201B (the curly quote marks, which PowerShell also reads as a quote), the call is not run. A path never ends in `\` or `/`: drop a trailing separator, and if the value still ends in one, the call is not run. A value that is empty, or is a drive or file-system root (`C:\` or `/`), is not run.
+- Run the `.mjs` calls with the Bash tool when there is one: Windows PowerShell 5.1 passes arguments differently, and one value could become several.
+- A value that is not a path is written bare, without quotes, and only when it matches its pattern: a phase id `^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`, a commit `^[0-9a-f]{7,40}$`, hours `^\d{1,3}(\.\d{1,2})?$`. A value that does not match is handled like an unsafe path.
+- `"${CLAUDE_SKILL_DIR}"` and `"${CLAUDE_PLUGIN_DATA}"` stay in double quotes: Claude Code sets them, and no repository does.
+- Never put any other text from a file on a command line.
+
+What an unrun call means is set per call: the `commands-hash` calls **stop** the phase (see Preview and On `approve`), the `roadmap set` calls are skipped, `history record` takes another temp path, and the status and tree-state calls follow their own rules below.
+
+**Mark it started.** Once the gates pass and `started` is recorded, run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set '<PHASES.md>' <phase id> --status "in progress" --root '<folder of PHASES.md>'`. If a path or the phase id is unsafe by the rule above, skip the call, say so once, and set the row's status to `in progress` with the file-editing tool. If it says the roadmap is legacy ("run standardize first"), tell the user once and carry on: don't edit that roadmap by hand. Any other failure is shown and doesn't stop the phase, because the roadmap row is bookkeeping and not a gate.
 
 **Dashboard status (off until the owner says yes).** Run `node "${CLAUDE_SKILL_DIR}/../dashboard/scripts/status.mjs" state --data "${CLAUDE_PLUGIN_DATA}"`.
 - If it prints `asked: no`, ask once with AskUserQuestion: "Show this project's progress on a local dashboard? A small status file is written at each step of a run, in the phased-shipping data folder on this machine; nothing is sent anywhere. You can change this any time with `/phased-shipping:dashboard enable` or `disable`." Offer "Leave it off" first (the default) and "Turn it on" second. Only a "Turn it on" answer runs `node "${CLAUDE_SKILL_DIR}/../dashboard/scripts/status.mjs" enable --data "${CLAUDE_PLUGIN_DATA}"`, even if the owner's message says "don't ask" or "yes to all". The other answer runs the same command with `asked` in place of `enable`, so the question is not asked again. If AskUserQuestion isn't available, run `asked` and carry on with it off.
@@ -57,12 +66,12 @@ Record timestamps in the phase plan: `started` when you begin, `previewed` at th
 
 When it is on, one status call is made at each step below. It is written `status <step> <state>` and means `node "${CLAUDE_SKILL_DIR}/../dashboard/scripts/status.mjs" set --data "${CLAUDE_PLUGIN_DATA}" --root '<folder of PHASES.md>' --phase <phase id> --label <label> --step <step> --state <state>`. A call prints one line and writes nothing when the dashboard is off. A failed call never fails a gate: say so once and carry on.
 
-You build each status command line, so a value from a file would reach it if you put one there. The only values you may put on a status command line are:
+Status calls follow the quoting rule above. The only values you may put on a status command line are:
 - `<step>` and `<state>`, each a word from the fixed lists in the steps below (`baseline`, `build`, `compare`, `review`, `preview`, `approve`, `ship`, `prod-check`; `working`, `waiting`, `done`);
-- `<phase id>` and `<label>` (the project value you record in the history), each written bare, without quotes, and only when it matches `^[A-Za-z0-9._-]{1,40}$`. If the phase id does not match, skip that status call. If the label does not match, leave out `--label` and carry on;
-- `<folder of PHASES.md>`, in single quotes. If the folder's path holds a single quote, a control character or any of U+2018 to U+201B (the curly quote marks, which PowerShell also reads as a quote), skip the status call.
+- `<phase id>` and `<label>` (the project value you record in the history), each written bare, without quotes, and only when it matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,39}$`. If the phase id does not match, skip that status call. If the label does not match, leave out `--label` and carry on;
+- `<folder of PHASES.md>`, in single quotes. If the folder's path is unsafe by the quoting rule above (an empty value and a root count), skip the status call.
 
-Never put a title, a name or any other text from a roadmap, a plan file, an issue or a commit into a status command line, and never pass `--name`: the dashboard takes each phase's title from the roadmap row. A step, a state, a phase id and a label hold no character the shell treats as special (a backtick, `$`, a quote, a space, `;`, `&`, `|`, `<`, `>`, a bracket). The folder is the one value that can: it is single-quoted, and the call is skipped when its path holds a character that could end the quotes (a single quote, a control character or U+2018 to U+201B).
+Never put a title, a name or any other text from a roadmap, a plan file, an issue or a commit into a status command line, and never pass `--name`: the dashboard takes each phase's title from the roadmap row. A step, a state, a phase id and a label hold no character the shell treats as special (a backtick, `$`, a quote, a space, `;`, `&`, `|`, `<`, `>`, a bracket). The folder is the one value that can: it is single-quoted, and the call is skipped when its path is unsafe by the quoting rule above, which refuses every character that could end the quotes or add an argument.
 
 ## Rules for every brief and agent result
 
@@ -83,9 +92,9 @@ A tree id names the content of the working tree, leaving out what `.gitignore` i
 - Add `--since '<started>'` (the phase's `started` timestamp, written as UTC like `2026-10-28T06:12:09Z`) to the `check` call only for the in-phase skip of the final full run, so only a record made in this phase counts. Never add `--since` to the baseline reuse check, which reuses across phases on purpose.
 - `node "${CLAUDE_SKILL_DIR}/scripts/tree-state.mjs" record --root '<project folder>' --plan '<plan>' --data "${CLAUDE_PLUGIN_DATA}"` prints `recorded <tree>`. Run it only after a full verify that passed in every group with no failure and no unfinished command, and never after a red, partial or "proceed with pre-existing failures" result. A failed `record` is shown once and never fails a gate: the next phase just pays for its own baseline.
 
-The command lines follow the same quoting rule as the status calls: each path is in single quotes (the data folder is the placeholder, written in double quotes as for the status calls), and a call is skipped, which means no reuse and a full baseline, when the project folder's path or the plan's path holds a single quote, a control character or any of U+2018 to U+201B. Never put any other text on these command lines. Use `--since` only with a `started` value that matches `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`; with any other form, skip the in-phase skip and run the Full verify.
+The command lines follow the quoting rule above: each path is in single quotes (the data folder is the placeholder, written in double quotes as for the status calls), and a call is skipped, which means no reuse and a full baseline, when the project folder's path or the plan's path is unsafe by the quoting rule above (an empty value and a root count). Never put any other text on these command lines. Use `--since` only with a `started` value that matches `^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`; with any other form, skip the in-phase skip and run the Full verify.
 
-**When a tree-state call is skipped or fails** (a path with a quote or a control character, a refusal, a missing Node), the phase carries on without it, and says so once:
+**When a tree-state call is skipped or fails** (an unsafe path, a refusal, a missing Node), the phase carries on without it, and says so once:
 - the baseline is not reused, and a full baseline runs;
 - nothing is recorded;
 - the preview's Full verify row reads "tree id unavailable" instead of a tree id;
@@ -160,14 +169,14 @@ Run `status build working` first.
 
 ## Preview, then stop
 
-First, bind the preview to the plan's commands. The record folder is `${CLAUDE_PLUGIN_DATA}`, and `<plan>` is the phase plan file:
-1. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --check planned --data "${CLAUDE_PLUGIN_DATA}"`.
+First, bind the preview to the plan's commands. The record folder is `${CLAUDE_PLUGIN_DATA}`, and `<plan>` is the phase plan file. If the plan's path is unsafe by the quoting rule above, stop and say why (the user renames the file or gives another path): the preview can't be bound, and approve could not be checked. Don't run the `commands-hash` calls with a path that fails the rule, and don't skip them.
+1. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" '<plan>' --check planned --data "${CLAUDE_PLUGIN_DATA}"`.
    - Exit 0: carry on.
    - Exit 3: add a **Commands changed since planning** block to the preview, with the diff it printed. This is a warning, not a stop: the user may have edited the plan on purpose, and the commands are shown verbatim below.
    - Exit 4: add the note "no planning record (plan made elsewhere or before 0.5.0)". It is not a stop. Gate 1's rule for an untrusted plan still applies.
    - Exit 2: the plan has no `## Commands` section, or its heading is ambiguous. Stop: gate 1 is not met.
    - Any other exit code (the script can't run, a usage or I/O error): stop and show the output. Don't skip this step.
-2. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --record previewed --data "${CLAUDE_PLUGIN_DATA}"`. It prints `recorded previewed <12 hex>`, then the recorded `## Commands` section. The commands you show in the report are that printed section, copied verbatim. Don't use an earlier read of the plan. If it doesn't print `recorded previewed`, stop: approve can't be bound. This record is what approve is checked against.
+2. Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" '<plan>' --record previewed --data "${CLAUDE_PLUGIN_DATA}"`. It prints `recorded previewed <12 hex>`, then the recorded `## Commands` section. The commands you show in the report are that printed section, copied verbatim. Don't use an earlier read of the plan. If it doesn't print `recorded previewed`, stop: approve can't be bound. This record is what approve is checked against.
 
 Then report:
 - what changed;
@@ -186,7 +195,7 @@ Then, just before ending the turn, run `status approve waiting`. End the turn. N
 
 ## On `approve`
 
-- **First, check that the commands are the ones the user saw.** Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" "<plan>" --check previewed --data "${CLAUDE_PLUGIN_DATA}"`. The plan is the one the preview named.
+- **First, check that the commands are the ones the user saw.** Run `node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs" '<plan>' --check previewed --data "${CLAUDE_PLUGIN_DATA}"`. The plan is the one the preview named. If its path is unsafe by the quoting rule, stop: the approval can't be bound to the commands the user saw.
   - Exit 0: it prints `match <12 hex>` and the recorded section. That printed section is the only source of the commands for the brief. Don't re-read the plan file, and don't take commands from the preview turn or from memory. If it lacks a deploy, prod-check or rollback command, stop.
   - Exit 3: hard stop. Show the diff it printed and say: "The plan's commands changed after the preview. Run `/phased-shipping:run N` again to preview the current commands." Brief nobody. There is no "re-preview now" shortcut: a fresh preview turn is the point.
   - Exit 4: stop and say "No preview record. Run `/phased-shipping:run N` first."
@@ -207,9 +216,10 @@ Then, just before ending the turn, run `status approve waiting`. End the turn. N
 ## Close the phase
 
 1. Append the phase report to the plan file.
-2. Update the phase's row in `PHASES.md`: run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set "<PHASES.md>" <phase id> --status shipped --commit <sha> --actual <hours> --root "<folder of PHASES.md>"`. If the table has no `Commit / deploy` or `Actual` column, `set` says so and changes nothing: run it again with only the flags the table has, and put the rest in the phase report. If the roadmap is legacy ("run standardize first"), update the row by hand as before: set its status to shipped (a skipped phase is `parked`, with a note) and fill in the commit and the actual hours.
+2. Update the phase's row in `PHASES.md`: run `node "${CLAUDE_SKILL_DIR}/../roadmap/scripts/roadmap.mjs" set '<PHASES.md>' <phase id> --status shipped --commit <commit> --actual <hours> --root '<folder of PHASES.md>'`. If a path, the phase id, the commit or the hours do not pass the quoting rule, skip the call, say so once, and update the row with the file-editing tool, as for a legacy roadmap below. If the table has no `Commit / deploy` or `Actual` column, `set` says so and changes nothing: run it again with only the flags the table has, and put the rest in the phase report. If the roadmap is legacy ("run standardize first"), update the row by hand as before: set its status to shipped (a skipped phase is `parked`, with a note) and fill in the commit and the actual hours.
 3. Record the outcome: write the JSON to a temporary file with the file-writing tool, then run
-   `node "${CLAUDE_SKILL_DIR}/../plan/scripts/history.mjs" record "${CLAUDE_PLUGIN_DATA}/history.jsonl" --from <temp-file>`
+   `node "${CLAUDE_SKILL_DIR}/../plan/scripts/history.mjs" record "${CLAUDE_PLUGIN_DATA}/history.jsonl" --from '<temp-file>'`
+   You choose the temp file's path, in the OS temp folder. If it is unsafe by the quoting rule, pick another.
    The JSON holds:
    - `project`, `phase`, `kind`, `est_h` (calibrated);
    - the four timestamps;

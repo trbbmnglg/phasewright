@@ -2,13 +2,13 @@
 // Reads, checks and standardizes a project's roadmap file (the tables in PHASES.md), adopts a project's plan files
 // into a roadmap, keeps a way back for every write, and restores a kept copy. No dependencies.
 //
-//   node roadmap.mjs read <file> [--root <dir>]
-//   node roadmap.mjs check <file> [--strict] [--root <dir>]
-//   node roadmap.mjs standardize <file> [--table <index>]... [--set-status <id>=<status>]... [--write] [--root <dir>]
-//   node roadmap.mjs set <file> <id> [--status <s>] [--commit <text>] [--actual <hours>] [--plan-file <p>] [--note <t>] [--root <dir>]
-//   node roadmap.mjs restore <file> [--from original|prev|<backup name>] [--write] [--root <dir>]
-//   node roadmap.mjs adopt <project folder> [--plans <dir>]... [--history <file>] [--project <label>]... [--no-history]
-//                          [--into <roadmap file>] [--set-status <id>=<status>]... [--write] [--root <dir>]
+//   node roadmap.mjs read '<file>' [--root '<dir>']
+//   node roadmap.mjs check '<file>' [--strict] [--root '<dir>']
+//   node roadmap.mjs standardize '<file>' [--table <index>]... [--set-status '<id>=<status>']... [--write] [--root '<dir>']
+//   node roadmap.mjs set '<file>' '<id>' [--status '<status>'] [--commit <commit>] [--actual <hours>] [--plan-file '<plan file>'] [--note '<note>'] [--root '<dir>']
+//   node roadmap.mjs restore '<file>' [--from original|prev|'<backup name>'] [--write] [--root '<dir>']
+//   node roadmap.mjs adopt '<project folder>' [--plans '<dir>']... [--history '<file>'] [--project '<label>']... [--no-history]
+//                          [--into '<roadmap file>'] [--set-status '<id>=<status>']... [--write] [--root '<dir>']
 //
 // The format is described in ../references/format.md. In short: a roadmap table has the columns "#" and
 // "Phase". When the nearest non-blank line above its header is exactly
@@ -435,7 +435,7 @@ export function checkRoadmap(parsed, { strict = false, file = "" } = {}) {
 }
 
 // ── Standardize ─────────────────────────────────────────────────────────────
-const hintFor = (id, prefix) => STATUSES.map((s) => (s.includes(" ") ? `--set-status "${prefix}${id}=${s}"` : `--set-status ${prefix}${id}=${s}`)).join(" | ");
+const hintFor = (id, prefix) => STATUSES.map((s) => `--set-status '${prefix}${id}=${s}'`).join(" | ");
 
 function planTable(t, overrides, tables) {
   const res = { index: t.index, line: t.line, heading: t.heading, edits: [], changes: [], notices: [], blocked: [] };
@@ -685,12 +685,12 @@ export function setPhase(text, id, patch = {}) {
 
 // ── Files ───────────────────────────────────────────────────────────────────
 const USAGE = [
-  "usage: node roadmap.mjs read <file> [--root <dir>]",
-  "       node roadmap.mjs check <file> [--strict] [--root <dir>]",
-  "       node roadmap.mjs standardize <file> [--table <index>]... [--set-status <id>=<status>]... [--write] [--root <dir>]",
-  "       node roadmap.mjs set <file> <id> [--status <s>] [--commit <text>] [--actual <hours>] [--plan-file <p>] [--note <t>] [--root <dir>]",
-  "       node roadmap.mjs restore <file> [--from original|prev|<backup name>] [--write] [--root <dir>]",
-  "       node roadmap.mjs adopt <project folder> [--plans <dir>]... [--history <file>] [--project <label>]... [--no-history] [--into <roadmap file>] [--set-status <id>=<status>]... [--write] [--root <dir>]",
+  "usage: node roadmap.mjs read '<file>' [--root '<dir>']",
+  "       node roadmap.mjs check '<file>' [--strict] [--root '<dir>']",
+  "       node roadmap.mjs standardize '<file>' [--table <index>]... [--set-status '<id>=<status>']... [--write] [--root '<dir>']",
+  "       node roadmap.mjs set '<file>' '<id>' [--status '<status>'] [--commit <commit>] [--actual <hours>] [--plan-file '<plan file>'] [--note '<note>'] [--root '<dir>']",
+  "       node roadmap.mjs restore '<file>' [--from original|prev|'<backup name>'] [--write] [--root '<dir>']",
+  "       node roadmap.mjs adopt '<project folder>' [--plans '<dir>']... [--history '<file>'] [--project '<label>']... [--no-history] [--into '<roadmap file>'] [--set-status '<id>=<status>']... [--write] [--root '<dir>']",
 ];
 
 function parseArgs(argv, bool, value) {
@@ -1528,7 +1528,7 @@ function adoptCommand(pos, opts, io, out, err, now, usage) {
   const dups = todo.filter((e) => e.duplicate);
 
   if (undecided.length) {
-    out(`undecided (${undecided.length}), left out unless you choose a status for each with --set-status <id>=<status>:`);
+    out(`undecided (${undecided.length}), left out unless you choose a status for each with --set-status '<id>=<status>':`);
     for (const e of undecided) out(`  ${e.id}: ${e.rel} (${e.why}) ${hintFor(e.id, "")}`);
   }
   if (dups.length) {

@@ -19,6 +19,7 @@
     "tests/summary.test.mjs",
     "tests/ids.test.mjs",
     "tests/logo.test.mjs",
-    "tests/adopt.test.mjs"
+    "tests/adopt.test.mjs",
+    "tests/command-lines.test.mjs"
   ]
 }

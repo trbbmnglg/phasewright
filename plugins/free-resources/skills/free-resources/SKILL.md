@@ -11,7 +11,16 @@ This skill measures the machine and reports. It never closes, kills or signals a
 
 ## Where to run the scripts
 
-Run every script from the user's project folder (the current folder), calling it by its full path. The scripts treat the current folder as the project, and `measure.mjs` runs the user's command there, so running them from inside this skill's folder would scan and measure the wrong place. In Claude Code the full path is `${CLAUDE_SKILL_DIR}/scripts/<script>.mjs`; in other tools use the full path to the `scripts/` folder next to this file. If a script prints a warning that the current folder is inside the skill's folder, stop, change to the project folder and run it again.
+Run every script from the user's project folder (the current folder), calling it by its full path. The scripts treat the current folder as the project, and `measure.mjs` runs the user's command there, so running them from inside this skill's folder would scan and measure the wrong place. In Claude Code the full path starts with `${CLAUDE_SKILL_DIR}/scripts/` and ends with the script's file name; in other tools use the full path to the `scripts/` folder next to this file. If a script prints a warning that the current folder is inside the skill's folder, stop, change to the project folder and run it again.
+
+## Writing a command line
+
+You build each command line, so a value that came from a file would reach it if you put one there. One rule covers every call in this skill:
+- A task name or a project folder is written in single quotes, like `'<name>'` and `'<dir>'`, never in double quotes: a shell still expands `$(...)` and backticks inside those. Check the value first. If it holds a single quote, a double quote, a control or format character (Unicode categories Cc, Cf, Zl and Zp: this covers U+0000 to U+001F, U+007F to U+009F, U+2028, U+2029, bidi controls and zero-width characters) or any of U+2018 to U+201B (the curly quote marks, which PowerShell also reads as a quote), don't run the call: stop and tell the user which value was refused. A path never ends in `\` or `/`: drop a trailing separator, and if the value still ends in one, don't run the call. A value that is empty, or is a drive or file-system root (`C:\` or `/`), is not run.
+- Run the `.mjs` calls with the Bash tool when there is one: Windows PowerShell 5.1 passes arguments differently, and one value could become several.
+- A number such as `--top N` or `--interval-ms N` is written bare, only when it is a whole number. The words after `--` are the user's own command, given in this conversation and copied as they typed it, never one taken from a file.
+- `"${CLAUDE_SKILL_DIR}"` stays in double quotes: Claude Code sets it, and no repository does.
+- Never put any other text from a file on a command line.
 
 ## Run the scan
 
@@ -25,7 +34,7 @@ It takes about 10 to 35 seconds, depending on how busy the machine is. Useful op
 - `--json` prints the report as JSON instead of tables.
 - `--all` also lists processes owned by other users (hidden by default).
 - `--top N` sets the rows in the top-consumer tables.
-- `--project <dir>` names the project folder whose processes count as in use (default: the current folder).
+- `--project '<dir>'` names the project folder whose processes count as in use (default: the current folder).
 
 ## Show the result
 
@@ -39,7 +48,7 @@ It takes about 10 to 35 seconds, depending on how busy the machine is. Useful op
 Run the user's own command through the measurer. It runs the command exactly as given, watches the command and everything it starts, and records the peak memory and the CPU cores used:
 
 ```
-node "${CLAUDE_SKILL_DIR}/scripts/measure.mjs" [--task <name>] [--interval-ms N] [--json] -- <command...>
+node "${CLAUDE_SKILL_DIR}/scripts/measure.mjs" [--task '<name>'] [--interval-ms N] [--json] -- <command...>
 ```
 
 - The command keeps the terminal, and its exit code becomes the script's. A failed command is still recorded, marked with its `exit_code`.
@@ -54,7 +63,7 @@ node "${CLAUDE_SKILL_DIR}/scripts/measure.mjs" [--task <name>] [--interval-ms N]
 Compare what the task needs with what is free now:
 
 ```
-node "${CLAUDE_SKILL_DIR}/scripts/headroom.mjs" --task <name> [--json] [--project <dir>]
+node "${CLAUDE_SKILL_DIR}/scripts/headroom.mjs" --task '<name>' [--json] [--project '<dir>']
 ```
 
 (or give the same command after `--` and the name is worked out the way `measure.mjs` does it). It runs the scan, then prints memory and CPU separately, each with the need, the available amount, the verdict (`fits` or `short by X`) and the source of every number. Exit code 0 whether it fits or not; 3 when there is no data yet.

@@ -146,7 +146,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.1.0",
+      "version": "0.1.1",
       "license": "MIT",
       "path": "plugins/free-resources",
       "files": [
@@ -211,7 +211,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.11.0",
+      "version": "0.11.1",
       "license": "MIT",
       "path": "plugins/phased-shipping",
       "files": [

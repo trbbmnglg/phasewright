@@ -302,7 +302,7 @@ test("reader: a legacy table with the real-world status forms places them, and o
   assert.equal(json.summary.shipped, 3);
   const plan = planStandardize(text);
   assert.deepEqual(plan.blocked.map((b) => [b.id, b.code]), [["4", "unmapped-status"], ["5", "unmapped-status"]]);
-  assert.ok(plan.blocked[0].hint.includes("--set-status 4=planned | --set-status \"4=in progress\" | --set-status 4=shipped | --set-status 4=parked"));
+  assert.ok(plan.blocked[0].hint.includes("--set-status '4=planned' | --set-status '4=in progress' | --set-status '4=shipped' | --set-status '4=parked'"));
   const done = planStandardize(text, { statusOverrides: [{ id: "4", status: "planned" }, { id: "5", status: "parked" }] });
   assert.deepEqual(done.blocked, []);
   const after = parseRoadmap(done.text).tables[0];
@@ -334,10 +334,10 @@ test("standardize plan: writes nothing, lists the marker, renames, normalisation
   assert.ok(r.out.includes("Est. (raw → cal.) | Plan | Blocked by | Status |"));
   assert.match(r.out, /\| to plan \| \| \|\n\s+\+ .*\| planned \|/);
   assert.match(r.out, /BLOCKED line 19 \(id 7\): Status "\$\$" cannot be placed/);
-  assert.ok(r.out.includes("--set-status 7=planned"));
-  assert.ok(r.out.includes('--set-status "7=in progress"'));
-  assert.ok(r.out.includes("--set-status 7=shipped"));
-  assert.ok(r.out.includes("--set-status 7=parked"));
+  assert.ok(r.out.includes("--set-status '7=planned'"));
+  assert.ok(r.out.includes("--set-status '7=in progress'"));
+  assert.ok(r.out.includes("--set-status '7=shipped'"));
+  assert.ok(r.out.includes("--set-status '7=parked'"));
   assert.match(r.out, /BLOCKED line 20 \(id 8\)/);
   assert.match(r.out, /BLOCKED line 31 \(id 13\): row has 17 cells but the header has 16/);
   assert.ok(!r.out.includes(p.dir));
@@ -385,8 +385,8 @@ test("standardize plan: an id that is in two tables gets a table-prefixed hint, 
   const text = `${table(MIN, [["1", "a", "maybe"]], false)}\n${table(MIN, [["1", "b", "maybe"]], false)}`;
   const plan = planStandardize(text);
   assert.equal(plan.blocked.length, 2);
-  assert.ok(plan.report.some((l) => l.includes("--set-status 0:1=planned")));
-  assert.ok(plan.report.some((l) => l.includes("--set-status 1:1=planned")));
+  assert.ok(plan.report.some((l) => l.includes("--set-status '0:1=planned'")));
+  assert.ok(plan.report.some((l) => l.includes("--set-status '1:1=planned'")));
   const one = planStandardize(text, { statusOverrides: [{ table: 1, id: "1", status: "shipped" }, { table: 0, id: "1", status: "parked" }] });
   assert.deepEqual(one.blocked, []);
   const [a, b] = parseRoadmap(one.text).tables;

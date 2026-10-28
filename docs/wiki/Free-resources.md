@@ -33,7 +33,7 @@ For Copilot and Cursor, copy the skill folder into your tool's skills folder. Wi
 
 ## What shipped when
 
-- Plugin version 0.1.0 is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)).
+- Plugin version 0.1.1 is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)).
 - This plugin has no changelog, so its [README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md) is the source for what it does today.
 
 ## Limits

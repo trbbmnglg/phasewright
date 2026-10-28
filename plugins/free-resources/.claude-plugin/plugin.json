@@ -1,7 +1,7 @@
 {
   "name": "free-resources",
   "description": "Report-only check of how pressured your machine is, which processes use the most, and what a task really needs (peak memory and CPU cores). It never closes anything.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "trbbmnglg"
   },
