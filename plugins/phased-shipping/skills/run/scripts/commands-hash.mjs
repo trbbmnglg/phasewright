@@ -17,9 +17,7 @@
 // (a copy, another checkout) is another plan and needs its own preview.
 //
 // The section runs from the "## Commands" heading to the next "## " heading or the end of the file
-// (a heading inside a fenced code block doesn't count; a fence follows the standard Markdown rules, see `fenceStep`: it
-// closes only on a line of the same character, at least as long, so a fence left open before "## Commands" hides the
-// heading and the plan is refused with exit 2). Before hashing, CRLF becomes LF, trailing
+// (a heading inside a fenced code block doesn't count). Before hashing, CRLF becomes LF, trailing
 // spaces and tabs are trimmed on each line and trailing blank lines are dropped. A plan with two
 // headings that look like "Commands", or one that isn't exactly "## Commands" (### Commands,
 // ## Commands (updated)), is ambiguous and is refused.
@@ -44,22 +42,7 @@ export const STAGES = ["planned", "previewed"];
 
 const HEADING = /^##[ \t]+Commands[ \t]*$/;
 const LOOKS_LIKE_HEADING = /^#{1,6}[ \t]+commands\b/i;
-// Fenced code blocks, by the standard Markdown fence rules: an opening fence is 3 or more backticks or tildes after at most 3 spaces (a backtick
-// fence's info text can't hold a backtick); it closes only on a line of the SAME character, at least as many, and nothing else
-// but spaces. A fence that never closes runs to the end of the text.
-const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
-// The fence state after `line`: null (outside a fence) or { ch, len } (inside one). `open` is the state before the line.
-// A line belongs to a fence (its content, its opening or its closing line) when `open` before it or the state after it is not null.
-export function fenceStep(open, line) {
-  if (open) {
-    const m = FENCE_CLOSE.exec(line);
-    return m && m[1][0] === open.ch && m[1].length >= open.len ? null : open;
-  }
-  const m = FENCE_OPEN.exec(line);
-  if (!m || (m[1][0] === "`" && m[2].includes("`"))) return null;
-  return { ch: m[1][0], len: m[1].length };
-}
+const FENCE = /^[ \t]*(```|~~~)/;
 const NEXT_HEADING = /^##[ \t]/;
 
 // The normalized text of the "## Commands" section, or null when the plan has none. Throws an error
@@ -67,12 +50,11 @@ const NEXT_HEADING = /^##[ \t]/;
 export function commandsSection(planText) {
   const lines = String(planText).replace(/\r\n?/g, "\n").split("\n");
   let start = -1;
-  let fence = null;
+  let fence = false;
   const lookalikes = [];
   for (let i = 0; i < lines.length; i++) {
-    const before = fence;
-    fence = fenceStep(fence, lines[i]);
-    if (!before && !fence && LOOKS_LIKE_HEADING.test(lines[i])) lookalikes.push(i);
+    if (FENCE.test(lines[i])) fence = !fence;
+    else if (!fence && LOOKS_LIKE_HEADING.test(lines[i])) lookalikes.push(i);
   }
   if (lookalikes.length > 1) {
     throw Object.assign(new Error(`${lookalikes.length} headings look like "Commands" (lines ${lookalikes.map((i) => i + 1).join(", ")}): keep one "## Commands" section`), { code: "ambiguous" });
@@ -85,11 +67,10 @@ export function commandsSection(planText) {
   }
   if (start < 0) return null;
   let end = lines.length;
-  fence = null;
+  fence = false;
   for (let i = start + 1; i < lines.length; i++) {
-    const before = fence;
-    fence = fenceStep(fence, lines[i]);
-    if (!before && !fence && NEXT_HEADING.test(lines[i])) { end = i; break; }
+    if (FENCE.test(lines[i])) fence = !fence;
+    else if (!fence && NEXT_HEADING.test(lines[i])) { end = i; break; }
   }
   const section = lines.slice(start, end).map((l) => l.replace(/[ \t]+$/, ""));
   while (section.length > 1 && section[section.length - 1] === "") section.pop();
@@ -136,17 +117,13 @@ export function lineDiff(before, after) {
   return out;
 }
 
-function usageTo(message, err) {
-  if (message) err(`${message}\n`);
-  err("usage: commands-hash.mjs <plan> [--short] [--record <planned|previewed> --data <dir>] [--check <planned|previewed> --data <dir>]\n");
+function usage(message) {
+  if (message) process.stderr.write(`${message}\n`);
+  process.stderr.write("usage: commands-hash.mjs <plan> [--short] [--record <planned|previewed> --data <dir>] [--check <planned|previewed> --data <dir>]\n");
   return 1;
 }
 
-// main(argv, io): io.out and io.err take a piece of text each (default: stdout and stderr); the return value is the exit code.
-export function main(argv, io = {}) {
-  const out = io.out ?? ((text) => process.stdout.write(text));
-  const err = io.err ?? ((text) => process.stderr.write(text));
-  const usage = (message) => usageTo(message, err);
+export function main(argv) {
   let plan;
   let short = false;
   let record;
@@ -177,11 +154,11 @@ export function main(argv, io = {}) {
   let section;
   try { section = commandsSection(planText); } catch (e) {
     if (e?.code !== "ambiguous") throw e;
-    err(`ambiguous Commands heading in ${plan}: ${e.message}\n`);
+    process.stderr.write(`ambiguous Commands heading in ${plan}: ${e.message}\n`);
     return 2;
   }
   if (section === null) {
-    err(`no "## Commands" section in ${plan}\n`);
+    process.stderr.write(`no "## Commands" section in ${plan}\n`);
     return 2;
   }
   const hash = hashOf(section);
@@ -197,37 +174,35 @@ export function main(argv, io = {}) {
       mkdirSync(join(resolve(data), "previews"), { recursive: true });
       writeFileSync(file, JSON.stringify({ hash, text: section, plan: real, at: new Date().toISOString() }, null, 2) + "\n");
     } catch (e) { return usage(`can't write the record: ${e.message}`); }
-    out(`recorded ${record} ${hash.slice(0, 12)}\n${section}\n`);
+    process.stdout.write(`recorded ${record} ${hash.slice(0, 12)}\n${section}\n`);
     return 0;
   }
 
   if (check !== undefined) {
     const file = recordPath(data, plan, check);
     if (!existsSync(file)) {
-      out(`no ${check} record for this plan\n`);
+      process.stdout.write(`no ${check} record for this plan\n`);
       return 4;
     }
     let saved;
     try { saved = JSON.parse(readFileSync(file, "utf8")); } catch { saved = null; }
     if (!saved || typeof saved.hash !== "string" || typeof saved.text !== "string") {
-      out(`the ${check} record is unreadable\n`);
+      process.stdout.write(`the ${check} record is unreadable\n`);
       return 4;
     }
     if (saved.hash === hash) {
-      out(`match ${hash.slice(0, 12)}\n${section}\n`);
+      process.stdout.write(`match ${hash.slice(0, 12)}\n${section}\n`);
       return 0;
     }
-    out(`the Commands section changed since it was ${check} (${saved.hash.slice(0, 12)} -> ${hash.slice(0, 12)}):\n${lineDiff(saved.text, section).join("\n")}\n`);
+    process.stdout.write(`the Commands section changed since it was ${check} (${saved.hash.slice(0, 12)} -> ${hash.slice(0, 12)}):\n${lineDiff(saved.text, section).join("\n")}\n`);
     return 3;
   }
 
-  out(`${shown}\n`);
+  process.stdout.write(`${shown}\n`);
   return 0;
 }
 
-// Run as a script, not when a test imports it. Both paths are resolved through links (a symbolic link or a
-// junction to this folder gives a different argv[1] than the module's own path), so the script still runs.
-const realOf = (p) => { try { return realpathSync.native(p); } catch { return resolve(p); } };
-if (process.argv[1] && realOf(process.argv[1]) === realOf(fileURLToPath(import.meta.url))) {
+// Run as a script, not when a test imports it.
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   process.exitCode = main(process.argv.slice(2));
 }

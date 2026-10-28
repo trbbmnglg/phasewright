@@ -54,7 +54,7 @@ test("the builder's output has no time-per-step line and carries the personal-da
 });
 
 test("all four agents carry the agreed maxTurns", () => {
-  const expected = { builder: 200, checker: 25, shipper: 40, "model-scout": 15 };
+  const expected = { builder: 200, checker: 25, shipper: 20, "model-scout": 15 };
   for (const [agent, turns] of Object.entries(expected)) {
     assert.match(frontmatter(text("agents", `${agent}.md`)), new RegExp(`^maxTurns: ${turns}$`, "m"), agent);
   }
@@ -65,10 +65,10 @@ test("the README lists what it touches and the four limits, and is at the new ve
   assert.match(readme, /^## What it touches$/m);
   assert.match(readme, /^## Limits$/m);
   assert.match(readme, /v2\.1\.292 or later/);
-  for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 40], ["model-scout", 15]]) {
+  for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 20], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.10.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -111,7 +111,7 @@ test("each of the four safety evals has a prompt with max_turns and allowed_tool
 
 test("every eval folder, old and new, has a prompt and at least one grader", () => {
   const dirs = readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory());
-  assert.equal(dirs.length, 18);
+  assert.equal(dirs.length, 15);
   for (const d of dirs) assert.ok(readdirSync(join(PS, "evals", d, "graders")).length >= 1, d);
 });
 
@@ -394,7 +394,7 @@ test("phase 7d1: the README has the roadmap section, the touches lines and the l
   assert.match(touches, /only after you say yes/);
   assert.match(touches, /`set` rewrites one row of one standard table/);
   assert.match(readme.slice(readme.indexOf("## Limits")), /tables only, line by line: it is not a full Markdown parser/);
-  assert.ok(readme.includes("The eighteen cases check that:"), "the README names the number of eval cases");
+  assert.ok(readme.includes("The fifteen cases check that:"), "the README names the number of eval cases");
 });
 
 test("phase 7d1: the roadmap skill is owner-invoked, on sonnet at low effort, and asks before it writes", () => {
@@ -487,8 +487,8 @@ test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_
 
 test("phase 7d1 to 7d1c: the guard rules file changed only its version", () => {
   const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
-  assert.match(rules, /^export const GUARD_VERSION = "0\.11\.0";$/m);
-  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.0";', "line 16");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.10\.0";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.10.0";', "line 16");
 });
 
 test("phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes", () => {
@@ -672,7 +672,7 @@ test("phase 7d1c: the README has the Onboarding section, says exactly what the s
   assert.ok(readme.includes("The summary holds exactly this"), "the README states exactly what the summary holds");
   const limits = readme.slice(readme.indexOf("## Limits"));
   for (const phrase of ["The script catches known secret shapes, not every secret", "The consent list is the control", "held back by instructions, not a lock", "not that you saw it", "should not run onboarding in an assistant session on client material", "Endpoint-security behaviour is unverified", "A monorepo is one project", "protects git users only", "Perforce, Subversion, Mercurial or similar"]) assert.ok(limits.includes(phrase), phrase);
-  assert.ok(readme.includes("The eighteen cases"));
+  assert.ok(readme.includes("The fifteen cases"));
 });
 
 test("phase 7d1c: the two new evals have a prompt, an llm grader and typed tool graders that forbid the write steps", () => {
@@ -742,7 +742,7 @@ test("phase 7d1c: the wiki has the Onboarding page with the five feature heading
   for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
   assert.ok(repoText("docs", "wiki", "Home.md").includes("(Onboarding)"));
   assert.ok(repoText("scripts", "publish-wiki.mjs").includes('{ page: "Onboarding", title: "Onboarding" }'));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.10.0 changed no guard rule"));
   assert.ok(page.includes("Plugin version 0.8.0"));
 });
 
@@ -787,13 +787,13 @@ test("phase 7d2: the CHANGELOG keeps 0.9.0 above 0.8.0 with Date, Summary, Added
   for (const word of ["status.mjs", "collect.mjs", "dashboard-opt-in-asks-once", "15 evals", "ps-dashboard", "asks once", "silent no-op", "hard link"]) assert.ok(entry.includes(word), word);
 });
 
-test("phase 7p: the What's new block lists 0.11.0, 0.10.0 and 0.9.0, newest first", () => {
+test("phase 7d3: the What's new block lists 0.10.0, 0.9.0 and 0.8.0, newest first", () => {
   const readme = repoText("README.md");
   const block = readme.slice(readme.indexOf("<!-- whats-new:start -->"), readme.indexOf("<!-- whats-new:end -->"));
-  const at = ["0.11.0", "0.10.0", "0.9.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
+  const at = ["0.10.0", "0.9.0", "0.8.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
   assert.ok(at.every((i) => i >= 0), "all three are listed");
   assert.ok(at[0] < at[1] && at[1] < at[2], "newest first");
-  assert.ok(!block.includes("**phased-shipping 0.8.0**"), "only the newest three");
+  assert.ok(!block.includes("**phased-shipping 0.7.1**"), "only the newest three");
 });
 
 test("phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes", () => {
@@ -845,8 +845,8 @@ test("phase 7d2: the eval dashboard-opt-in-asks-once has a prompt, an llm grader
   const tool = parsed.filter((g) => /^type: tool_used$/m.test(g));
   for (const g of tool) { assert.match(g, /^tool: \w+$/m); assert.match(g, /^input_match: .+$/m); assert.match(g, /^max: 0$/m); }
   assert.ok(tool.some((g) => /^tool: Bash$/m.test(g) && g.includes("input_match: 'status\\.mjs.*enable'")), "the Bash grader forbids status.mjs enable");
-  assert.equal(readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory()).length, 18, "18 evals");
-  assert.ok(text("README.md").includes("The eighteen cases") && text("README.md").includes("`run` asks once whether to turn the dashboard on"));
+  assert.equal(readdirSync(join(PS, "evals")).filter((d) => statSync(join(PS, "evals", d)).isDirectory()).length, 15, "15 evals");
+  assert.ok(text("README.md").includes("The fifteen cases") && text("README.md").includes("`run` asks once whether to turn the dashboard on"));
 });
 
 test("phase 7d2: the README and the wiki describe the dashboard data, what it writes and that it is off until you say yes", () => {
@@ -859,19 +859,22 @@ test("phase 7d2: the README and the wiki describe the dashboard data, what it wr
   for (const phrase of ["**The dashboard data**", "**The dashboard files**", "`dashboard.json`", "`projects.json`", "`sessions/<id>-<tag>+<phase>.json`", "**absolute path**", "the only file with an absolute path", "never print it except `list --paths`", "makes no network calls", "a link, a junction or a hard link makes the script stop and write nothing", "at most 16 KB", "`collect --out` writes the one file you name", "is refused inside the data folder"]) assert.ok(touches.includes(phrase), phrase);
   assert.ok(touches.includes("The status script (`status.mjs`)"), "the commands it runs list the status script");
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.0"));
+  assert.ok(wiki.includes("The current plugin version is 0.10.0"));
   assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
   assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(wiki), "the version row");
   const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
-  assert.ok(release.includes("plugin version 0.11.0") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
+  assert.ok(release.includes("plugin version 0.10.0") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.10.0 changed no guard rule"));
 });
 
 // ---------- phase 7d3: the dashboard page (plugin version 0.10.0) ----------
-test("phase 7d3: the CHANGELOG keeps 0.10.0 above 0.9.0 with Date, Summary, Added, Changed and No guard rule changed", () => {
+test("phase 7d3: the plugin is at 0.10.0 everywhere and the CHANGELOG has 0.10.0 above 0.9.0 with Date, Summary, Added, Changed and No guard rule changed", () => {
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.10.0");
+  assert.ok(repoText("library.json").includes('"version": "0.10.0"'), "library.json carries the plugin version");
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.10.0";');
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.10.0").length, 2, "one 0.10.0 block");
-  assert.ok(log.indexOf("## 0.11.0") < log.indexOf("## 0.10.0") && log.indexOf("## 0.10.0") < log.indexOf("## 0.9.0") && log.indexOf("## 0.9.0") < log.indexOf("## 0.8.0"), "newest first");
+  assert.ok(log.indexOf("## 0.10.0") < log.indexOf("## 0.9.0") && log.indexOf("## 0.9.0") < log.indexOf("## 0.8.0"), "newest first");
   const lines = log.split(/\r?\n/);
   const at = lines.indexOf("## 0.10.0");
   assert.equal(lines[at + 2], "Date: 2026-10-27");
@@ -916,240 +919,4 @@ test("phase 7d3: the README describes the page, its fonts and what it touches, a
   assert.ok(/^\| 0\.10\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.10.0: the dashboard page"));
   assert.ok(page.includes("Nobody has run it in a real browser"));
-});
-
-// ---------- phase 7p: faster runs by default (plugin version 0.11.0) ----------
-test("phase 7p: the plugin is at 0.11.0 everywhere and the CHANGELOG has 0.11.0 above 0.10.0 with Date, Summary, Added, Changed and No guard rule changed", () => {
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.0");
-  assert.ok(repoText("library.json").includes('"version": "0.11.0"'), "library.json carries the plugin version");
-  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.0";');
-  const log = text("CHANGELOG.md");
-  assert.equal(log.split("## 0.11.0").length, 2, "one 0.11.0 block");
-  assert.ok(log.indexOf("## 0.11.0") < log.indexOf("## 0.10.0"), "newest first");
-  const lines = log.split(/\r?\n/);
-  const at = lines.indexOf("## 0.11.0");
-  assert.equal(lines[at + 2], "Date: 2026-10-28");
-  assert.match(lines[at + 3], /^Summary: [\p{L}\p{Nd} .,;:'"()/+&!?`-]{20,160}$/u);
-  const entry = log.slice(log.indexOf("## 0.11.0"), log.indexOf("## 0.10.0"));
-  for (const heading of ["### Added", "### Changed"]) assert.ok(entry.includes(heading), heading);
-  assert.ok(entry.includes("No guard rule changed"));
-  for (const word of ["Full verify", "Fast verify", "Parallel groups", "tree-state.mjs", "verify-records.json", "review-brief.md", "baseline_reused", "tokens.reviewer", "Where the time went", "18 evals", "`maxTurns`", "git gc", "full = fast"]) assert.ok(entry.includes(word), word);
-  // The 0.10.0 section keeps its own text.
-  assert.ok(log.slice(log.indexOf("## 0.10.0"), log.indexOf("## 0.9.0")).includes("The guard version is 0.10.0, kept equal to the plugin version"));
-});
-
-test("phase 7p: the plan template and the plan skill have both verify sets and the parallel groups, and read an old plan as full = fast", () => {
-  const tpl = text("skills", "plan", "references", "templates.md");
-  for (const phrase of ["- **Full verify** (baseline and final compare):", "- **Fast verify** (after the build and after each fix round):", "- **Parallel groups** (optional;"]) assert.ok(tpl.includes(phrase), phrase);
-  assert.ok(!tpl.includes("Baseline and verify (same commands):"), "the template no longer has the single line");
-  const plan = text("skills", "plan", "SKILL.md");
-  for (const phrase of ["**Full verify**", "**Fast verify**", "**Parallel groups**", "Only the plan names groups; the run skill never makes them up", "still confirm each command", "`Baseline and verify (same commands)`, is read as full = fast", "not a lower bar"]) assert.ok(plan.includes(phrase), phrase);
-});
-
-test("phase 7p: the run skill reuses a baseline only from a green full verify, never previews on a fast result, and reviews the first time at full depth", () => {
-  const run = text("skills", "run", "SKILL.md");
-  const tree = run.slice(run.indexOf("## Tree state"), run.indexOf("## Baseline"));
-  for (const phrase of ['scripts/tree-state.mjs" id --root', 'scripts/tree-state.mjs" check --root', 'scripts/tree-state.mjs" record --root', "never records a red result", "`reuse <tree> <date>`", "`no reuse: <reason>`", "never after a red, partial or \"proceed with pre-existing failures\" result", "U+2018 to U+201B", "no reuse and a full baseline", "single quote, a control character"]) assert.ok(tree.includes(phrase), phrase);
-  assert.ok(run.includes("**Baseline: reused (green full verify on this exact tree, <date>)**"));
-  assert.ok(run.includes("reuse can only make a compare stricter: a failure that is not in a green baseline is new and blocks"));
-  assert.ok(run.includes("A baseline with pre-existing failures is not green and is not recorded."));
-  const check = run.slice(run.indexOf("## Check"), run.indexOf("## Preview, then stop"));
-  for (const phrase of ["Fast verify", "Full verify", "once on the final tree", "**The preview is never shown on a fast result alone.**", "The owner can ask for the Full set at any round", "one `phased-shipping:checker` per group in a single message", "Only the first group's checker carries the guard probe", "never hidden by the others", "Never make groups up", "Any code change after the last security review gets a delta review before the preview", "A record from an earlier phase doesn't count here"]) assert.ok(check.includes(phrase), phrase);
-  assert.ok(check.includes("[review-brief.md](references/review-brief.md)") && check.includes("**The first review of a phase is full depth:**") && check.includes("`standard`: read the diff yourself, briefly. This stays the default."));
-  assert.ok(check.includes("1,500 changed lines") && check.includes("**Never** lower the tier or the effort, time-box a stage"));
-  const preview = run.slice(run.indexOf("## Preview, then stop"), run.indexOf("## On `approve`"));
-  for (const phrase of ["always has a **Full verify** row, with the tree id", "A fast result is never shown in place of it", "**Where the time went** table"]) assert.ok(preview.includes(phrase), phrase);
-  const close = run.slice(run.indexOf("## Close the phase"));
-  for (const phrase of ['"reviewer": N', "`baseline_reused`", "`timings`", "baseline_s", "checks_s", "review_s", "full_runs", "fast_runs", "Never estimate a duration"]) assert.ok(close.includes(phrase), phrase);
-  // The tree-state command lines keep the placeholder forms the sync script rewrites.
-  assert.ok(run.includes('--data "${CLAUDE_PLUGIN_DATA}"') && run.includes('"${CLAUDE_SKILL_DIR}/scripts/tree-state.mjs"'));
-  assert.equal(run.split('tree-state.mjs" record').length, 2, "the record call is written once");
-  assert.ok(existsSync(join(PS, "skills", "run", "scripts", "tree-state.mjs")));
-});
-
-test("phase 7p: the review brief has the three stages, the full-depth first review, the split and the never-lower rules, and names no project", () => {
-  const brief = text("skills", "run", "references", "review-brief.md").toLowerCase();
-  const phrases = ["The mechanical pack", "The delta", "Adversarial probing of new surface only", "The first review of a phase is full depth", "A later review is a delta", "about 1,500 lines", "two unrelated trust boundaries", "disjoint file lists", "the same tier and effort", "Allowed probes", "OS temp folder", "Never touch the real data folder", "Required output", "failing input", "What you ran and what you only read", "One mutation", "**Never lower** the tier or the effort", "**Never time-box** a stage", "**Never tell a reviewer that the tests proved a fix.**", "**Never reuse a verdict**"];
-  for (const phrase of phrases) assert.ok(brief.includes(phrase.toLowerCase()), phrase);
-  assert.doesNotMatch(brief, /dashboard/, "a generic template");
-});
-
-test("phase 7p: the shipper has 40 turns and the README says so", () => {
-  assert.match(frontmatter(text("agents", "shipper.md")), /^maxTurns: 40$/m);
-  assert.match(text("README.md"), /\| `shipper` \| Read, Grep, Glob, Bash \| 40 \|/);
-});
-
-test("phase 7p: the three new evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders", () => {
-  const expect = {
-    "run-previews-only-after-full-verify": [/^\/phased-shipping:run 4$/m, /skip it and show me the preview now/],
-    "run-reuses-only-green-baseline": [/^\/phased-shipping:run 5$/m, /Count that run as the baseline/],
-    "security-review-first-is-full-depth": [/^\/phased-shipping:run 6$/m, /first review of the phase/],
-  };
-  for (const [name, patterns] of Object.entries(expect)) {
-    const dir = join(PS, "evals", name);
-    const prompt = readFileSync(join(dir, "prompt.md"), "utf8");
-    const fm = frontmatter(prompt);
-    assert.match(fm, /^max_turns: \d+$/m, name);
-    assert.match(fm, /^allowed_tools: \[.+\]$/m, name);
-    for (const re of patterns) assert.match(prompt, re, name);
-    const graders = readdirSync(join(dir, "graders")).filter((f) => f.endsWith(".md")).map((f) => frontmatter(readFileSync(join(dir, "graders", f), "utf8")));
-    assert.ok(graders.length >= 2, name);
-    assert.ok(graders.every((g) => /^type: (llm|tool_used)$/m.test(g)), `${name}: typed`);
-    assert.ok(graders.some((g) => /^type: llm$/m.test(g)), `${name}: an llm grader`);
-    for (const g of graders.filter((x) => /^type: tool_used$/m.test(x))) { assert.match(g, /^tool: \w+$/m); assert.match(g, /^input_match: .+$/m); assert.match(g, /^max: 0$/m); }
-  }
-  assert.ok(readFileSync(join(PS, "evals", "run-reuses-only-green-baseline", "graders", "no-record.md"), "utf8").includes("tree-state"), "a red run is never recorded");
-});
-
-test("phase 7p: the README has the Speed section with the honest limits, and the wiki has the Speed page with a sidebar link", () => {
-  const readme = text("README.md");
-  assert.match(readme, /^## Speed$/m);
-  const speed = readme.slice(readme.indexOf("## Speed"), readme.indexOf("## Requirements"));
-  for (const phrase of ["cannot make your project's own test suite faster", "fewer times and in a better order", "A weak fast set is still caught by the final full compare and by CI, at the cost of a late fix round", "stay until `git gc` removes them", "at most 50", "7 days", "never shown on a fast result alone", "[review-brief.md](skills/run/references/review-brief.md)"]) assert.ok(speed.includes(phrase), phrase);
-  const touches = readme.slice(readme.indexOf("## What it touches"), readme.indexOf("## Limits"));
-  for (const phrase of ["`<data folder>/verify-records.json`", "The tree-state script (`tree-state.mjs`)", "never a shell"]) assert.ok(touches.includes(phrase), phrase);
-  const page = repoText("docs", "wiki", "Speed.md");
-  for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
-  assert.ok(page.includes("cannot make your project's own test suite faster") && page.includes("until `git gc` removes them"));
-  assert.ok(repoText("docs", "wiki", "_Sidebar.md").includes("[Speed](Speed)"));
-  assert.ok(repoText("docs", "wiki", "Home.md").includes("(Speed)"));
-  assert.ok(repoText("scripts", "publish-wiki.mjs").includes('{ page: "Speed", title: "Speed" }'));
-});
-
-test("phase 7p: the wiki pages say 0.11.0 where they name the current version", () => {
-  const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.0"));
-  assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|.*fast and a full verify set/m.test(wiki), "the version row");
-  assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.0: faster runs without a lower bar"));
-  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.0 changed no guard rule"));
-  const hist = repoText("docs", "wiki", "Phase-history-and-estimates.md");
-  for (const phrase of ["`timings`", "`baseline_reused`", "security reviewers", "Version 0.11.0 added", "the median full runs per phase"]) assert.ok(hist.includes(phrase), phrase);
-  assert.ok(repoText("docs", "wiki", "Roadmap-standard.md").includes("Plugin version 0.11.0 changed nothing in the format"));
-});
-
-// ---------- phase 7p fix round 1: what the run skill, the checker and the docs say after the review ----------
-test("phase 7p fix 1: the run skill says only a printed reuse line counts, adds --since for the in-phase skip only, and names the blind spots", () => {
-  const run = text("skills", "run", "SKILL.md");
-  const tree = run.slice(run.indexOf("## Tree state"), run.indexOf("## Baseline"));
-  for (const phrase of ["Only a printed line `reuse <tree> <date>`, whose tree equals the `id` output, counts as reuse. Exit 0 with no output is NOT reuse", "Exit 2 means the plan has no usable Full verify text",
-    "--since '<started>'", "Never add `--since` to the baseline reuse check", "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
-    "`.gitignore` ignores", "`node_modules`", "the contents of a submodule", "`core.autocrlf`", "NEVER skipped when the build or a fix round touched anything outside the tracked, text-visible files, or when you are unsure: run it",
-    "tree id unavailable", "every security review is a first review at full depth", "the final Full verify always runs",
-    "A green fast compare after the build or a fix round is then a full verify, so run `record` after it"]) assert.ok(tree.includes(phrase), phrase);
-  const check = run.slice(run.indexOf("## Check"), run.indexOf("## Preview, then stop"));
-  for (const phrase of ["`check` call with `--since '<started>'`", "neither does exit 0 with no output", "never skipped when a fix round touched anything the tree id cannot see", "**The Full verify always includes the project's browser check if the project has one**",
-    "Include the browser check if the project has one.", "the brief names none and says that every failure in the compare is NEW", "cover every Full verify command, including the project's browser check, exactly once", "run the whole Full set in ONE checker", "each group writes its own baseline file"]) assert.ok(check.includes(phrase), phrase);
-  const base = run.slice(run.indexOf("## Baseline"), run.indexOf("### Guard"));
-  for (const phrase of ["Only if `check` printed `reuse <tree> <date>` with the same tree that `id` printed", "there is no baseline file", "name a baseline file per group", "the project's browser check if it has one"]) assert.ok(base.includes(phrase), phrase);
-  assert.equal(run.split("--since").length - 1 >= 3, true);
-  const close = run.slice(run.indexOf("## Close the phase"));
-  for (const phrase of ['"ship_s": N', "`ship_s` is the shipper's reported duration"]) assert.ok(close.includes(phrase), phrase);
-  assert.ok(run.includes("a **Ship** row"), "the table has a Ship row");
-});
-
-test("phase 7p fix 5: the checker has no baseline file when the baseline was reused, and one file per parallel group", () => {
-  const checker = text("agents", "checker.md");
-  for (const phrase of ["**compare with no baseline file:**", "every failure is **new**", "never use an older one you find", "**A parallel group** has its own baseline file"]) assert.ok(checker.includes(phrase), phrase);
-});
-
-test("phase 7p fix 11: the review brief says the pack proves only what its tests assert, and a split reviewer may read other files", () => {
-  const brief = text("skills", "run", "references", "review-brief.md");
-  assert.ok(brief.includes("The pack proves only what its tests assert, never a claimed fix"));
-  assert.ok(brief.includes("It proves only what its tests assert, never a claimed fix."));
-  assert.ok(!brief.includes("Take the mechanical pack as proven") && !brief.includes("build on it") && !brief.includes("does not re-derive"));
-  assert.ok(brief.includes("Each REVIEWS its own list only, and may READ any other file for context"));
-  const grader = readFileSync(join(PS, "evals", "security-review-first-is-full-depth", "graders", "not-cheap.md"), "utf8");
-  assert.ok(grader.includes('input_match: \'"model"\\s*:\\s*"(?:haiku|sonnet)"\''), "the cheap-reviewer grader matches haiku and sonnet");
-  const re = new RegExp(grader.match(/^input_match: '(.+)'$/m)[1]);
-  assert.ok(re.test('"model": "haiku"') && re.test('"model":"sonnet"') && !re.test('"model": "opus"'));
-});
-
-test("phase 7p fix 12, 13: the docs name both tree-state test files and the ship_s key", () => {
-  const entry = text("CHANGELOG.md").slice(text("CHANGELOG.md").indexOf("## 0.11.0"), text("CHANGELOG.md").indexOf("## 0.10.0"));
-  for (const phrase of ["`tests/tree-state.test.mjs` and `tests/tree-state-process.test.mjs`", "`ship_s`", "`check --since <UTC time>`", "`core.hooksPath`", "(mode 160000)", "symbolic link or a junction", "never overwritten when it exists but cannot be read", "one less reuse", "git-ignored files"]) assert.ok(entry.includes(phrase), phrase);
-  assert.ok(!entry.includes("existing plans behave as before"), "the old claim is gone");
-  assert.ok(entry.includes("green fast compare on such a plan counts as a full verify"));
-  const readme = text("README.md");
-  const speed = readme.slice(readme.indexOf("## Speed"), readme.indexOf("## Requirements"));
-  for (const phrase of ["ship step", "green fast compare on such a plan counts as a full verify", "git-ignored file", "`core.autocrlf`", "a filter driver set in the repository's own configuration still runs", "nothing is cached", "except when the process is killed", "one less reuse", "never skips the final Full verify"]) assert.ok(speed.includes(phrase), phrase);
-  assert.ok(!speed.includes("so it behaves as before"));
-  const page = repoText("docs", "wiki", "Speed.md");
-  for (const phrase of ["filter driver", "nothing is cached", "git-ignored file", "never skipped", "one less reuse", "tree-state-process.test.mjs", "green fast compare on such a plan counts as a full verify"]) assert.ok(page.includes(phrase), phrase);
-  assert.ok(repoText("docs", "wiki", "Phase-history-and-estimates.md").includes("the ship step"));
-  const hist = readFileSync(join(PS, "skills", "plan", "scripts", "history.mjs"), "utf8");
-  assert.ok(hist.includes("ship_s") && hist.includes("Number.isSafeInteger"));
-});
-
-test("phase 7p fix 1: the plan template and plan skill keep the format unambiguous, and the scripts find themselves through a link", () => {
-  const tpl = text("skills", "plan", "references", "templates.md");
-  assert.ok(tpl.includes("must cover every Full verify command exactly once, the browser check included"));
-  assert.ok(tpl.includes("a second Full verify bullet, a fenced block or a bullet with no command means a baseline cannot be reused"));
-  const plan = text("skills", "plan", "SKILL.md");
-  assert.ok(plan.includes("write only one Full verify bullet") && plan.includes("(the project's browser check too)"));
-  for (const [dir, name] of [["run", "tree-state.mjs"], ["run", "commands-hash.mjs"], ["plan", "history.mjs"]]) {
-    const src = text("skills", dir, "scripts", name);
-    assert.ok(src.includes("realpathSync") && /realOf\(process\.argv\[1\]\)|realPath\(process\.argv\[1\]\)/.test(src), `${name} resolves links before it compares paths`);
-    assert.ok(!/resolve\(process\.argv\[1\]\) === resolve\(fileURLToPath/.test(src), `${name} no longer compares unresolved paths`);
-  }
-});
-
-// ---------- phase 7p fix round 2 ----------
-test("phase 7p fix 2: the final full run is skipped only for a full verify that ran after the last build or fix round", () => {
-  const run = text("skills", "run", "SKILL.md");
-  const check = run.slice(run.indexOf("## Check"), run.indexOf("## Preview, then stop"));
-  assert.ok(check.includes("**The skip is allowed ONLY for a Full verify that ran AFTER the last build or fix round**"));
-  assert.ok(check.includes("the baseline's own record never counts for it, because the build can change files the tree id cannot see"));
-  assert.ok(check.includes("**Never skip it when the build or a fix round touched anything the tree id cannot see.**"));
-});
-
-test("phase 7p fix 4: the script header, the CHANGELOG and the review brief carry the corrections", () => {
-  const src = text("skills", "run", "scripts", "tree-state.mjs");
-  const header = src.slice(0, src.indexOf("import "));
-  assert.ok(!header.includes("The only side\n// effect"), "the header no longer says the only side effect is the object store");
-  assert.ok(header.includes("Its side effects are that git writes the blob and tree objects") && header.includes("a filter driver set in the repository's own"));
-  const log = text("CHANGELOG.md");
-  const entry = log.slice(log.indexOf("## 0.11.0"), log.indexOf("## 0.10.0"));
-  assert.ok(entry.includes("deleted in every case except when the process is killed"));
-  assert.ok(entry.includes("(no record, tree differs, commands differ, Node differs, too old, recorded before --since)"));
-  const brief = text("skills", "run", "references", "review-brief.md");
-  const template = brief.slice(brief.indexOf("```text"), brief.indexOf("## Rules for the main session"));
-  assert.ok(template.includes("You REVIEW only the files in this list. You may READ any other file for context"), "the brief text itself says it");
-});
-
-// ---------- phase 7p fix round 3 ----------
-test("phase 7p fix 3: the CHANGELOG says what the approval script's fence change does, and the script header points at fenceStep", () => {
-  const log = text("CHANGELOG.md");
-  const entry = log.slice(log.indexOf("## 0.11.0"), log.indexOf("## 0.10.0"));
-  assert.ok(entry.includes("The approval script (`commands-hash.mjs`) now finds the `## Commands` section with the standard Markdown fence rules (`fenceStep`)"));
-  assert.ok(entry.includes("whose fence is left open before `## Commands` now hides that heading and exits 2 (a stop at the preview and at approve)"));
-  assert.ok(entry.includes("a fence closed by a longer or a different closer now ends where those rules say"));
-  const src = text("skills", "run", "scripts", "commands-hash.mjs");
-  assert.ok(src.slice(0, src.indexOf("import ")).includes("see `fenceStep`"));
-});
-
-test("phase 7p fix 1: no public file names a text standard, a product or a site for the fence rules", () => {
-  const named = new RegExp(["common", "mark"].join(""), "i");
-  for (const [dir, name] of [["run", "commands-hash.mjs"], ["run", "tree-state.mjs"]]) {
-    assert.doesNotMatch(text("skills", dir, "scripts", name), named, name);
-  }
-  assert.doesNotMatch(readFileSync(join(HERE, "tree-state.test.mjs"), "utf8"), named);
-  for (const f of ["README.md", "CHANGELOG.md"]) assert.doesNotMatch(text(f), named, f);
-  for (const f of readdirSync(join(HERE, "..", "docs", "wiki"))) assert.doesNotMatch(repoText("docs", "wiki", f), named, f);
-});
-
-test("phase 7p fix 4: the run skill says the build or a fix round in both places", () => {
-  const run = text("skills", "run", "SKILL.md");
-  assert.ok(run.includes("NEVER skipped when the build or a fix round touched anything outside the tracked, text-visible files"));
-  assert.ok(run.includes("A green fast compare after the build or a fix round is then a full verify, so run `record` after it"));
-  assert.ok(!run.includes("NEVER skipped when a fix round touched") && !run.includes("A green fast compare after a fix round"));
-});
-
-test("phase 7p fix 5: the README and the Speed page name the two limits of the test inventory and the workflow test", () => {
-  const readme = repoText("README.md");
-  const page = repoText("docs", "wiki", "Speed.md");
-  for (const doc of [readme.slice(readme.indexOf("## Develop")), page.slice(page.indexOf("## In this repository"), page.indexOf("## What shipped when"))]) {
-    assert.ok(doc.includes("A hand-edited `tests/inventory.txt` that still has valid lines is not caught by `--write`"));
-    assert.ok(doc.includes("the git diff is the trace"));
-    assert.ok(doc.includes("tripwire, not a proof") && doc.includes("`shell:`, `env:` or trigger filters such as branches or paths"));
-  }
 });

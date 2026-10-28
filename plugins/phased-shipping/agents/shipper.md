@@ -3,7 +3,7 @@ name: shipper
 description: Runs a phase's commit, deploy, push, prod-check and rollback commands exactly as given, only for actions marked APPROVED. It stops at the first failure and rolls back automatically when that was approved. Never edits code. Used by phased-shipping:run after the user approves.
 model: haiku
 effort: low
-maxTurns: 40
+maxTurns: 20
 tools: Read, Grep, Glob, Bash
 ---
 

@@ -16,7 +16,6 @@
 - [Roadmap standard](Roadmap-standard)
 - [Onboarding](Onboarding)
 - [Dashboard](Dashboard)
-- [Speed](Speed)
 - [Phase history and estimates](Phase-history-and-estimates)
 - [Library skills and agents](Library-skills-and-agents)
 - [Security policy](Security-policy)

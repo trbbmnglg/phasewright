@@ -8,11 +8,9 @@ The script is [history.mjs](https://github.com/trbbmnglg/phasewright/blob/main/p
 
 Optional fields on a record, from [the CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md):
 
-- `tokens`: the agent tokens per phase (builder, checker, shipper, model scout and the security reviewers).
+- `tokens`: the agent tokens per phase (builder, checker, shipper and model scout).
 - `guard`: whether the guard hook was active in that run, from the checker's probe. See [The guard](The-guard).
 - `caught_by`: which check caught each fix round or rollback, in order.
-- `timings`: seconds for the baseline, the checks, the reviews and the ship step, and how many full runs, fast runs and reviews the phase had.
-- `baseline_reused`: whether the baseline was skipped because a green full verify on the same tree was reused. See [Speed](Speed).
 - `v`: the record's schema version, a positive integer. `record` adds `v: 1` when it is missing, and `stats` ignores it, so older records read as before.
 
 ## How to use it
@@ -23,7 +21,7 @@ Optional fields on a record, from [the CHANGELOG](https://github.com/trbbmnglg/p
 node history.mjs stats <history.jsonl>
 ```
 
-`stats` prints the estimate multiplier per kind of work, how many phases had tokens recorded and the median agent tokens per phase, how many phases had the guard active, the median seconds per kind (baseline, checks, review and ship), the median full runs per phase and how many baselines were reused (over the phases that have timings), and, when records have it, the `caught_by` summary ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). The history lives at `${CLAUDE_PLUGIN_DATA}/history.jsonl` for a plugin install and `~/.claude/phased-shipping/history.jsonl` for personal copies. See [Phased shipping](Phased-shipping).
+`stats` prints the estimate multiplier per kind of work, how many phases had tokens recorded and the median agent tokens per phase, how many phases had the guard active, and, when records have it, the `caught_by` summary ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). The history lives at `${CLAUDE_PLUGIN_DATA}/history.jsonl` for a plugin install and `~/.claude/phased-shipping/history.jsonl` for personal copies. See [Phased shipping](Phased-shipping).
 
 ## What shipped when
 
@@ -31,7 +29,6 @@ node history.mjs stats <history.jsonl>
 - Version 0.4.0 added the `guard` field.
 - Version 0.6.0 added `caught_by`.
 - Version 0.7.0 added `v`.
-- Version 0.11.0 added `timings`, `baseline_reused` and the reviewer tokens, and `stats` lines for them.
 - These versions are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
 - Tests: [history.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/history.test.mjs).
 

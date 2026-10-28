@@ -11,8 +11,7 @@
     "manifest": "node scripts/build-manifest.mjs",
     "manifest:check": "node scripts/build-manifest.mjs --check",
     "test": "node --test tests/*.test.mjs",
-    "verify": "node scripts/verify.mjs",
-    "verify:fast": "node scripts/verify.mjs --fast",
+    "verify": "node scripts/lint.mjs && node scripts/build-manifest.mjs --check && node --test tests/*.test.mjs",
     "board": "node scripts/board-dashboard.mjs --owner trbbmnglg --project 2"
   }
 }

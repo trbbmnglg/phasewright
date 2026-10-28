@@ -13,7 +13,7 @@
 import { posix } from "node:path";
 import { splitCommands } from "./lib/shell.mjs";
 
-export const GUARD_VERSION = "0.11.0";
+export const GUARD_VERSION = "0.10.0";
 export const PROBE_COMMAND = "echo phased-shipping-guard-probe";
 export const ROLES = ["builder", "checker", "shipper", "model-scout"];
 export const ROLE_PATTERN = /^phased-shipping:(builder|checker|shipper|model-scout)$/;

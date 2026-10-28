@@ -1269,10 +1269,7 @@ test("hygiene: every test file that calls mkdtempSync also removes what it made"
   assert.equal(leaksTempFolders('const d = mkdtempSync(join(tmpdir(), "x-"));'), true, "the check catches a file that never cleans up");
   assert.equal(leaksTempFolders('const d = mkdtempSync(a); rmSync(d, {});'), false);
   assert.equal(leaksTempFolders('const d = mkdtempSync(a); test.after(() => {});'), false);
-  // The test files and, since the big files were split, the helper modules they share (tests/helpers).
-  const files = [...readdirSync(HERE).filter((n) => n.endsWith(".mjs")), ...readdirSync(join(HERE, "helpers")).filter((n) => n.endsWith(".mjs")).map((n) => `helpers/${n}`)];
-  assert.ok(files.some((n) => n.startsWith("helpers/")), "the helper modules are checked too");
-  for (const f of files) {
+  for (const f of readdirSync(HERE).filter((n) => n.endsWith(".mjs"))) {
     assert.equal(leaksTempFolders(readFileSync(join(HERE, f), "utf8")), false, `${f} makes temp folders and never removes them`);
   }
 });
@@ -1282,13 +1279,9 @@ test("hygiene: every test file that calls mkdtempSync also removes what it made"
 // skilldir-* folder; history.test.mjs removed its folders only when no assertion failed first. Each now has an
 // after hook, which this test keeps in place. The rmSync-or-after check above cannot see this kind of leak.
 test("hygiene: the test files that were measured leaking keep an after hook that removes every folder they made", () => {
-  // plugin-split.test.mjs was split in two; the folders are made by the helper module both halves import, so the hook is kept there.
-  for (const [file, pushes] of [["history.test.mjs", /scratch\.push\(d\)/], ["commands-hash.test.mjs", /made\.push\(d\)/], ["helpers/plugin-split.mjs", /scratch\.push\(d\)/]]) {
+  for (const [file, pushes] of [["history.test.mjs", /scratch\.push\(d\)/], ["commands-hash.test.mjs", /made\.push\(d\)/], ["plugin-split.test.mjs", /scratch\.push\(d\)/]]) {
     const src = readFileSync(join(HERE, file), "utf8");
     assert.ok(/test\.after\(/.test(src), `${file}: an after hook removes what a failing or careless test leaves`);
     assert.ok(pushes.test(src), `${file}: the helper that makes folders records them`);
-  }
-  for (const file of ["plugin-split.test.mjs", "plugin-split-guard.test.mjs"]) {
-    assert.ok(readFileSync(join(HERE, file), "utf8").includes('from "./helpers/plugin-split.mjs"'), `${file} imports the helper that holds the after hook`);
   }
 });

@@ -8,30 +8,16 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, realpath
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { main, commandsSection, hashOf, planKey, lineDiff } from "../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs";
+import { commandsSection, hashOf, planKey, lineDiff } from "../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "..", "plugins", "phased-shipping", "skills", "run", "scripts", "commands-hash.mjs");
 
-// The cases call main(argv, io) in this process, from the folder the real command would have run in (a node process per case is slow
-// where this runs). runReal starts the script itself; the tests that say so use it, so the command line and its exit code stay covered.
 const runIn = (cwd, ...args) => {
-  const startedIn = process.cwd();
-  let out = "";
-  let err = "";
-  try {
-    if (cwd !== undefined) process.chdir(cwd);
-    const status = main(args, { out: (text) => { out += text; }, err: (text) => { err += text; } });
-    return { status, out, err };
-  } finally {
-    process.chdir(startedIn);
-  }
-};
-const run = (...args) => runIn(undefined, ...args);
-const runReal = (...args) => {
-  const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8" });
+  const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", cwd });
   return { status: r.status, out: r.stdout, err: r.stderr };
 };
+const run = (...args) => runIn(undefined, ...args);
 
 const PLAN = [
   "# Phase 3: zork",
@@ -96,11 +82,10 @@ test("no ## Commands section: exit 2", () => {
 
 test("prints the full hash, or 12 hex characters with --short", () => {
   const { plan } = withPlan(PLAN);
-  const full = runReal(plan); // a real process: the command line, its output and its exit code
+  const full = run(plan);
   assert.equal(full.status, 0);
   assert.match(full.out.trim(), /^[0-9a-f]{64}$/);
   assert.equal(full.out.trim(), hashOf(commandsSection(PLAN)));
-  assert.equal(run(plan).out, full.out, "the same text in this process");
   const short = run(plan, "--short");
   assert.match(short.out.trim(), /^[0-9a-f]{12}$/);
   assert.equal(short.out.trim(), full.out.trim().slice(0, 12));

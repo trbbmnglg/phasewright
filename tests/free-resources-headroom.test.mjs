@@ -3,20 +3,29 @@
 // Every fixture is synthetic (invented names, numbers and paths), never real process data.
 // The live tests run only on Windows (they start real helper processes) and are skipped elsewhere.
 // Mac code is covered by fixtures only and is untested on a real Mac.
-// This file is one of 2 (free-resources-headroom.test.mjs, free-resources-measure.test.mjs) that came from one file; the helpers they share are in tests/helpers/free-resources-headroom.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync, appendFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { FR, FIX, load, WINDOWS_ONLY, sampler, tmp, peak, cliEnv } from "./helpers/free-resources-headroom.mjs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = join(HERE, "..");
+const FR = join(REPO, "plugins", "free-resources", "skills", "free-resources");
+const FIX = join(HERE, "fixtures");
 const fix = (name) => readFileSync(join(FIX, name), "utf8");
+const load = (mod) => import(pathToFileURL(join(FR, "scripts", "lib", `${mod}.mjs`)).href);
+const WINDOWS_ONLY = process.platform === "win32" ? false : "live test: Windows only";
+
 const peaksLib = await load("peaks");
+const sampler = await load("sampler");
 const headroom = await load("headroom");
 const rules = await load("rules");
 const snapshot = await load("snapshot");
+
+const tmp = () => mkdtempSync(join(tmpdir(), "fr-test-"));
 const dirEnv = (dir) => ({ env: { FREE_RESOURCES_DATA: dir } });
 const rec = (key, extra = {}) => ({ schema_version: 1, key, cmd_summary: "npm test", project: "x", started_iso: "2026-10-23T00:00:00.000Z", duration_s: 30, exit_code: 0, peak_tree_mb: 100, peak_avail_drop_mb: 120, avg_cpu_cores: 1, peak_cpu_cores: 2, samples: 10, ...extra });
 
@@ -29,6 +38,7 @@ test("peaks: FREE_RESOURCES_DATA wins; the defaults are LOCALAPPDATA on Windows 
   assert.equal(peaksLib.dataDir({ env: {}, platform: "darwin", home: "/srv/fakehome" }), join("/srv/fakehome", ".local", "state", "free-resources"));
   assert.equal(peaksLib.peaksFile(dirEnv("D:\\x")), join("D:\\x", "peaks.jsonl"));
 });
+
 test("peaks: append then read returns the last 5 for a key in order, without another key's runs", () => {
   const dir = tmp();
   try {
@@ -45,6 +55,7 @@ test("peaks: append then read returns the last 5 for a key in order, without ano
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
 test("peaks: a --token value in the command is stored masked, whether or not the caller masked it", () => {
   const dir = tmp();
   try {
@@ -61,6 +72,7 @@ test("peaks: a --token value in the command is stored masked, whether or not the
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
 test("peaks: a corrupt line is skipped, not fatal", () => {
   const dir = tmp();
   try {
@@ -72,6 +84,7 @@ test("peaks: a corrupt line is skipped, not fatal", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
 test("task key: the command's first two words plus the folder name; --task overrides", () => {
   assert.equal(peaksLib.taskKey({ argv: ["npm", "test"], project: join("D:\\Work", "x") }), "npm test @ x");
   assert.equal(peaksLib.taskKey({ argv: ["npm", "run", "build", "--silent"], project: "D:\\Work\\zork\\" }), "npm run @ zork");
@@ -93,6 +106,7 @@ test("sampler: a tick line parses, and a line that is not a tick is ignored", ()
   assert.deepEqual(t.rows[1], { pid: 101, ppid: 100, ws_bytes: 209715200, cpu_s: 2 });
   assert.deepEqual(sampler.parseTreeLine("FR1 5 0.10 ").rows, []);
 });
+
 test("sampler: descendants are the root and everything below it, never a sibling, and a cycle cannot loop", () => {
   const t = sampler.parseTreeLine(fix("tree-ticks.txt").split(/\r?\n/)[1]);
   assert.deepEqual(sampler.descendants(t.rows, 100).map((r) => r.pid).sort(), [100, 101, 102]);
@@ -100,6 +114,7 @@ test("sampler: descendants are the root and everything below it, never a sibling
   const loop = [{ pid: 1, ppid: 2, ws_bytes: 1, cpu_s: 0 }, { pid: 2, ppid: 1, ws_bytes: 1, cpu_s: 0 }];
   assert.deepEqual(sampler.descendants(loop, 1).map((r) => r.pid).sort(), [1, 2]);
 });
+
 test("sampler: peak tree MB counts descendants only, and CPU cores come from CPU-second deltas over wall time", () => {
   const agg = new sampler.Aggregator();
   for (const line of fix("tree-ticks.txt").split(/\r?\n/)) {
@@ -115,6 +130,7 @@ test("sampler: peak tree MB counts descendants only, and CPU cores come from CPU
   assert.equal(r.sampler_startup_cpu_s, 1);
   assert.equal(r.first_tree_t, 1790000000000);
 });
+
 test("sampler: a pid that disappears mid-run, or a root that is gone, does not throw or add CPU", () => {
   const agg = new sampler.Aggregator();
   const rows = (...r) => r.map(([pid, ppid, mbv, cpu]) => ({ pid, ppid, ws_bytes: mbv * 1048576, cpu_s: cpu }));
@@ -131,6 +147,7 @@ test("sampler: a pid that disappears mid-run, or a root that is gone, does not t
   assert.equal(empty.peak_avail_drop_mb, null);
   assert.equal(empty.avg_cpu_cores, null);
 });
+
 test("sampler: streaming typeperf lines parse, including a partial last line, and the drop is first minus lowest", () => {
   const text = fix("typeperf.txt");
   const cut = text.indexOf("8000.000000") + 3; // the third data row is cut in two
@@ -148,6 +165,7 @@ test("sampler: streaming typeperf lines parse, including a partial last line, an
   assert.equal(agg.result().peak_avail_drop_mb, 192);
   assert.equal(agg.result().machine_samples, 3);
 });
+
 test("sampler: macOS ps output parses into the tree (fixture only; Mac is untested on a real machine)", () => {
   const tick = sampler.parseMacTree(fix("mac-tree-ps.txt"), 5);
   assert.equal(tick.rows.length, 4);
@@ -166,7 +184,9 @@ const scanReport = ({ total = 10000, avail = 5000, cpuPct = 50, cpus = 8, sugges
   buckets: { suggest_closing: suggest, your_call: call },
 });
 const group = (name, count, total_mb, cpu_pct = 0) => ({ name, count, total_mb, cpu_pct, confidence: "high", reasons: ["synthetic"] });
+const peak = (mbv, cores = 1, extra = {}) => ({ started_iso: "2026-10-23T00:00:00.000Z", peak_tree_mb: mbv, peak_avail_drop_mb: mbv + 50, peak_cpu_cores: cores, samples: 10, duration_s: 100, ...extra });
 const near = (a, b, eps = 0.5) => assert.ok(Math.abs(a - b) <= eps, `${a} is not within ${eps} of ${b}`);
+
 test("headroom: no peaks gives no data yet and no picks", () => {
   const r = headroom.computeHeadroom({ key: "k", peaks: [], report: scanReport({ suggest: [group("workerd.exe", 4, 275)] }) });
   assert.equal(r.status, "no_data");
@@ -178,6 +198,7 @@ test("headroom: no peaks gives no data yet and no picks", () => {
   assert.match(text, /Nothing is recommended/);
   assert.ok(text.endsWith("Nothing was closed. This scan is read-only."));
 });
+
 test("headroom: need 2,000 MB against 5,000 MB free fits and picks nothing", () => {
   // reserve 10% of 10,000 = 1,000, so 6,000 free in the scan leaves 5,000 available; peak 1739.2 x 1.15 = 2,000
   const r = headroom.computeHeadroom({ key: "k", peaks: [peak(1739.2)], report: scanReport({ avail: 6000, suggest: [group("workerd.exe", 4, 275)] }) });
@@ -188,6 +209,7 @@ test("headroom: need 2,000 MB against 5,000 MB free fits and picks nothing", () 
   assert.equal(r.memory.covered, null);
   assert.match(headroom.renderHeadroom(r), /fits, with [\d,]+ MB to spare/);
 });
+
 test("headroom: short by 600 MB with Suggest groups of 400, 275 and 100 picks 400 + 275, covered, not all three", () => {
   // available = 5,000; need = 5,600 -> peak 5,600 / 1.15
   const r = headroom.computeHeadroom({
@@ -202,6 +224,7 @@ test("headroom: short by 600 MB with Suggest groups of 400, 275 and 100 picks 40
   assert.deepEqual(r.memory.could_also_consider, []);
   assert.match(headroom.renderHeadroom(r), /mid\.exe x4: up to 275 MB, total 675 MB of 600 MB short/);
 });
+
 test("headroom: short by 2,000 MB with only 675 MB in Suggest picks all of it, says it is not enough, and only lists Your call", () => {
   const r = headroom.computeHeadroom({
     key: "k",
@@ -218,6 +241,7 @@ test("headroom: short by 2,000 MB with only 675 MB in Suggest picks all of it, s
   assert.match(text, /You could also consider/);
   assert.match(text, /chrome\.exe x3: up to 900 MB/);
 });
+
 test("headroom: CPU short with only idle Suggest candidates says closing them frees no CPU and lists the busy Your call processes", () => {
   // need 4 x 1.15 = 4.6 cores; available (100 - 70)% of 8 = 2.4 cores
   const r = headroom.computeHeadroom({
@@ -237,6 +261,7 @@ test("headroom: CPU short with only idle Suggest candidates says closing them fr
   assert.match(text, /bigapp\.exe x1: 12\.5% of the machine \(1 core\)/);
   assert.equal(r.memory.verdict, "fits", "memory is reported separately and still fits");
 });
+
 test("headroom: need is the max of the last 5 peaks times 1.15 and ignores a 6th, older, larger peak", () => {
   const peaks = [peak(9000, 9), peak(100, 1), peak(200, 2), peak(300, 1), peak(400, 1), peak(250, 1)]; // oldest first: 9000 is the 6th back
   const r = headroom.computeHeadroom({ key: "k", peaks, report: scanReport() });
@@ -247,6 +272,7 @@ test("headroom: need is the max of the last 5 peaks times 1.15 and ignores a 6th
   assert.equal(rules.NEED_MARGIN, 1.15);
   assert.equal(rules.PEAKS_WINDOW, 5);
 });
+
 test("headroom: the reserve of 10% of total memory is subtracted from the available memory", () => {
   const r = headroom.computeHeadroom({ key: "k", peaks: [peak(100)], report: scanReport({ total: 16000, avail: 6000 }) });
   assert.equal(rules.RESERVE_PCT_OF_TOTAL, 10);
@@ -254,6 +280,7 @@ test("headroom: the reserve of 10% of total memory is subtracted from the availa
   assert.equal(r.memory.available_mb, 4400);
   assert.match(headroom.renderHeadroom(r), /minus a 1,600 MB reserve \(10% of 16,000 MB\)/);
 });
+
 test("headroom: a run with fewer than 3 tree samples uses the available-memory drop and the report says so", () => {
   const thin = { ...peak(50), samples: 1, peak_avail_drop_mb: 900 };
   const r = headroom.computeHeadroom({ key: "k", peaks: [thin], report: scanReport() });
@@ -262,13 +289,19 @@ test("headroom: a run with fewer than 3 tree samples uses the available-memory d
   assert.ok(r.notes.some((n) => /Low confidence/.test(n)));
   assert.match(headroom.renderHeadroom(r), /available-memory drop/);
 });
+
 test("headroom: the rendered text never offers a command to close anything and always ends with the read-only line", () => {
   const r = headroom.computeHeadroom({ key: "k", peaks: [peak(8000)], report: scanReport({ avail: 3000, suggest: [group("workerd.exe", 2, 300)], call: [group("chrome.exe", 3, 900, 2)] }) });
   const text = headroom.renderHeadroom(r, { platform: "win32" });
   for (const bad of [/taskkill/i, /Stop-Process/i, /\bkill\b/i, /\bclose them with\b/i, /\brun:/i]) assert.ok(!bad.test(text), `found ${bad}`);
   assert.ok(text.endsWith("Nothing was closed. This scan is read-only."));
 });
+
+// ---------- headroom CLI ----------
+
+const cliEnv = (dir, extra = {}) => ({ ...process.env, FREE_RESOURCES_DATA: dir, FREE_RESOURCES_PROTECTED: join(FIX, "protected.test.json"), ...extra });
 const headroomCli = (args, dir) => spawnSync(process.execPath, [join(FR, "scripts", "headroom.mjs"), ...args], { encoding: "utf8", env: cliEnv(dir), cwd: FR });
+
 test("headroom CLI: no data exits 3 without scanning; bad options exit 2", () => {
   const dir = tmp();
   try {
@@ -286,6 +319,7 @@ test("headroom CLI: no data exits 3 without scanning; bad options exit 2", () =>
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
 test("headroom CLI: with peaks and a recorded scan it prints the arithmetic, JSON is valid, exit code is 0 even when short", () => {
   const dir = tmp();
   try {
@@ -313,6 +347,24 @@ test("headroom CLI: with peaks and a recorded scan it prints the arithmetic, JSO
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------- measure CLI ----------
+
+const measureCli = (args, dir, extra = {}) => spawnSync(process.execPath, [join(FR, "scripts", "measure.mjs"), ...args], { encoding: "utf8", env: cliEnv(dir, extra), cwd: FR, timeout: 180000 });
+
+test("measure CLI: bad options exit 2 before running anything", () => {
+  const dir = tmp();
+  try {
+    for (const args of [[], ["--task", "x"], ["--bogus", "--", "node", "-v"], ["--interval-ms", "5", "--", "node", "-v"], ["--task"]]) {
+      const r = measureCli(args, dir);
+      assert.equal(r.status, 2, `${args.join(" ")}: ${r.stderr}`);
+      assert.match(r.stderr, /usage|no command|must be|needs/);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("measure: a Windows command line quotes each argument separately, so what you typed is what runs", async () => {
   const { windowsCommandLine } = await import(pathToFileURL(join(FR, "scripts", "measure.mjs")).href);
   assert.equal(windowsCommandLine(["npm", "test"]), "npm test");
@@ -320,6 +372,57 @@ test("measure: a Windows command line quotes each argument separately, so what y
   assert.equal(windowsCommandLine(["echo", "a&b", 'say "hi"']), 'echo "a&b" "say \\"hi\\""');
   assert.equal(windowsCommandLine(["dir", "C:\\My Files\\"]), 'dir "C:\\My Files\\\\"');
 });
+
+test("measure CLI: the command's exit code becomes ours and the record carries exit_code 7", { skip: WINDOWS_ONLY }, () => {
+  const dir = tmp();
+  try {
+    const r = measureCli(["--", "node", "-e", "process.exit(7)"], dir);
+    assert.equal(r.status, 7, r.stderr);
+    assert.match(r.stderr, /free-resources: node -e @ /, "the summary goes to stderr");
+    assert.equal(r.stdout, "", "the command's own stdout stays clean: nothing of ours on stdout");
+    const lines = readFileSync(join(dir, "peaks.jsonl"), "utf8").trim().split("\n");
+    assert.equal(lines.length, 1);
+    const record = JSON.parse(lines[0]);
+    assert.equal(record.exit_code, 7);
+    assert.equal(record.schema_version, 1);
+    assert.equal(record.platform, "win32");
+    assert.equal(record.interval_ms, 2000);
+    for (const f of ["key", "cmd_summary", "project", "started_iso", "duration_s", "peak_tree_mb", "peak_avail_drop_mb", "avg_cpu_cores", "peak_cpu_cores", "samples", "sampler_overhead_pct"]) assert.ok(f in record, `record has ${f}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("measure CLI: a command's stdout is passed through untouched, and --json goes to stderr", { skip: WINDOWS_ONLY }, () => {
+  const dir = tmp();
+  try {
+    const r = measureCli(["--task", "pass-through", "--json", "--", "node", "-e", "console.log('hello from the task')"], dir);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout.trim(), "hello from the task");
+    const j = JSON.parse(r.stderr.slice(r.stderr.indexOf("{")));
+    assert.equal(j.key, "pass-through");
+    assert.equal(j.exit_code, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB", { skip: WINDOWS_ONLY, timeout: 240000 }, (t) => {
+  // PowerShell can take 15 s to start on a busy machine, so the child lives long enough for the tree sampler to tick.
+  const dir = tmp();
+  try {
+    const r = measureCli(["--task", "mem-150", "--", "node", "-e", "const a=Buffer.alloc(150*1024*1024,1);setTimeout(()=>{},30000)"], dir);
+    assert.equal(r.status, 0, r.stderr);
+    const record = JSON.parse(readFileSync(join(dir, "peaks.jsonl"), "utf8").trim());
+    if (!record.samples) return t.skip("no tree sample arrived in 30 s: the machine was too busy to judge");
+    assert.ok(record.peak_tree_mb >= 100, `peak_tree_mb ${record.peak_tree_mb}`);
+    assert.ok(record.peak_tree_mb < 2000, "a plausible number, not another process's memory");
+    assert.ok(record.peak_avail_drop_mb != null);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("sampler: after stop() every helper child the sampler started has exited", { skip: WINDOWS_ONLY, timeout: 120000 }, async () => {
   const task = spawn(process.execPath, ["-e", "setTimeout(()=>{},60000)"], { stdio: "ignore", windowsHide: true });
   try {
@@ -364,6 +467,7 @@ test("no code path can close, kill or signal a process, except the sampler endin
   assert.equal((src.match(/owned\.push\(/g) ?? []).length, 2);
   assert.ok(!/pid\s*=\s*\w+\.pid[\s\S]{0,40}kill/.test(src), "no end-by-pid");
 });
+
 test("the tree PowerShell mode only reads: no write or stop verbs, and only the fixed read-only native calls", () => {
   const ps = snapshot.POWERSHELL_SCRIPT;
   assert.match(ps, /\$mode -eq 'tree'/);
