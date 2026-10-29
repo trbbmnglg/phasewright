@@ -5,5 +5,3 @@ scripts/denylist.local.txt
 plugins/*/skills/free-resources/scripts/protected.local.json
 evals/results/
 
-# GitHub Project build scratch and dashboard output (local only)
-.board/

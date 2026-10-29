@@ -33,7 +33,7 @@ Shipped on 2026-10-30 ([releases.json](https://github.com/trbbmnglg/phasewright/
 - **A releases table generated from one file**: the table in the README is written from [releases.json](https://github.com/trbbmnglg/phasewright/blob/main/releases.json) by [releases-table.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/releases-table.mjs).
 - **A work-in-progress banner and a What's new list**: the README opens with a banner and the latest three plugin releases, written from the [plugin CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md) by [whats-new.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/whats-new.mjs).
 - **Personal copies without a marketplace**: [sync-personal.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/sync-personal.mjs) installs both plugins as personal skills and agents, for setups that do not use plugin marketplaces.
-- **A project-board dashboard**: [board-dashboard.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/board-dashboard.mjs) reads a GitHub Project through the `gh` command line and writes one self-contained page.
+- **A project-board dashboard**: a script that read a GitHub Project through the `gh` command line and wrote one self-contained page. It was removed after this release.
 
 ## Notes
 

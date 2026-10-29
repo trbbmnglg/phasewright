@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 952
+# tests: 945
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
 linux:run,win32:skip	the release zip step puts an agent's Codex and Antigravity versions next to its Claude file
 linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
@@ -48,8 +48,6 @@ run	a BOM in front of the marker on the first line is allowed: the table is stan
 run	a Summary must be 20 to 160 characters
 run	a Summary with a character outside the allowlist is an error that names the version and the code point, never the character
 run	a bare placeholder fails unless it is on the validated list and the file states its pattern
-run	a before that is not an ancestor of the new head returns only the new head
-run	a before that is not in the repository returns only the new head
 run	a broken relative link fails, but a link inside a code block does not
 run	a broken repo link fails, and so does a link to a heading that does not exist
 run	a broken wiki link fails
@@ -70,7 +68,6 @@ run	a folder swapped for a link after the listing is never read through, and eac
 run	a folder that is not a git repo, a sub-folder of one, and a missing folder are refused, with nothing printed but a fixed phrase
 run	a forbidden word fails, without printing a denylist term
 run	a forced exception in the rules denies the call with the error message
-run	a git failure that is not a missing or unrelated commit is not hidden
 run	a hard link to a file outside the project is not listed or read, and the check is what stops it
 run	a history file with old lines (no v) gives the same stats as before, and mixed lines read the same
 run	a kept copy of a roadmap cannot be given as the file: set, standardize --write and restore --write exit 2, change nothing and make no nested folder
@@ -80,7 +77,6 @@ run	a long first word is cut hard at 157 characters
 run	a missing Date or Summary line is an error that names the version
 run	a missing heading fails on a feature page and on a release page
 run	a missing or half-synced rules file denies for a known role instead of crashing
-run	a normal range returns its commits, oldest first
 run	a page that is empty or over 300 lines fails, and so does a missing required page
 run	a placeholder word or variable at the start of a longer value is still a secret, and a bare placeholder still passes
 run	a plan file name with an invisible character is skipped as an unusual name, never listed, read or printed
@@ -117,7 +113,6 @@ run	adopt plan: an invisible character in a plan title (tag, zero-width, format,
 run	adopt plan: finds plan files in docs/phases, .plans/phases and docs/<topic>, never in node_modules, and a custom --plans folder only when given
 run	adopt plan: plans/ and the project's own phases/ are scanned, a root-level phase file is not, and a name with a control or invisible character is skipped
 run	adopt plan: the proposal holds only the rows the plan files prove, in id order, with a Note that names the source
-run	after the last commit is rewritten, the old head to the new head returns only the new head
 run	agent model: best warns, a full ID fails, fable passes
 run	agent versions: --check finds a missing, an out-of-date and a left-over version; build-manifest --check fails the same way; writing fixes them
 run	agent versions: the Codex body survives backslashes, quotes, triple quotes, CRLF and control characters; the Antigravity body is the same text
@@ -125,7 +120,6 @@ run	all four agents carry the agreed maxTurns
 run	allowed commands pass for builder and checker
 run	allowed commands pass for the shipper
 run	an agent file with a bad name fails the name rule
-run	an all-zero before returns only the latest commit
 run	an email address or a mailto link fails
 run	an email with a multi-label domain is reported in full
 run	an interrupted write leaves the old file valid and no temp file behind
@@ -161,7 +155,6 @@ run	big page: over 256 KB the tables of projects with no running session are lef
 run	big page: running projects lose their tables only after the idle ones, never their rows or sessions; a page that fits has no note; idle projects go until it fits
 run	big page: the hard limit is 1 MB and the soft one 256 KB, in the source and in the docs
 run	big page: when the note line itself puts the page over the limit, one more project's tables go
-run	board-sync.mjs imports commitShas from ./board-range.mjs and no longer builds the range itself
 run	both case: a legacy table refuses to propose until it is standard, unless --into names the file
 run	both case: a standard table lists only the plan files whose ids are not in it; with no --into a write is refused
 run	both case: several roadmap files are listed, --into picks one, nothing is merged across files
