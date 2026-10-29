@@ -62,10 +62,13 @@ test("the release table lists only releases that are shipped or in progress", ()
   }
   assert.ok(table.includes("| [v1.0.0](Release-1.0.0-Allacapan) | Allacapan | shipped | 2026-10-22 |"));
 });
-test("every shipped or in-progress release has a page, and the in-progress one says so", () => {
-  for (const r of releases.filter((x) => x.status !== "planned")) assert.ok(existsSync(join(WIKI, `${releasePageName(r)}.md`)), r.version);
-  const baggao = releases.find((r) => r.status === "in progress");
-  assert.match(read(WIKI, `${releasePageName(baggao)}.md`), /^## Status\n\nIn progress/m);
+test("every shipped or in-progress release has a page whose Status says so, with the date of a shipped one", () => {
+  for (const r of releases.filter((x) => x.status !== "planned")) {
+    const page = `${releasePageName(r)}.md`;
+    assert.ok(existsSync(join(WIKI, page)), r.version);
+    const status = r.status === "shipped" ? new RegExp(`^## Status\\n\\nShipped on ${r.date}`, "m") : /^## Status\n\nIn progress/m;
+    assert.match(read(WIKI, page), status, `${r.version} Status`);
+  }
 });
 test("the pages make no claim that drifts or that the plugins cannot keep", () => {
   for (const f of readdirSync(WIKI)) {

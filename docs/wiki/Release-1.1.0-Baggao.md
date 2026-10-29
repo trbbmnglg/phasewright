@@ -2,7 +2,7 @@
 
 ## Status
 
-In progress ([releases.json](https://github.com/trbbmnglg/phasewright/blob/main/releases.json)). It has no date yet and no git tag. This page lists only what has shipped on the main branch so far; it grows as work ships.
+Shipped on 2026-10-30 ([releases.json](https://github.com/trbbmnglg/phasewright/blob/main/releases.json)). The version is the git tag.
 
 ## What shipped
 
@@ -20,6 +20,14 @@ In progress ([releases.json](https://github.com/trbbmnglg/phasewright/blob/main/
   - 0.11.0: faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs, a timings table and new history fields. See [Speed](Speed).
   - 0.11.1: every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. The free-resources plugin has the same change in 0.1.1.
 - **free-resources, plugin version 0.1.1** ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)): a report-only check of how pressured your machine is. It has no changelog, so see its [README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md). See [Free resources](Free-resources).
+- **Two rewritten skills**, both at version 2.0.0: [refactoring](https://github.com/trbbmnglg/phasewright/blob/main/skills/refactoring/SKILL.md) and [business-analyst](https://github.com/trbbmnglg/phasewright/blob/main/skills/business-analyst/SKILL.md).
+  - refactoring is now a risk-based guide: classify each change, keep the behavior and prove it. A file over 300 lines starts a responsibility review, not a forced split. It adds a solo review mode for repositories without pull-request review, and two reference files: the PR description and the rules for LLM requests.
+  - business-analyst clarifies requirements and writes a testable feature spec sized to the risk (lean, standard or high-risk), with a spec template. It is no longer manual-only. Its plugin eval cases are in [evals/business-analyst](https://github.com/trbbmnglg/phasewright/tree/main/evals/business-analyst) and have not been run against a model yet.
+- **OpenAI Codex and Google Antigravity install support**, with install steps in the README for [Codex](https://github.com/trbbmnglg/phasewright/blob/main/README.md#openai-codex) and [Antigravity](https://github.com/trbbmnglg/phasewright/blob/main/README.md#google-antigravity):
+  - Skills: both tools load skills from `SKILL.md` folders, so a skill folder works as it is. A skill that pins a model or is manual only is partial there.
+  - Agents: [build-agent-versions.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/build-agent-versions.mjs) writes `agents/codex/<slug>.toml` and `agents/antigravity/<slug>.md` from each Claude agent file, and `build-manifest.mjs --check` (so `npm run verify`) fails until they match. Both leave out the model and the tool list, which come from the tool's own settings. An agent whose Claude version limits its tools is partial there.
+  - Plugins: partial in both. Copy the plugin's skills; hooks, agents and model pins do not carry over. Native plugin packages are a later step.
+  - An agent's release zip also holds its `codex/<slug>.toml` and `antigravity/<slug>.md`.
 - **A security policy**: [SECURITY.md](https://github.com/trbbmnglg/phasewright/blob/main/SECURITY.md) says how to report a vulnerability, what is in scope, and how releases are built. See [Security policy](Security-policy).
 - **A rewritten README** built around the problem, how it helps and a two-command start, with the logo files in [docs/brand](https://github.com/trbbmnglg/phasewright/tree/main/docs/brand) ([README](https://github.com/trbbmnglg/phasewright/blob/main/README.md)).
 - **A releases table generated from one file**: the table in the README is written from [releases.json](https://github.com/trbbmnglg/phasewright/blob/main/releases.json) by [releases-table.mjs](https://github.com/trbbmnglg/phasewright/blob/main/scripts/releases-table.mjs).

@@ -19,7 +19,7 @@ The shipper takes the deploy, prod-check and rollback commands only from the sec
 ## What shipped when
 
 - Plugin version 0.5.0 added the approval check, the two builder-only guard rules that protect the plan files and the records, and the README section ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).
-- Version 0.5.0 is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- Version 0.5.0 is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - Tests for the hashing and the records: [commands-hash.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/commands-hash.test.mjs).
 
 ## Limits

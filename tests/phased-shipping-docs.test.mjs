@@ -861,7 +861,7 @@ test("phase 7d2: the README and the wiki describe the dashboard data, what it wr
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
   assert.ok(wiki.includes("The current plugin version is 0.11.1"));
   assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
-  assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(wiki), "the version row");
+  assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(wiki), "the version row");
   const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
   assert.ok(release.includes("plugin version 0.11.1") && release.includes("  - 0.9.0: the `/phased-shipping:dashboard` skill"));
   assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
@@ -913,7 +913,7 @@ test("phase 7d3: the README describes the page, its fonts and what it touches, a
   for (const heading of ["## What it is", "## How to use it", "## What shipped when", "## Limits", "## Source"]) assert.ok(new RegExp(`^${heading}$`, "m").test(page), heading);
   assert.ok(repoText("docs", "wiki", "Home.md").includes("(Dashboard)"));
   assert.ok(repoText("scripts", "publish-wiki.mjs").includes('{ page: "Dashboard", title: "Dashboard" }'));
-  assert.ok(/^\| 0\.10\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
+  assert.ok(/^\| 0\.10\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.10.0: the dashboard page"));
   assert.ok(page.includes("Nobody has run it in a real browser"));
 });
@@ -1022,7 +1022,7 @@ test("phase 7p: the README has the Speed section with the honest limits, and the
 test("phase 7p: the wiki pages say 0.11.0 where they name the current version", () => {
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
   assert.ok(wiki.includes("The current plugin version is 0.11.1"));
-  assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|.*fast and a full verify set/m.test(wiki), "the version row");
+  assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|.*fast and a full verify set/m.test(wiki), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.0: faster runs without a lower bar"));
   assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
   const hist = repoText("docs", "wiki", "Phase-history-and-estimates.md");
@@ -1236,6 +1236,6 @@ test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, 
   for (const heading of ["### Changed", "### Added"]) assert.ok(entry.includes(heading), heading);
   for (const word of ["single quotes", "U+2018 to U+201B", "commands-hash", "tests/command-lines.test.mjs", "No guard rule changed", "free-resources plugin is at 0.1.1"]) assert.ok(entry.includes(word), word);
   assert.ok(repoText("docs", "wiki", "Free-resources.md").includes("Plugin version 0.1.1") && repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("free-resources, plugin version 0.1.1"));
-  assert.ok(/^\| 0\.11\.1 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \(in progress\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
+  assert.ok(/^\| 0\.11\.1 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.1: every script command line"));
 });

@@ -10,7 +10,7 @@ Do not put the details of a vulnerability in a public issue, pull request or dis
 
 ## What shipped when
 
-- The policy was added during [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- The policy was added during [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - A test keeps its headings and its promises in step with what one maintainer can keep: [security-policy.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/security-policy.test.mjs).
 - It also says how releases are built: a version tag starts a workflow that runs the lint, the manifest check and the tests, zips each item and attaches the zips and `library.json`. Its actions are pinned to full commit SHAs ([How releases are built](https://github.com/trbbmnglg/phasewright/blob/main/SECURITY.md#how-releases-are-built), [release.yml](https://github.com/trbbmnglg/phasewright/blob/main/.github/workflows/release.yml)).
 

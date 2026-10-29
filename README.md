@@ -3,7 +3,7 @@
 Skills, agents and plugins that keep AI-assisted coding work small, checked and reversible.
 
 <!-- whats-new:start -->
-> **Work in progress.** Phasewright is built in the open. Release v1.1.0 (Baggao) is being built, so interfaces and file formats may still change; see [Releases](#releases).
+> **Under active development.** Interfaces and file formats may still change; see [Releases](#releases).
 
 ## What's new
 
@@ -150,7 +150,7 @@ Releases are numbered by version and named. The version is the git tag.
 |---|---|---|---|
 | v1.0.0 | Allacapan | shipped | First public release: skills, agents and the phased-shipping plugin. |
 | v1.0.1 | Aparri | shipped | Fixes item summaries that were cut off mid-word. |
-| v1.1.0 | Baggao | in progress | Trust and guardrails, the free-resources plugin, a local dashboard, the README, the footprint budget and supply-chain signals. |
+| v1.1.0 | Baggao | shipped | Trust and guardrails, the free-resources plugin, a local dashboard, the README, the footprint budget, supply-chain signals, rewritten refactoring and business-analyst skills, and OpenAI Codex and Google Antigravity install support. |
 | v1.2.0 | Buguey | planned | Evals, reviewer agents, security checks by default, trustworthy history, operate and rollout, plan import, a test-first gate, more harnesses and new skills. |
 | v1.3.0 | Camalaniugan | planned | Privacy and governance packs. |
 | v1.4.0 | $\color{#D4AF37}{\textbf{Gattaran}}$ | planned | The sensitive-information guard and the loop-guard plugin. |

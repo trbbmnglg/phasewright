@@ -32,7 +32,7 @@ A failed rebuild never fails a status call: it prints one line, `page not rebuil
 
 - Plugin version 0.10.0 added the page script, its style and client script, the fonts, the `page` mode and the rebuild at each status call ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). No guard rule changed.
 - Session files gained an optional trail of step and state changes (at most 40), and the merged JSON gained loops, rounds, visits, time worked, estimates and a summary for each project.
-- This is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- This is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - Tests: [dashboard-page.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/dashboard-page.test.mjs) and [dashboard.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/dashboard.test.mjs).
 
 ## Limits

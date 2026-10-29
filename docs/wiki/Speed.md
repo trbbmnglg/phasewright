@@ -45,7 +45,7 @@ The repository's own checks run on Node 20 or newer with no dependencies.
 ## What shipped when
 
 - Plugin version 0.11.0 added the two verify sets, parallel groups, the tree-state script, baseline reuse, the review brief, the timings table and the new history fields ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). No guard rule changed. The shipper's turn limit went from 20 to 40.
-- This is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- This is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - Tests: [tree-state.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/tree-state.test.mjs), [tree-state-process.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/tree-state-process.test.mjs) and [history.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/history.test.mjs).
 
 ## Limits

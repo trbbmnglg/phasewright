@@ -9,7 +9,7 @@ This wiki describes what has shipped. Each page links the file its claims come f
 - [Releases](Releases): every release with its name, status and date.
 - [v1.0.0 Allacapan](Release-1.0.0-Allacapan)
 - [v1.0.1 Aparri](Release-1.0.1-Aparri)
-- [v1.1.0 Baggao](Release-1.1.0-Baggao) (in progress)
+- [v1.1.0 Baggao](Release-1.1.0-Baggao)
 
 ## Features
 

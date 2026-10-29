@@ -32,7 +32,7 @@ node history.mjs stats <history.jsonl>
 - Version 0.6.0 added `caught_by`.
 - Version 0.7.0 added `v`.
 - Version 0.11.0 added `timings`, `baseline_reused` and the reviewer tokens, and `stats` lines for them.
-- These versions are part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- These versions are part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - Tests: [history.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/history.test.mjs).
 
 ## Limits

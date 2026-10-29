@@ -278,7 +278,7 @@ run	every path that is not a plain regular .gitignore, or has other content, is 
 run	every relative link and image points at a file that exists, and every anchor at a heading in the target
 run	every rule denies with the documented output (the decision the script prints)
 run	every scan is linear: 32,000 repeats of the shapes that made a regex rescan the text finish at once
-run	every shipped or in-progress release has a page, and the in-progress one says so
+run	every shipped or in-progress release has a page whose Status says so, with the date of a shipped one
 run	every summary in the real library.json is within 240 characters
 run	every tokenizer loop is linear: 80000-word inputs are split in well under a second
 run	exempt: "${CLAUDE_SKILL_DIR}" and "${CLAUDE_PLUGIN_DATA}" in double quotes, with or without a path after them

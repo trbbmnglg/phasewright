@@ -23,7 +23,7 @@ There is one mode: the script reads your files, and the assistant sees the summa
 ## What shipped when
 
 - Plugin version 0.8.0 added the skill, the survey script, `adopt` and two evals, `onboard-needs-consent` and `adopt-needs-yes` ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). No guard rule changed.
-- This is part of [v1.1.0](Release-1.1.0-Baggao), which is in progress.
+- This is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
 - Tests: [survey.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/survey.test.mjs).
 
 ## Limits

@@ -46,19 +46,19 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | Plugin version | Release | What changed |
 |---|---|---|
 | 0.2.0 | [v1.0.0](Release-1.0.0-Allacapan) and [v1.0.1](Release-1.0.1-Aparri) | The plugin as first published ([plugin.json at the v1.0.0 tag](https://github.com/trbbmnglg/phasewright/blob/v1.0.0/plugins/phased-shipping/.claude-plugin/plugin.json)). |
-| 0.3.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | "What it touches" and "Limits" sections, a turn limit on every agent, token recording, safety evals, an override gate and a minimum-version check. |
-| 0.4.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The guard hook and the guard probe. |
-| 0.5.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Approval bound to the commands you saw at the preview. |
-| 0.6.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | `caught_by` in the phase history, a rule for long commands, a rule for a missing shell. |
-| 0.6.1, 0.6.2 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The checker times each command and reads the exit code and duration from one line. |
-| 0.6.3 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The README's Limits say what has been seen of the guard in real runs; documentation only. |
-| 0.7.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The roadmap format, the `/phased-shipping:roadmap` skill and script, and a schema version on each history record. See [Roadmap standard](Roadmap-standard). |
-| 0.7.1 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Roadmap backups kept in `.roadmap-backups/`, a permanent `.original`, `set` keeps `.prev`, a new `restore` command, and a changed-while-writing check. See [Roadmap standard](Roadmap-standard). |
-| 0.8.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:onboard` skill, the survey script, `adopt` and the real-world status forms in the roadmap reader. See [Onboarding](Onboarding). |
-| 0.9.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The `/phased-shipping:dashboard` skill, opt-in status files that the run writes at each step, a local project list, and one merged JSON for a dashboard page. Off until you say yes. |
-| 0.10.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | The dashboard page: projects, sessions and the loops back in a phase, one local file rebuilt at every step, no network. See [Dashboard](Dashboard). |
-| 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
-| 0.11.1 | [v1.1.0](Release-1.1.0-Baggao) (in progress) | Every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. |
+| 0.3.0 | [v1.1.0](Release-1.1.0-Baggao) | "What it touches" and "Limits" sections, a turn limit on every agent, token recording, safety evals, an override gate and a minimum-version check. |
+| 0.4.0 | [v1.1.0](Release-1.1.0-Baggao) | The guard hook and the guard probe. |
+| 0.5.0 | [v1.1.0](Release-1.1.0-Baggao) | Approval bound to the commands you saw at the preview. |
+| 0.6.0 | [v1.1.0](Release-1.1.0-Baggao) | `caught_by` in the phase history, a rule for long commands, a rule for a missing shell. |
+| 0.6.1, 0.6.2 | [v1.1.0](Release-1.1.0-Baggao) | The checker times each command and reads the exit code and duration from one line. |
+| 0.6.3 | [v1.1.0](Release-1.1.0-Baggao) | The README's Limits say what has been seen of the guard in real runs; documentation only. |
+| 0.7.0 | [v1.1.0](Release-1.1.0-Baggao) | The roadmap format, the `/phased-shipping:roadmap` skill and script, and a schema version on each history record. See [Roadmap standard](Roadmap-standard). |
+| 0.7.1 | [v1.1.0](Release-1.1.0-Baggao) | Roadmap backups kept in `.roadmap-backups/`, a permanent `.original`, `set` keeps `.prev`, a new `restore` command, and a changed-while-writing check. See [Roadmap standard](Roadmap-standard). |
+| 0.8.0 | [v1.1.0](Release-1.1.0-Baggao) | The `/phased-shipping:onboard` skill, the survey script, `adopt` and the real-world status forms in the roadmap reader. See [Onboarding](Onboarding). |
+| 0.9.0 | [v1.1.0](Release-1.1.0-Baggao) | The `/phased-shipping:dashboard` skill, opt-in status files that the run writes at each step, a local project list, and one merged JSON for a dashboard page. Off until you say yes. |
+| 0.10.0 | [v1.1.0](Release-1.1.0-Baggao) | The dashboard page: projects, sessions and the loops back in a phase, one local file rebuilt at every step, no network. See [Dashboard](Dashboard). |
+| 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
+| 0.11.1 | [v1.1.0](Release-1.1.0-Baggao) | Every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. |
 
 ## Limits
 

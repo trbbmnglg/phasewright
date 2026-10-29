@@ -392,7 +392,7 @@ test("mutation proof on a temp copy: removing a marker or a CHANGELOG line makes
   assert.equal(r.code, 1);
   assert.ok(r.err.includes("0.12.0") && r.err.includes("needs a"), r.err);
   // a README block edited by hand
-  r = run(["--check"], copy((s) => s.replace("Work in progress", "Finished")));
+  r = run(["--check"], copy((s) => s.replace(/Work in progress|Under active development/, "Finished")));
   assert.equal(r.code, 1);
   assert.ok(r.err.includes("out of date"));
 });
