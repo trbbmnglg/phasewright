@@ -9,8 +9,8 @@ Plain Markdown skills and agents you can read, copy and adapt ([README](https://
 | `prompt-engineering` | Prompt techniques, an 8-part anatomy, a robustness checklist and a maturity rubric ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/prompt-engineering/SKILL.md)) |
 | `planner` | Multi-perspective implementation plans: business analysis, architecture, QA, security, definition of done ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/planner/SKILL.md)) |
 | `docs-generator` | Flowcharts, design docs, API docs, ERDs, changelogs and release notes ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/docs-generator/SKILL.md)) |
-| `business-analyst` | A requirements interview that ends in a formal feature spec ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/business-analyst/SKILL.md)) |
-| `refactoring` | A file-size limit and patterns for extracting hooks, modals, tabs and constants ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/refactoring/SKILL.md)) |
+| `business-analyst` | Clarifies requirements and writes a testable feature spec, sized to the risk (Lean, Standard or High-risk) ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/business-analyst/SKILL.md)) |
+| `refactoring` | Risk-based refactoring: classify each change, keep behavior the same and prove it; 300 lines starts a review, not a forced split ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/refactoring/SKILL.md)) |
 | `error-handling` | API response shapes, validation, database errors and loading and empty states ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/error-handling/SKILL.md)) |
 | `performance` | Render, fetch and query patterns for web apps ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/performance/SKILL.md)) |
 | `commits` | Conventional Commits types, scopes and splitting rules ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/commits/SKILL.md)) |

@@ -488,8 +488,8 @@
       "slug": "business-analyst",
       "type": "skill",
       "title": "Business Analyst",
-      "summary": "Business analyst requirements interviewer.",
-      "description": "Business analyst requirements interviewer. Conducts a structured requirements interview, then produces a formal feature spec (strategy analysis, personas, user stories with Given/When/Then acceptance scenarios, process flows, data model impact, prioritization, success metrics) before any code is written. TRIGGER when the user mentions a new feature, enhancement, or idea that is vague or hasn't been fully defined yet.",
+      "summary": "Clarify requirements, challenge material assumptions, and produce testable feature specifications before implementation.",
+      "description": "Clarify requirements, challenge material assumptions, and produce testable feature specifications before implementation. Use for explicit requests to clarify requirements or create a feature spec. For other feature requests, use only when the request plus available project context leaves material expected behavior unresolved. Do not use merely because formal acceptance criteria are absent. Exclude routine bug fixes, changes with clear expected behavior and established conventions, and implementation of approved specs unless a material requirements gap is discovered.",
       "tags": [
         "requirements",
         "specs",
@@ -497,11 +497,12 @@
       ],
       "featured": false,
       "order": 4,
-      "version": "1.0.0",
+      "version": "2.0.0",
       "license": "MIT",
       "path": "skills/business-analyst",
       "files": [
-        "skills/business-analyst/SKILL.md"
+        "skills/business-analyst/SKILL.md",
+        "skills/business-analyst/references/spec-template.md"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/business-analyst",
       "zip": "skill-business-analyst.zip",
@@ -534,19 +535,21 @@
       "slug": "refactoring",
       "type": "skill",
       "title": "Refactoring Guide",
-      "summary": "Code refactoring guide — 300-line hard limit, hook extraction, modal extraction, tab extraction, constants extraction, and API route splitting.",
-      "description": "Code refactoring guide — 300-line hard limit, hook extraction, modal extraction, tab extraction, constants extraction, and API route splitting. TRIGGER when a file approaches or exceeds 300 lines, or when extracting hooks/modals/tabs/constants.",
+      "summary": "Risk-based code refactoring guide for frontend components, hooks, modals, tabs, constants, API routes, and LLM request builders.",
+      "description": "Risk-based code refactoring guide for frontend components, hooks, modals, tabs, constants, API routes, and LLM request builders. Use when asked to refactor or extract these elements, or when a maintained source file approaches or exceeds 300 lines and needs a responsibility review. Classify changes, preserve behavior contracts, require verification evidence, and document size exceptions instead of splitting solely to satisfy line counts.",
       "tags": [
         "refactoring",
         "code-quality"
       ],
       "featured": false,
       "order": 5,
-      "version": "1.0.0",
+      "version": "2.0.0",
       "license": "MIT",
       "path": "skills/refactoring",
       "files": [
-        "skills/refactoring/SKILL.md"
+        "skills/refactoring/SKILL.md",
+        "skills/refactoring/references/llm-boundaries.md",
+        "skills/refactoring/references/pr-description.md"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/refactoring",
       "zip": "skill-refactoring.zip",

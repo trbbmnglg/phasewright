@@ -65,8 +65,8 @@ Everything here is a plain Markdown file or folder you can read, copy and adapt.
 | `prompt-engineering` | 24 prompt techniques, an 8-part anatomy, a robustness checklist and a maturity rubric |
 | `planner` | Multi-perspective implementation plans: business analysis, architecture, QA, security, definition of done |
 | `docs-generator` | Flowcharts, design docs, API docs, ERDs, changelogs and release notes |
-| `business-analyst` | A requirements interview that ends in a formal feature spec |
-| `refactoring` | A file-size limit and patterns for extracting hooks, modals, tabs and constants |
+| `business-analyst` | Clarifies requirements and writes a testable feature spec, sized to the risk (Lean, Standard or High-risk) |
+| `refactoring` | Risk-based refactoring: classify each change, keep behavior the same and prove it; 300 lines starts a review, not a forced split |
 | `error-handling` | API response shapes, validation, database errors and loading and empty states |
 | `performance` | Render, fetch and query patterns for web apps |
 | `commits` | Conventional Commits types, scopes and splitting rules |
