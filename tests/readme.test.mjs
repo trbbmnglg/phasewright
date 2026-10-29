@@ -30,6 +30,7 @@ const anchorsOf = (md) => new Set(headingsOf(md).map((h) => slug(h.text)));
 const EXPECTED = [
   [2, "What's new"], [2, "The problem"], [2, "How it helps"], [2, "Quick start"], [2, "What a phase looks like"], [2, "What's inside"],
   [2, "Install in your tool"], [3, "Claude Code"], [3, "VS Code with GitHub Copilot"], [3, "Cursor"],
+  [3, "OpenAI Codex"], [3, "Google Antigravity"],
   [3, "Other tools"], [3, "Download a single item"],
   [2, "What works where"], [2, "What it will not do"], [2, "Releases"], [2, "Security"], [2, "Develop"], [2, "License"],
 ];

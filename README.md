@@ -102,13 +102,23 @@ Copy a skill folder into `.github/skills/`, `.claude/skills/` or `.agents/skills
 
 Copy a skill folder into `.cursor/skills/` or `.agents/skills/` (project), or `~/.cursor/skills/` (personal). Cursor has no documented custom-agent file format, so use the matching skill instead of an agent.
 
+### OpenAI Codex
+
+Copy a skill folder into `.agents/skills/` (project; Codex also looks in the parent folders up to the repository root) or `~/.agents/skills/` (personal). Each agent has a Codex version, `agents/codex/<name>.toml`: copy it into `.codex/agents/` (project) or `~/.codex/agents/` (personal). It takes the model and the tool list from your Codex settings. The skills marked manual only in Claude Code (`disable-model-invocation`) need an `agents/openai.yaml` with `policy.allow_implicit_invocation: false` to stay manual. For a plugin, copy its skills; its hooks, agents and model pins don't carry over.
+
+### Google Antigravity
+
+Copy a skill folder into `.agents/skills/` (project) or `~/.gemini/config/skills/` (personal, App and IDE); the CLI reads `~/.gemini/antigravity-cli/skills/`, and the older `.agent/skills/` still works. Each agent has an Antigravity version, `agents/antigravity/<name>.md`: copy it into `.agents/agents/` (project) or `~/.gemini/config/agents/` (personal, App and CLI). It takes the model and the tool list from your Antigravity settings. For a plugin, copy its skills; its hooks, agents and model pins don't carry over.
+
+The Codex and Antigravity agent files are generated from the Claude ones by `node scripts/build-agent-versions.mjs` (also run by `node scripts/build-manifest.mjs`), so edit the Claude file and regenerate.
+
 ### Other tools
 
 Copy a skill folder into your tool's skills folder.
 
 ### Download a single item
 
-Every release attaches one zip per item (`skill-planner.zip`, `agent-debugger.zip`, ...). Each zip holds the item in its own folder: unzip it into your skills or agents folder.
+Every release attaches one zip per item (`skill-planner.zip`, `agent-debugger.zip`, ...). Each zip holds the item in its own folder: unzip it into your skills or agents folder. An agent's zip also holds its Codex and Antigravity versions, in `codex/` and `antigravity/`.
 
 ## What works where
 

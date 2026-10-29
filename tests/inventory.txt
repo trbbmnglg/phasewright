@@ -2,8 +2,9 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 948
+# tests: 952
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
+linux:run,win32:skip	the release zip step puts an agent's Codex and Antigravity versions next to its Claude file
 linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
 linux:skip,win32:run	measure CLI: a command's stdout is passed through untouched, and --json goes to stderr
 linux:skip,win32:run	measure CLI: the command's exit code becomes ours and the record carries exit_code 7
@@ -118,6 +119,8 @@ run	adopt plan: plans/ and the project's own phases/ are scanned, a root-level p
 run	adopt plan: the proposal holds only the rows the plan files prove, in id order, with a Note that names the source
 run	after the last commit is rewritten, the old head to the new head returns only the new head
 run	agent model: best warns, a full ID fails, fable passes
+run	agent versions: --check finds a missing, an out-of-date and a left-over version; build-manifest --check fails the same way; writing fixes them
+run	agent versions: the Codex body survives backslashes, quotes, triple quotes, CRLF and control characters; the Antigravity body is the same text
 run	all four agents carry the agreed maxTurns
 run	allowed commands pass for builder and checker
 run	allowed commands pass for the shipper
@@ -443,6 +446,7 @@ run	main: the name shown comes from plugin.json
 run	main: unknown or missing flags exit 2 and touch nothing
 run	manifest --check fails after an edit until the manifest is rebuilt
 run	manifest: a plugin with no agents and no model pins is full for Copilot and Cursor; others stay partial
+run	manifest: every item has Codex and Antigravity install steps; a manual-only skill, a tool-limited agent and a plugin are partial
 run	mapStatus: a parenthetical moves to Plan file or Note, moved-to is parked, the rest is blocked
 run	mapStatus: confirmed, a bare number and every other word or shape stay blocked (never guessed)
 run	mapStatus: every word of the mapping, case-insensitive and trimmed

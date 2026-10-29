@@ -35,6 +35,11 @@ jobs:
           jq -r '.items[] | [.path, .zip] | @tsv' library.json | while IFS=$'\t' read -r path zip; do
             (cd "$(dirname "$path")" && zip -qr "$root/dist/$zip" "$(basename "$path")" -x '*/evals/results/*')
           done
+          # An item's files outside its own path go in its zip too, under their path below the top folder: an agent's
+          # agents/codex/<slug>.toml and agents/antigravity/<slug>.md land as codex/<slug>.toml and antigravity/<slug>.md.
+          jq -r '.items[] | .path as $p | .zip as $z | .files[] | select(. != $p and (startswith($p + "/") | not)) | [$z, .] | @tsv' library.json | while IFS=$'\t' read -r zip file; do
+            (cd "${file%%/*}" && zip -q "$root/dist/$zip" "${file#*/}")
+          done
           cp library.json dist/library.json
           ls -l dist
       - name: Publish release

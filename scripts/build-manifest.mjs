@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Generates library.json: the catalogue of every item, with its install steps per tool.
 //   node scripts/build-manifest.mjs           write library.json
-//   node scripts/build-manifest.mjs --check   exit 1 if library.json is out of date
+//   node scripts/build-manifest.mjs --check   exit 1 if library.json, or an agent's Codex or Antigravity version, is out of date
 // Deterministic: no timestamps, stable ordering.
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { agentToolLimit, versionProblems, writeVersions } from "./build-agent-versions.mjs";
 import { REPO, ROOT, loadItems, parseFrontmatter, rel } from "./lib.mjs";
 
 const SCHEMA_VERSION = 1;
@@ -48,7 +49,32 @@ const copyTo = (project, personal, slug) => [
   `Copy skills/${slug} into ${project}/ (project)${personal ? ` or ${personal}/ (personal)` : ""}`,
 ];
 
-function skillTools(slug) {
+// OpenAI Codex and Google Antigravity both load skills from SKILL.md folders, so a skill folder works there as it is. Two Claude Code
+// fields don't carry over, and a skill that uses one is partial there: a pinned `model`, and `disable-model-invocation` (manual only).
+const CODEX_SKILLS = "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills";
+const ANTIGRAVITY_SKILLS = "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills";
+function skillLosses(data, manualOnly) {
+  const out = [];
+  if (data?.model) out.push("the pinned model is not carried over");
+  if (data?.["disable-model-invocation"] === "true") out.push(manualOnly);
+  return out;
+}
+function otherSkillTools(slug, data) {
+  const codexLoss = skillLosses(data, "for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false");
+  const agyLoss = skillLosses(data, "manual only is a Claude Code field, so Antigravity may use it unasked");
+  return {
+    codex: {
+      ...(codexLoss.length ? support("partial", `Skills load; ${codexLoss.join("; ")}`) : support("full", CODEX_SKILLS)),
+      install: copyTo(".agents/skills", "~/.agents/skills", slug),
+    },
+    antigravity: {
+      ...(agyLoss.length ? support("partial", `Skills load; ${agyLoss.join("; ")}`) : support("full", ANTIGRAVITY_SKILLS)),
+      install: [`Copy skills/${slug} into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)`, `For the CLI, copy it into ~/.gemini/antigravity-cli/skills/`],
+    },
+  };
+}
+
+function skillTools(slug, data) {
   return {
     "claude-code": {
       ...support("full"),
@@ -66,10 +92,22 @@ function skillTools(slug) {
       ...support("full", "Cursor reads .cursor/skills and .agents/skills"),
       install: copyTo(".cursor/skills", "~/.cursor/skills", slug),
     },
+    ...otherSkillTools(slug, data),
   };
 }
 
-function agentTools(slug) {
+// An agent's Codex and Antigravity versions are generated from its Claude version (build-agent-versions.mjs), and inherit the model and
+// the tool list from the tool's own settings: partial when the Claude version limits the tools to fewer than the full set.
+function agentVersionTool(tool, file, folders, limit) {
+  const inherited = `The model and the tool list come from your ${tool} settings`;
+  return {
+    ...(limit ? support("partial", `${inherited}; the Claude version's limit to ${limit} is not kept`) : support("full", `${inherited}`)),
+    install: [`Copy ${file} into ${folders}`],
+  };
+}
+
+function agentTools(slug, data) {
+  const limit = agentToolLimit(data?.tools);
   return {
     "claude-code": {
       ...support("full"),
@@ -80,6 +118,8 @@ function agentTools(slug) {
       install: [`Copy agents/claude/${slug}.md into .claude/agents/ (project) or ~/.claude/agents/ (personal)`],
     },
     cursor: { ...support("none", "No documented custom-agent file format; use the matching skill instead"), install: [] },
+    codex: agentVersionTool("Codex", `agents/codex/${slug}.toml`, ".codex/agents/ (project) or ~/.codex/agents/ (personal)", limit),
+    antigravity: agentVersionTool("Antigravity", `agents/antigravity/${slug}.md`, ".agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)", limit),
   };
 }
 
@@ -106,15 +146,20 @@ function pluginTools(slug, needsClaudeCode) {
     },
     copilot: { ...other, install: [`Copy plugins/${slug}/skills/* into .github/skills/`] },
     cursor: { ...other, install: [`Copy plugins/${slug}/skills/* into .cursor/skills/`] },
+    // Neither tool's own plugin format is supported yet: the skills are what carries over.
+    codex: { ...support("partial", NO_NATIVE_PLUGIN), install: [`Copy plugins/${slug}/skills/* into .agents/skills/`] },
+    antigravity: { ...support("partial", NO_NATIVE_PLUGIN), install: [`Copy plugins/${slug}/skills/* into .agents/skills/`] },
   };
 }
+const NO_NATIVE_PLUGIN = "No native plugin package yet: copy the plugin's skills; its hooks, agents and model pins don't carry over";
 
 export function build() {
   const { skills, agents, plugins } = loadItems();
   const items = [
-    ...skills.map((s) => common(s, s.data, s.data.metadata, { zip: `skill-${s.slug}.zip`, tools: skillTools(s.slug) })),
-    ...agents.map((a) => common(a, a.data, a.data.metadata, {
-      license: "MIT", zip: `agent-${a.slug}.zip`, model: a.data.model, tools: agentTools(a.slug),
+    ...skills.map((s) => common(s, s.data, s.data.metadata, { zip: `skill-${s.slug}.zip`, tools: skillTools(s.slug, s.data) })),
+    // An agent's zip and files also hold its generated Codex and Antigravity versions, which its install steps name.
+    ...agents.map((a) => common({ ...a, files: [...a.files, `agents/codex/${a.slug}.toml`, `agents/antigravity/${a.slug}.md`] }, a.data, a.data.metadata, {
+      license: "MIT", zip: `agent-${a.slug}.zip`, model: a.data.model, tools: agentTools(a.slug, a.data),
     })),
     ...plugins.map((p) => {
       const metadata = { title: p.slug.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" "), tags: (p.manifest.keywords ?? []).join(","), featured: "true", order: "1", version: p.manifest.version };
@@ -135,13 +180,17 @@ if (process.argv[1]?.endsWith("build-manifest.mjs")) {
   const out = JSON.stringify(build(), null, 2) + "\n";
   const target = join(ROOT, "library.json");
   if (process.argv.includes("--check")) {
-    if (!existsSync(target) || readFileSync(target, "utf8") !== out) {
-      console.log("library.json is out of date. Run: node scripts/build-manifest.mjs");
-      process.exit(1);
-    }
-    console.log("library.json is up to date");
+    const versions = versionProblems();
+    for (const [path, why] of versions) console.log(`${path} ${why}`);
+    if (versions.length) console.log("The agent versions are out of date. Run: node scripts/build-agent-versions.mjs");
+    const stale = !existsSync(target) || readFileSync(target, "utf8") !== out;
+    if (stale) console.log("library.json is out of date. Run: node scripts/build-manifest.mjs");
+    if (stale || versions.length) process.exit(1);
+    console.log("library.json and the agent versions are up to date");
   } else {
+    // the agent versions first: library.json names their files, so the two are always written together
+    const versions = writeVersions();
     writeFileSync(target, out);
-    console.log(`library.json written (${JSON.parse(out).items.length} items)`);
+    console.log(`library.json written (${JSON.parse(out).items.length} items); agent versions written (${versions} files)`);
   }
 }

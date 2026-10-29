@@ -20,7 +20,9 @@
       "license": "MIT",
       "path": "agents/claude/prompt-engineer.md",
       "files": [
-        "agents/claude/prompt-engineer.md"
+        "agents/claude/prompt-engineer.md",
+        "agents/codex/prompt-engineer.toml",
+        "agents/antigravity/prompt-engineer.md"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/prompt-engineer.md",
       "zip": "agent-prompt-engineer.zip",
@@ -43,6 +45,20 @@
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
           "install": []
+        },
+        "codex": {
+          "support": "full",
+          "note": "The model and the tool list come from your Codex settings",
+          "install": [
+            "Copy agents/codex/prompt-engineer.toml into .codex/agents/ (project) or ~/.codex/agents/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "The model and the tool list come from your Antigravity settings",
+          "install": [
+            "Copy agents/antigravity/prompt-engineer.md into .agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)"
+          ]
         }
       }
     },
@@ -62,7 +78,9 @@
       "license": "MIT",
       "path": "agents/claude/debugger.md",
       "files": [
-        "agents/claude/debugger.md"
+        "agents/claude/debugger.md",
+        "agents/codex/debugger.toml",
+        "agents/antigravity/debugger.md"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/debugger.md",
       "zip": "agent-debugger.zip",
@@ -85,6 +103,20 @@
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
           "install": []
+        },
+        "codex": {
+          "support": "full",
+          "note": "The model and the tool list come from your Codex settings",
+          "install": [
+            "Copy agents/codex/debugger.toml into .codex/agents/ (project) or ~/.codex/agents/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "The model and the tool list come from your Antigravity settings",
+          "install": [
+            "Copy agents/antigravity/debugger.md into .agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)"
+          ]
         }
       }
     },
@@ -105,7 +137,9 @@
       "license": "MIT",
       "path": "agents/claude/docs-writer.md",
       "files": [
-        "agents/claude/docs-writer.md"
+        "agents/claude/docs-writer.md",
+        "agents/codex/docs-writer.toml",
+        "agents/antigravity/docs-writer.md"
       ],
       "source_url": "https://github.com/trbbmnglg/phasewright/blob/main/agents/claude/docs-writer.md",
       "zip": "agent-docs-writer.zip",
@@ -128,6 +162,20 @@
           "support": "none",
           "note": "No documented custom-agent file format; use the matching skill instead",
           "install": []
+        },
+        "codex": {
+          "support": "partial",
+          "note": "The model and the tool list come from your Codex settings; the Claude version's limit to Read, Grep, Glob, Bash, Write is not kept",
+          "install": [
+            "Copy agents/codex/docs-writer.toml into .codex/agents/ (project) or ~/.codex/agents/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "The model and the tool list come from your Antigravity settings; the Claude version's limit to Read, Grep, Glob, Bash, Write is not kept",
+          "install": [
+            "Copy agents/antigravity/docs-writer.md into .agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)"
+          ]
         }
       }
     },
@@ -192,6 +240,20 @@
           "support": "full",
           "install": [
             "Copy plugins/free-resources/skills/* into .cursor/skills/"
+          ]
+        },
+        "codex": {
+          "support": "partial",
+          "note": "No native plugin package yet: copy the plugin's skills; its hooks, agents and model pins don't carry over",
+          "install": [
+            "Copy plugins/free-resources/skills/* into .agents/skills/"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "No native plugin package yet: copy the plugin's skills; its hooks, agents and model pins don't carry over",
+          "install": [
+            "Copy plugins/free-resources/skills/* into .agents/skills/"
           ]
         }
       }
@@ -342,6 +404,20 @@
           "install": [
             "Copy plugins/phased-shipping/skills/* into .cursor/skills/"
           ]
+        },
+        "codex": {
+          "support": "partial",
+          "note": "No native plugin package yet: copy the plugin's skills; its hooks, agents and model pins don't carry over",
+          "install": [
+            "Copy plugins/phased-shipping/skills/* into .agents/skills/"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "No native plugin package yet: copy the plugin's skills; its hooks, agents and model pins don't carry over",
+          "install": [
+            "Copy plugins/phased-shipping/skills/* into .agents/skills/"
+          ]
         }
       }
     },
@@ -387,6 +463,21 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/prompt-engineering into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills",
+          "install": [
+            "Copy skills/prompt-engineering into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills",
+          "install": [
+            "Copy skills/prompt-engineering into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
           ]
         }
       }
@@ -435,6 +526,21 @@
           "install": [
             "Copy skills/planner into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
+        },
+        "codex": {
+          "support": "partial",
+          "note": "Skills load; for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false",
+          "install": [
+            "Copy skills/planner into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "Skills load; manual only is a Claude Code field, so Antigravity may use it unasked",
+          "install": [
+            "Copy skills/planner into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
+          ]
         }
       }
     },
@@ -480,6 +586,21 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/docs-generator into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "codex": {
+          "support": "partial",
+          "note": "Skills load; for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false",
+          "install": [
+            "Copy skills/docs-generator into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "Skills load; manual only is a Claude Code field, so Antigravity may use it unasked",
+          "install": [
+            "Copy skills/docs-generator into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
           ]
         }
       }
@@ -528,6 +649,21 @@
           "install": [
             "Copy skills/business-analyst into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills",
+          "install": [
+            "Copy skills/business-analyst into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills",
+          "install": [
+            "Copy skills/business-analyst into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
+          ]
         }
       }
     },
@@ -575,6 +711,21 @@
           "install": [
             "Copy skills/refactoring into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills",
+          "install": [
+            "Copy skills/refactoring into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills",
+          "install": [
+            "Copy skills/refactoring into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
+          ]
         }
       }
     },
@@ -620,6 +771,21 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/error-handling into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills",
+          "install": [
+            "Copy skills/error-handling into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills",
+          "install": [
+            "Copy skills/error-handling into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
           ]
         }
       }
@@ -667,6 +833,21 @@
           "install": [
             "Copy skills/performance into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
           ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills",
+          "install": [
+            "Copy skills/performance into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "full",
+          "note": "Antigravity reads .agents/skills (the older .agent/skills still works); its CLI reads ~/.gemini/antigravity-cli/skills",
+          "install": [
+            "Copy skills/performance into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
+          ]
         }
       }
     },
@@ -711,6 +892,21 @@
           "note": "Cursor reads .cursor/skills and .agents/skills",
           "install": [
             "Copy skills/commits into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "codex": {
+          "support": "partial",
+          "note": "Skills load; for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false",
+          "install": [
+            "Copy skills/commits into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "Skills load; manual only is a Claude Code field, so Antigravity may use it unasked",
+          "install": [
+            "Copy skills/commits into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
           ]
         }
       }

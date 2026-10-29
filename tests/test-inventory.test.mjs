@@ -353,7 +353,10 @@ const LINUX_SKIPS = [
   "sampler: after stop() every helper child the sampler started has exited",
 ];
 const JQ_TEST = "the Release name step titles a listed tag and fails an unlisted one";
-const PER_PLATFORM = { ...Object.fromEntries(LINUX_SKIPS.map((n) => [n, "linux:skip,win32:run"])), [JQ_TEST]: "linux:run,win32:skip" };
+// The release zip step's test needs jq, zip and unzip too, so it runs on Linux (CI) and skips on Windows, like JQ_TEST.
+const ZIP_TEST = "the release zip step puts an agent's Codex and Antigravity versions next to its Claude file";
+const LINUX_ONLY = [JQ_TEST, ZIP_TEST];
+const PER_PLATFORM = { ...Object.fromEntries(LINUX_SKIPS.map((n) => [n, "linux:skip,win32:run"])), ...Object.fromEntries(LINUX_ONLY.map((n) => [n, "linux:run,win32:skip"])) };
 
 test("inventory: the real tests/inventory.txt is well formed, and its header count is its number of lines", () => {
   const text = readFileSync(INVENTORY, "utf8");
@@ -375,12 +378,13 @@ test("inventory: the real tests/inventory.txt is well formed, and its header cou
     "a file with an allowlisted name that holds binary bytes or is not text is skipped and never printed",
     "the last check is its own safety net: with the file scan removed, a secret in a workflow name still stops the run",
   ]) assert.equal(listed.get(name), "run", name);
-  // No test is skipped everywhere. These five are skipped on one platform only, and adding one more means changing this list on purpose.
+  // No test is skipped everywhere. These six are skipped on one platform only, and adding one more means changing this list on purpose.
   assert.deepEqual(Object.fromEntries(items.filter((i) => i.status !== "run").map((i) => [i.name, i.status])), PER_PLATFORM);
 });
 
 test("inventory: the Linux run in CI that failed against one status per test passes against the real inventory, and the old format still fails it", () => {
-  // What CI saw on 2026-10-28 (Node 22, ubuntu): every listed name ran once, the four Windows-only tests skipped and the jq test ran.
+  // What CI saw on 2026-10-28 (Node 22, ubuntu): every listed name ran once, the four Windows-only tests skipped and the jq test ran
+  // (the zip step's test, added later, runs there too).
   const items = parseInventory(readFileSync(INVENTORY, "utf8"));
   const ci = items.map(({ name }) => item(name, LINUX_SKIPS.includes(name) ? "skip" : "run"));
   const now = compare(items, ci, "linux");
@@ -388,7 +392,7 @@ test("inventory: the Linux run in CI that failed against one status per test pas
   const oneStatus = items.map(({ name, status }) => item(name, statusOn(status, "win32")));
   const then = compare(oneStatus, ci, "linux");
   assert.equal(then.ok, false);
-  assert.deepEqual([[...then.newlySkipped].sort(), then.nowRuns], [[...LINUX_SKIPS].sort(), [JQ_TEST]]);
+  assert.deepEqual([[...then.newlySkipped].sort(), [...then.nowRuns].sort()], [[...LINUX_SKIPS].sort(), [...LINUX_ONLY].sort()]);
   assert.equal(compare(items, oneStatus, "win32").ok, true, "the Windows run here passes too");
   assert.equal(compare(items, ci, "win32").ok, false, "the Linux skips are not allowed on Windows");
 });

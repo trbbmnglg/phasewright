@@ -7,6 +7,8 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { lintRepo, reportLines } from "../scripts/lint.mjs";
+import { agentToolLimit, antigravityVersion, codexVersion } from "../scripts/build-agent-versions.mjs";
+import { parseFrontmatter } from "../scripts/lib.mjs";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const run = (script, root, args = [], env = {}) =>
@@ -507,4 +509,129 @@ test("the real phased-shipping hooks.json passes lint and is wired to the guard"
   const text = reportLines(result).join("\n");
   assert.equal(result.errors.length, 0, text);
   assert.doesNotMatch(text, /hooks\.json/);
+});
+
+// ---------- OpenAI Codex and Google Antigravity versions ----------
+
+const MANUAL_SKILL = (name) => skill(name).replace("license: MIT\n", "license: MIT\ndisable-model-invocation: true\n");
+const LIMITED_AGENT = (name) => agent(name).replace("model: sonnet\n", "model: sonnet\ntools:\n  - Read\n  - Write\n  - Bash\n");
+const itemOf = (lib, type, slug) => lib.items.find((i) => i.type === type && i.slug === slug);
+
+test("manifest: every item has Codex and Antigravity install steps; a manual-only skill, a tool-limited agent and a plugin are partial", () => {
+  const root = withPlugin({
+    "skills/manual-skill/SKILL.md": MANUAL_SKILL("manual-skill"),
+    "agents/claude/writer.md": LIMITED_AGENT("writer"),
+    "plugins/plug/skills/ps/SKILL.md": pSkill(),
+  });
+  assert.equal(run("build-manifest.mjs", root).status, 0);
+  const lib = JSON.parse(readFileSync(join(root, "library.json"), "utf8"));
+  const plain = itemOf(lib, "skill", "good-skill").tools;
+  assert.equal(plain.codex.support, "full");
+  assert.deepEqual(plain.codex.install, ["Copy skills/good-skill into .agents/skills/ (project) or ~/.agents/skills/ (personal)"]);
+  assert.equal(plain.antigravity.support, "full");
+  assert.equal(plain.antigravity.install[0], "Copy skills/good-skill into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)");
+  assert.equal(plain.antigravity.install[1], "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/");
+  const manual = itemOf(lib, "skill", "manual-skill").tools;
+  assert.equal(manual.codex.support, "partial");
+  assert.ok(manual.codex.note.includes("agents/openai.yaml with policy.allow_implicit_invocation: false"), manual.codex.note);
+  assert.equal(manual.antigravity.support, "partial");
+  assert.equal(manual["claude-code"].support, "full"); // only the other tools lose the flag
+  const helper = itemOf(lib, "agent", "helper");
+  assert.equal(helper.tools.codex.support, "full");
+  assert.equal(helper.tools.codex.note, "The model and the tool list come from your Codex settings");
+  assert.deepEqual(helper.tools.codex.install, ["Copy agents/codex/helper.toml into .codex/agents/ (project) or ~/.codex/agents/ (personal)"]);
+  assert.deepEqual(helper.tools.antigravity.install, ["Copy agents/antigravity/helper.md into .agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)"]);
+  assert.deepEqual(helper.files, ["agents/claude/helper.md", "agents/codex/helper.toml", "agents/antigravity/helper.md"]); // the zip holds every file a step names
+  const writer = itemOf(lib, "agent", "writer").tools;
+  assert.equal(writer.codex.support, "partial");
+  assert.ok(writer.antigravity.note.endsWith("the Claude version's limit to Read, Write, Bash is not kept"), writer.antigravity.note);
+  const plug = itemOf(lib, "plugin", "plug").tools;
+  for (const t of ["codex", "antigravity"]) {
+    assert.equal(plug[t].support, "partial");
+    assert.ok(plug[t].note.startsWith("No native plugin package yet"), plug[t].note);
+    assert.deepEqual(plug[t].install, ["Copy plugins/plug/skills/* into .agents/skills/"]);
+  }
+  // within what the library page accepts: notes up to 200 characters, install lines of printable ASCII up to 240
+  for (const i of lib.items) for (const [t, v] of Object.entries(i.tools)) {
+    assert.ok(!v.note || v.note.length <= 200, `${i.slug} ${t} note`);
+    for (const line of v.install) assert.match(line, /^[\x20-\x7e]{1,240}$/, `${i.slug} ${t} install`);
+  }
+  rmSync(root, { recursive: true });
+});
+
+test("agent versions: --check finds a missing, an out-of-date and a left-over version; build-manifest --check fails the same way; writing fixes them", () => {
+  const root = good();
+  const check = () => run("build-agent-versions.mjs", root, ["--check"]);
+  let r = check();
+  assert.equal(r.status, 1);
+  assert.ok(r.stdout.includes("agents/codex/helper.toml missing"), r.stdout);
+  assert.equal(run("build-manifest.mjs", root).status, 0); // writes library.json and the versions together
+  assert.equal(check().status, 0);
+  assert.equal(run("build-manifest.mjs", root, ["--check"]).status, 0);
+  const claude = join(root, "agents/claude/helper.md");
+  writeFileSync(claude, readFileSync(claude, "utf8").replace('description: "An agent."', 'description: "A changed agent."'));
+  r = check();
+  assert.equal(r.status, 1);
+  assert.ok(r.stdout.includes("agents/antigravity/helper.md out of date"), r.stdout);
+  r = run("build-manifest.mjs", root, ["--check"]);
+  assert.equal(r.status, 1);
+  assert.ok(r.stdout.includes("The agent versions are out of date"), r.stdout);
+  assert.equal(run("build-agent-versions.mjs", root).status, 0);
+  writeFileSync(join(root, "agents/codex/ghost.toml"), 'name = "ghost"\n');
+  r = check();
+  assert.equal(r.status, 1);
+  assert.ok(r.stdout.includes("agents/codex/ghost.toml has no Claude version"), r.stdout);
+  assert.equal(run("build-agent-versions.mjs", root).status, 0);
+  assert.equal(check().status, 0);
+  assert.throws(() => readFileSync(join(root, "agents/codex/ghost.toml")), /ENOENT/); // a version with no Claude agent is removed
+  rmSync(root, { recursive: true });
+});
+
+// A TOML basic string read back: the only escapes the generator writes are a backslash, a quote and \uXXXX.
+const BS = String.fromCharCode(92);
+const tomlUnescape = (s) => s.replace(new RegExp(`${BS}${BS}(u[0-9a-f]{4}|${BS}${BS}|")`, "g"), (_, e) => (e[0] === "u" ? String.fromCharCode(parseInt(e.slice(1), 16)) : e));
+
+test("agent versions: the Codex body survives backslashes, quotes, triple quotes, CRLF and control characters; the Antigravity body is the same text", () => {
+  const body = `Line one with C:${BS}path and "quotes".\r\nA """ triple, a ${BS}" pair, a tab\tand a bell${String.fromCharCode(7)}.\r\nEnds with a quote"`;
+  const data = { name: "tricky", description: `Says "hi" ${BS} back` };
+  const codex = codexVersion("tricky", data, body);
+  const start = codex.indexOf('developer_instructions = """\n');
+  assert.ok(start > 0 && codex.endsWith('"""\n'), codex);
+  const inner = codex.slice(start + 'developer_instructions = """\n'.length, -'"""\n'.length);
+  assert.ok(!inner.includes('"""'), "the text can never close the string early");
+  assert.equal(tomlUnescape(inner), body.replace(/\r\n/g, "\n") + "\n");
+  const desc = codex.split("\n").find((l) => l.startsWith("description = "));
+  assert.equal(tomlUnescape(desc.slice('description = "'.length, -1)), data.description);
+  assert.ok(codex.startsWith("# Generated from agents/claude/tricky.md"), codex.slice(0, 80));
+  const { data: front, body: rest } = parseFrontmatter(antigravityVersion("tricky", data, body));
+  assert.deepEqual([front.name, front.description], ["tricky", data.description]);
+  assert.equal(rest.replace(/^\n/, ""), body.replace(/\r\n/g, "\n"));
+  assert.equal(agentToolLimit(["Read", "Edit", "Write", "Grep", "Glob", "Bash"]), null);
+  assert.equal(agentToolLimit(undefined), null);
+  assert.equal(agentToolLimit(["Read", "Bash"]), "Read, Bash");
+});
+
+const onPath = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: "utf8" }); return !r.error && r.status === 0; };
+const hasZipTools = onPath("jq", ["--version"]) && onPath("zip", ["-v"]) && onPath("unzip", ["-v"]);
+
+// The script of the release workflow's "Zip every item" step: the indented block after `run: |`.
+function zipStepScript() {
+  const lines = readFileSync(join(REPO, ".github", "workflows", "release.yml"), "utf8").split(/\r?\n/);
+  const at = lines.findIndex((l) => l.trim() === "- name: Zip every item");
+  assert.ok(at >= 0, "Zip every item step");
+  const body = [];
+  for (let i = at + 2; i < lines.length && /^ {10}/.test(lines[i]); i++) body.push(lines[i].slice(10));
+  return body.join("\n") + "\n";
+}
+
+test("the release zip step puts an agent's Codex and Antigravity versions next to its Claude file", { skip: hasZipTools ? false : "jq, zip or unzip is not on the PATH" }, () => {
+  const root = good();
+  assert.equal(run("build-manifest.mjs", root).status, 0);
+  writeFileSync(join(root, "step.sh"), zipStepScript());
+  const r = spawnSync("bash", ["step.sh"], { cwd: root, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr);
+  const entries = (zip) => spawnSync("unzip", ["-Z1", join(root, "dist", zip)], { encoding: "utf8" }).stdout.split(/\r?\n/).filter(Boolean).sort();
+  assert.deepEqual(entries("agent-helper.zip"), ["antigravity/helper.md", "codex/helper.toml", "helper.md"]);
+  assert.deepEqual(entries("skill-good-skill.zip"), ["good-skill/", "good-skill/SKILL.md"]);
+  rmSync(root, { recursive: true });
 });
