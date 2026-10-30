@@ -559,6 +559,34 @@ test("manifest: every item has Codex and Antigravity install steps; a manual-onl
   rmSync(root, { recursive: true });
 });
 
+test("manifest: a manual-only skill that ships agents/openai.yaml with allow_implicit_invocation: false is full for Codex, and still partial for Antigravity", () => {
+  const root = withPlugin({
+    "skills/kept-skill/SKILL.md": MANUAL_SKILL("kept-skill"),
+    "skills/kept-skill/agents/openai.yaml": "policy:\n  allow_implicit_invocation: false\n",
+    "skills/open-skill/SKILL.md": MANUAL_SKILL("open-skill"),
+    "skills/open-skill/agents/openai.yaml": "policy:\n  allow_implicit_invocation: true\n",
+    "skills/comment-skill/SKILL.md": MANUAL_SKILL("comment-skill"),
+    "skills/comment-skill/agents/openai.yaml": "# allow_implicit_invocation: false\npolicy:\n  allow_implicit_invocation: true\n",
+    "skills/bare-skill/SKILL.md": MANUAL_SKILL("bare-skill"),
+    "plugins/plug/skills/ps/SKILL.md": pSkill(),
+  });
+  assert.equal(run("build-manifest.mjs", root).status, 0);
+  const lib = JSON.parse(readFileSync(join(root, "library.json"), "utf8"));
+  const kept = itemOf(lib, "skill", "kept-skill");
+  assert.equal(kept.tools.codex.support, "full");
+  assert.ok(kept.tools.codex.note.endsWith("agents/openai.yaml keeps it manual only"), kept.tools.codex.note);
+  assert.ok(kept.tools.codex.note.length <= 200, "within the library page's note limit");
+  assert.ok(kept.files.includes("skills/kept-skill/agents/openai.yaml"), "the zip holds the file");
+  assert.equal(kept.tools.antigravity.support, "partial", "Antigravity documents no manual-only setting");
+  assert.equal(kept.tools["claude-code"].support, "full");
+  for (const slug of ["open-skill", "comment-skill", "bare-skill"]) {
+    const t = itemOf(lib, "skill", slug).tools;
+    assert.equal(t.codex.support, "partial", `${slug}: no setting that stops implicit use`);
+    assert.ok(t.codex.note.includes("agents/openai.yaml with policy.allow_implicit_invocation: false"), slug);
+  }
+  rmSync(root, { recursive: true });
+});
+
 test("agent versions: --check finds a missing, an out-of-date and a left-over version; build-manifest --check fails the same way; writing fixes them", () => {
   const root = good();
   const check = () => run("build-agent-versions.mjs", root, ["--check"]);

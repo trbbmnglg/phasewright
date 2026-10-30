@@ -70,6 +70,7 @@ Everything here is a plain Markdown file or folder you can read, copy and adapt.
 | `error-handling` | API response shapes, validation, database errors and loading and empty states |
 | `performance` | Render, fetch and query patterns for web apps |
 | `commits` | Conventional Commits types, scopes and splitting rules |
+| `use-case-discovery` | Design Thinking discovery: evidence to pain points, ranked use cases, user stories and metrics, with Jira and Azure DevOps import files |
 
 **Agents** (`agents/claude/`), each a single Markdown file: `debugger`, `prompt-engineer`, `docs-writer`.
 

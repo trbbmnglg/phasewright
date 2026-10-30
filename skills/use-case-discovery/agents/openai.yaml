@@ -1,0 +1,4 @@
+# Keeps this skill manual only in OpenAI Codex: it is not started just because a prompt matches its description.
+# Start it with $use-case-discovery or from /skills. Other tools use disable-model-invocation in SKILL.md.
+policy:
+  allow_implicit_invocation: false

@@ -14,6 +14,7 @@ Plain Markdown skills and agents you can read, copy and adapt ([README](https://
 | `error-handling` | API response shapes, validation, database errors and loading and empty states ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/error-handling/SKILL.md)) |
 | `performance` | Render, fetch and query patterns for web apps ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/performance/SKILL.md)) |
 | `commits` | Conventional Commits types, scopes and splitting rules ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/commits/SKILL.md)) |
+| `use-case-discovery` | Design Thinking discovery: evidence to pain points, ranked use cases, user stories and metrics, with Jira and Azure DevOps import files ([SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/skills/use-case-discovery/SKILL.md)) |
 
 | Agent | File |
 |---|---|

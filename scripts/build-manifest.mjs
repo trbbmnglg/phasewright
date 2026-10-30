@@ -59,12 +59,18 @@ function skillLosses(data, manualOnly) {
   if (data?.["disable-model-invocation"] === "true") out.push(manualOnly);
   return out;
 }
-function otherSkillTools(slug, data) {
-  const codexLoss = skillLosses(data, "for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false");
+// Codex keeps a skill manual only through agents/openai.yaml with policy.allow_implicit_invocation: false. A skill that ships that file loses nothing there.
+const codexKeepsManualOnly = (dir) => {
+  const file = join(dir, "agents", "openai.yaml");
+  return existsSync(file) && /^[ \t]*allow_implicit_invocation:[ \t]*false[ \t]*$/m.test(readFileSync(file, "utf8"));
+};
+function otherSkillTools(slug, data, dir) {
+  const codexManual = data?.["disable-model-invocation"] === "true" && codexKeepsManualOnly(dir);
+  const codexLoss = skillLosses(codexManual ? { ...data, "disable-model-invocation": "false" } : data, "for manual only, add agents/openai.yaml with policy.allow_implicit_invocation: false");
   const agyLoss = skillLosses(data, "manual only is a Claude Code field, so Antigravity may use it unasked");
   return {
     codex: {
-      ...(codexLoss.length ? support("partial", `Skills load; ${codexLoss.join("; ")}`) : support("full", CODEX_SKILLS)),
+      ...(codexLoss.length ? support("partial", `Skills load; ${codexLoss.join("; ")}`) : support("full", codexManual ? `${CODEX_SKILLS}; agents/openai.yaml keeps it manual only` : CODEX_SKILLS)),
       install: copyTo(".agents/skills", "~/.agents/skills", slug),
     },
     antigravity: {
@@ -74,7 +80,7 @@ function otherSkillTools(slug, data) {
   };
 }
 
-function skillTools(slug, data) {
+function skillTools(slug, data, dir) {
   return {
     "claude-code": {
       ...support("full"),
@@ -92,7 +98,7 @@ function skillTools(slug, data) {
       ...support("full", "Cursor reads .cursor/skills and .agents/skills"),
       install: copyTo(".cursor/skills", "~/.cursor/skills", slug),
     },
-    ...otherSkillTools(slug, data),
+    ...otherSkillTools(slug, data, dir),
   };
 }
 
@@ -156,7 +162,7 @@ const NO_NATIVE_PLUGIN = "No native plugin package yet: copy the plugin's skills
 export function build() {
   const { skills, agents, plugins } = loadItems();
   const items = [
-    ...skills.map((s) => common(s, s.data, s.data.metadata, { zip: `skill-${s.slug}.zip`, tools: skillTools(s.slug, s.data) })),
+    ...skills.map((s) => common(s, s.data, s.data.metadata, { zip: `skill-${s.slug}.zip`, tools: skillTools(s.slug, s.data, s.dir) })),
     // An agent's zip and files also hold its generated Codex and Antigravity versions, which its install steps name.
     ...agents.map((a) => common({ ...a, files: [...a.files, `agents/codex/${a.slug}.toml`, `agents/antigravity/${a.slug}.md`] }, a.data, a.data.metadata, {
       license: "MIT", zip: `agent-${a.slug}.zip`, model: a.data.model, tools: agentTools(a.slug, a.data),

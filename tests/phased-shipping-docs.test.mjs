@@ -733,7 +733,7 @@ test("phase 7d1c: every agent in agents/ is counted everywhere, the guard has fo
     assert.doesNotMatch(doc, new RegExp(`\\b(${wrong.join("|")}) (guarded )?agents\\b`, "i"), `${file} counts the agents wrongly (there are ${agents.length})`);
   }
   // The repo's own agents/ folder is a different thing and keeps its own count.
-  assert.ok(repoText(".claude-plugin", "marketplace.json").includes("8 skills and 3 agents"));
+  assert.ok(repoText(".claude-plugin", "marketplace.json").includes("9 skills and 3 agents"));
   assert.equal(readdirSync(join(REPO, "agents", "claude")).filter((f) => f.endsWith(".md")).length, 3);
 });
 

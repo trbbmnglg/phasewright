@@ -6,7 +6,7 @@
     {
       "name": "phasewright",
       "source": "./",
-      "description": "8 skills and 3 agents: planning, requirements, commits, refactoring, error handling, performance, docs, prompt engineering, debugging."
+      "description": "9 skills and 3 agents: planning, requirements, discovery, commits, refactoring, error handling, performance, docs, prompt engineering, debugging."
     },
     {
       "name": "phased-shipping",

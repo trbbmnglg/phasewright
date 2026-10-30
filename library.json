@@ -910,6 +910,78 @@
           ]
         }
       }
+    },
+    {
+      "slug": "use-case-discovery",
+      "type": "skill",
+      "title": "Use Case Discovery",
+      "summary": "Runs a Design Thinking discovery that turns evidence about real pain points into ranked use cases, user stories and measurable success metrics.",
+      "description": "Runs a Design Thinking discovery that turns evidence about real pain points into ranked use cases, user stories and measurable success metrics. Use only when the user explicitly asks to run it, for example by typing /use-case-discovery, to find what is worth building or automating in software, delivery or automation work, for a delivery-automation group, a solo developer, a development team or someone building with AI prompts. Works from a live interview, notes, repository history and ticket exports, and writes a Markdown pack plus Jira and Azure DevOps import files. Not for a feature that is already chosen: use business-analyst to specify it.",
+      "tags": [
+        "design-thinking",
+        "discovery",
+        "use-cases",
+        "user-stories",
+        "metrics"
+      ],
+      "featured": false,
+      "order": 9,
+      "version": "1.0.0",
+      "license": "MIT",
+      "path": "skills/use-case-discovery",
+      "files": [
+        "skills/use-case-discovery/SKILL.md",
+        "skills/use-case-discovery/agents/openai.yaml",
+        "skills/use-case-discovery/references/define.md",
+        "skills/use-case-discovery/references/empathize.md",
+        "skills/use-case-discovery/references/evidence.md",
+        "skills/use-case-discovery/references/ideate-and-select.md",
+        "skills/use-case-discovery/references/outputs.md",
+        "skills/use-case-discovery/references/specify.md",
+        "skills/use-case-discovery/references/test-plan.md",
+        "skills/use-case-discovery/scripts/backlog-to-csv.mjs"
+      ],
+      "source_url": "https://github.com/trbbmnglg/phasewright/tree/main/skills/use-case-discovery",
+      "zip": "skill-use-case-discovery.zip",
+      "tools": {
+        "claude-code": {
+          "support": "full",
+          "install": [
+            "claude plugin marketplace add trbbmnglg/phasewright",
+            "claude plugin install phasewright@phasewright",
+            "Or copy skills/use-case-discovery into .claude/skills/ (project) or ~/.claude/skills/ (personal)"
+          ]
+        },
+        "copilot": {
+          "support": "full",
+          "note": "VS Code reads .github/skills, .claude/skills and .agents/skills",
+          "install": [
+            "Copy skills/use-case-discovery into .github/skills/ (project) or ~/.copilot/skills/ (personal)"
+          ]
+        },
+        "cursor": {
+          "support": "full",
+          "note": "Cursor reads .cursor/skills and .agents/skills",
+          "install": [
+            "Copy skills/use-case-discovery into .cursor/skills/ (project) or ~/.cursor/skills/ (personal)"
+          ]
+        },
+        "codex": {
+          "support": "full",
+          "note": "Codex reads .agents/skills in the project and its parent folders up to the repo root, ~/.agents/skills and /etc/codex/skills; agents/openai.yaml keeps it manual only",
+          "install": [
+            "Copy skills/use-case-discovery into .agents/skills/ (project) or ~/.agents/skills/ (personal)"
+          ]
+        },
+        "antigravity": {
+          "support": "partial",
+          "note": "Skills load; manual only is a Claude Code field, so Antigravity may use it unasked",
+          "install": [
+            "Copy skills/use-case-discovery into .agents/skills/ (project) or ~/.gemini/config/skills/ (personal, App and IDE)",
+            "For the CLI, copy it into ~/.gemini/antigravity-cli/skills/"
+          ]
+        }
+      }
     }
   ]
 }
