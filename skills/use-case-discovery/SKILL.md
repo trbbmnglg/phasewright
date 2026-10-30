@@ -69,8 +69,8 @@ numbered message. Skip what the user already said.
 
 These defaults are this skill's design choices. The user can change them.
 
-| | Quick | Full |
-|-|-------|------|
+| Aspect | Quick | Full |
+|--------|-------|------|
 | Sittings | One | Several, resumable |
 | People | The user, plus any notes | 5 or more per group, until nothing new appears |
 | Pain points | 1 to 3 | All that the evidence supports, ranked |
