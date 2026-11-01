@@ -2,7 +2,7 @@
 // other tool). Append-only. Read-only towards processes: it only reads and writes its own file.
 import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { maskSecrets, relativizePaths, baseName } from "./snapshot.mjs";
 import { PEAKS_WINDOW } from "./rules.mjs";
 
@@ -36,11 +36,13 @@ export function taskKey({ task = null, argv = [], project = process.cwd(), home 
   return mask(`${words || "(no command)"} @ ${folder}`, home);
 }
 
-// True when `path` is `folder` or inside it (both resolved, compared case-insensitively on Windows).
+// True when `path` is `folder` or inside it (both resolved, compared case-insensitively on Windows). The path
+// rules follow `platform` (Windows paths use \ and drive letters, others use /), not the machine running this.
 export function isInside(path, folder, platform = process.platform) {
-  const norm = (p) => (platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
-  const rel = relative(norm(folder), norm(path));
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  const rules = platform === "win32" ? win32 : posix;
+  const norm = (p) => (platform === "win32" ? rules.resolve(p).toLowerCase() : rules.resolve(p));
+  const rel = rules.relative(norm(folder), norm(path));
+  return rel === "" || (!rel.startsWith("..") && !rules.isAbsolute(rel));
 }
 
 // Opens the store for appending without following a link. A repository being measured, or an environment
