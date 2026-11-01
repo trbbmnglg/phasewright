@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 962
+# tests: 971
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
 linux:run,win32:skip	the release zip step puts an agent's Codex and Antigravity versions next to its Claude file
 linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
@@ -322,6 +322,15 @@ run	folder links inside docs and plan folders are counted and reported, never fo
 run	folder warning: each CLI warns on stderr when run from inside the skill folder, and not from elsewhere
 run	fonts: both woff2 files are renamed (no Plex outside the copyright and licence records) and the licence file is unchanged
 run	fonts: the check catches a name that still says Plex (a copy of the font with one instance name put back to the old text)
+run	free-resources bin: PowerShell runs from the Windows folder with only its own module folder
+run	free-resources bin: SystemRoot is used only when it looks like X:\Windows
+run	free-resources bin: helpers resolve to fixed absolute paths, never through PATH
+run	free-resources bin: helpers start from a fixed folder with no shell; Windows drops other spellings of a variable it sets
+run	free-resources bin: no script starts a program by a bare name, through a shell flag, or through ComSpec
+run	free-resources bin: the peaks store is never written inside the project folder
+run	free-resources bin: the peaks store refuses a link and leaves its target alone
+run	free-resources bin: the peaks store refuses a second name for another file and leaves that file alone
+run	free-resources bin: the plugin is at 0.1.2, and the README and wiki say what changed
 run	git global options move to globals and leave the subcommand first
 run	git: the backup folder never shows up in git status and git add -A stages nothing from it
 run	guard.mjs and guard-rules.mjs agree on the role pattern

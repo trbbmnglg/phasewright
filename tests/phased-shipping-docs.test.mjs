@@ -1222,8 +1222,11 @@ test("phase 7q: the roadmap, onboard and free-resources skills stop and say why;
 
 test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added", () => {
   assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.1");
-  assert.equal(JSON.parse(readFileSync(join(HERE, "..", "plugins", "free-resources", ".claude-plugin", "plugin.json"), "utf8")).version, "0.1.1");
-  assert.ok(repoText("library.json").includes('"version": "0.11.1"') && repoText("library.json").includes('"version": "0.1.1"'), "library.json carries both plugin versions");
+  // free-resources is at 0.1.1 or later (the exact current version is pinned by tests/free-resources-bin.test.mjs)
+  const frVersion = JSON.parse(readFileSync(join(HERE, "..", "plugins", "free-resources", ".claude-plugin", "plugin.json"), "utf8")).version;
+  const [frMajor, frMinor, frPatch] = frVersion.split(".").map(Number);
+  assert.ok(frMajor > 0 || frMinor > 1 || (frMinor === 1 && frPatch >= 1), frVersion);
+  assert.ok(repoText("library.json").includes('"version": "0.11.1"') && repoText("library.json").includes(`"version": "${frVersion}"`), "library.json carries both plugin versions");
   assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.1";');
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.11.1").length, 2, "one 0.11.1 block");

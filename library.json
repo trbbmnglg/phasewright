@@ -194,7 +194,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.1.1",
+      "version": "0.1.2",
       "license": "MIT",
       "path": "plugins/free-resources",
       "files": [
@@ -206,6 +206,7 @@
         "plugins/free-resources/evals/never-offers-close/prompt.md",
         "plugins/free-resources/skills/free-resources/SKILL.md",
         "plugins/free-resources/skills/free-resources/scripts/headroom.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/bin.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/classify.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/headroom.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/peaks.mjs",

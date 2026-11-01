@@ -8,6 +8,7 @@
 import { execFile } from "node:child_process";
 import { homedir, cpus } from "node:os";
 import { runPowerShell } from "./powershell.mjs";
+import { bin, helperOptions } from "./bin.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -183,9 +184,13 @@ export function parseLsof(text) {
   return pids;
 }
 
-export function run(cmd, args, { timeoutMs = 20000 } = {}) {
+// Runs a helper by its table name (lib/bin.mjs), from its absolute path and a fixed working folder; a missing
+// helper or any error resolves to null, which callers treat as "not readable".
+export function run(name, args, { timeoutMs = 20000 } = {}) {
   return new Promise((resolve) => {
-    execFile(cmd, args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs, windowsHide: true }, (err, stdout) => resolve(err ? null : stdout));
+    const file = bin(name);
+    if (!file) return resolve(null);
+    execFile(file, args, { ...helperOptions(), encoding: "utf8", maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs }, (err, stdout) => resolve(err ? null : stdout));
   });
 }
 

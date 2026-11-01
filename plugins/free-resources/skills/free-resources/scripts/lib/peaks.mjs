@@ -1,8 +1,8 @@
 // The peaks store: one JSON line per measured run, in a folder that belongs to this skill (not to any
 // other tool). Append-only. Read-only towards processes: it only reads and writes its own file.
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { maskSecrets, relativizePaths, baseName } from "./snapshot.mjs";
 import { PEAKS_WINDOW } from "./rules.mjs";
 
@@ -36,13 +36,45 @@ export function taskKey({ task = null, argv = [], project = process.cwd(), home 
   return mask(`${words || "(no command)"} @ ${folder}`, home);
 }
 
+// True when `path` is `folder` or inside it (both resolved, compared case-insensitively on Windows).
+export function isInside(path, folder, platform = process.platform) {
+  const norm = (p) => (platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
+  const rel = relative(norm(folder), norm(path));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
+// Opens the store for appending without following a link. A repository being measured, or an environment
+// variable it sets, could otherwise point the store at another file of yours (a link, or a second hard link
+// to it), and the record would be appended there. Anything that is not a plain file with one name is refused.
+function openStore(file) {
+  let st = null;
+  try {
+    st = lstatSync(file);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+  if (st && (!st.isFile() || st.nlink > 1)) throw new Error(`${PEAKS_FILE} is not a plain file (a link or a second name for another file), so nothing was written`);
+  // O_NOFOLLOW is not available on Windows; there the lstat check above is the guard.
+  const flags = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0);
+  return openSync(file, flags, 0o600);
+}
+
 // Adds one record. The command summary is masked again here, so a caller that forgot cannot store a secret.
+// opts.project: the folder being measured. The store is never written inside it (a repository could ship a link
+// there, or set FREE_RESOURCES_DATA to point into itself).
 export function appendPeak(record, opts = {}) {
   const dir = dataDir(opts);
+  if (opts.project && isInside(dir, opts.project, opts.platform)) throw new Error("the data folder is inside the project folder, so nothing was written; set FREE_RESOURCES_DATA to a folder outside it");
   mkdirSync(dir, { recursive: true });
   const safe = { schema_version: PEAK_SCHEMA_VERSION, ...record, cmd_summary: mask(record.cmd_summary, opts.home ?? homedir()), key: mask(record.key, opts.home ?? homedir()) };
-  appendFileSync(join(dir, PEAKS_FILE), `${JSON.stringify(safe)}\n`, "utf8");
-  return join(dir, PEAKS_FILE);
+  const file = join(dir, PEAKS_FILE);
+  const fd = openStore(file);
+  try {
+    writeSync(fd, `${JSON.stringify(safe)}\n`, null, "utf8");
+  } finally {
+    closeSync(fd);
+  }
+  return file;
 }
 
 // The last n records for a key, oldest first. A missing file is an empty list and a corrupt line is skipped.

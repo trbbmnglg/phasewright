@@ -63,12 +63,14 @@ This skill reads process and performance information through operating system to
 
 | Platform | Program | Why |
 |---|---|---|
-| Windows | `powershell.exe -NoProfile -NonInteractive -Command <fixed script>` | Lists processes, their CPU time, start time and owner, and (for `measure.mjs`) walks the process tree of your command. The script is fixed text inside `scripts/lib/powershell.mjs`; it takes no user input. No `-EncodedCommand`, no temp file, no execution-policy change. It also makes one WMI query (`Get-CimInstance Win32_Process`) for the process list, command lines and working sets. |
-| Windows | `typeperf` | Reads three performance counters that ship with Windows: available memory, pages per second, total processor time. |
-| Windows | `netstat -ano -p tcp` | Finds which processes are listening on a port, so they are not suggested for closing. |
-| Windows | `cmd.exe` | Only for `measure.mjs`: your own command runs through it so `npm` and other `.cmd` files resolve. Each argument is quoted separately, and nothing is added. |
-| macOS | `ps`, `vm_stat`, `sysctl`, `memory_pressure`, `top` | Process list with memory and CPU time, available memory, page size and swap, memory pressure, and CPU use. |
-| macOS | `lsof -nP -iTCP -sTCP:LISTEN` | Finds which processes are listening on a port. |
+| Windows | `System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command <fixed script>` | Lists processes, their CPU time, start time and owner, and (for `measure.mjs`) walks the process tree of your command. The script is fixed text inside `scripts/lib/powershell.mjs`; it takes no user input. No `-EncodedCommand`, no temp file, no execution-policy change. It also makes one WMI query (`Get-CimInstance Win32_Process`) for the process list, command lines and working sets. |
+| Windows | `System32\typeperf.exe` | Reads three performance counters that ship with Windows: available memory, pages per second, total processor time. |
+| Windows | `System32\netstat.exe -ano -p tcp` | Finds which processes are listening on a port, so they are not suggested for closing. |
+| Windows | `System32\cmd.exe` | Only for `measure.mjs`: your own command runs through it so `npm` and other `.cmd` files resolve. Each argument is quoted separately, and nothing is added. |
+| macOS | `/bin/ps`, `/usr/bin/vm_stat`, `/usr/sbin/sysctl`, `/usr/bin/memory_pressure`, `/usr/bin/top` | Process list with memory and CPU time, available memory, page size and swap, memory pressure, and CPU use. |
+| macOS | `/usr/sbin/lsof -nP -iTCP -sTCP:LISTEN` | Finds which processes are listening on a port. |
+
+Every program above is started from its absolute path (on Windows, below the Windows folder: `SystemRoot` when it looks like `X:\Windows`, else `C:\Windows`), from that folder or `/` rather than your project, with no shell, and never found through `PATH`. Windows PowerShell gets only its own module folder, so a module folder added to `PSModulePath` is not used. macOS programs run in the C locale, so dates and numbers come out in one format. Before 0.1.2 the programs were started by name, and on Windows a file with the same name in the project folder would have run instead of the real one.
 
 With `measure.mjs` your own command is also started, by you, as typed.
 
@@ -86,7 +88,7 @@ The rest is ordinary .NET: process list, CPU time, start time, working set. macO
 
 **What it ends.** No process other than its own helpers is ever ended. On Windows, `measure.mjs` starts two helpers (one streaming `typeperf`, one persistent PowerShell) and ends them when measuring stops, through the handles Node gave it, never by name or number. If one of the scan's helper programs runs past its time limit, Node ends that helper through its own handle. On macOS there are no persistent helpers. It does not send any signal to your command; Ctrl+C is handled by the terminal.
 
-**What it writes.** Only `peaks.jsonl` (and the data folder holding it), by `measure.mjs`. The scan and headroom check write nothing. It reads your protected-process list and `peaks.jsonl`.
+**What it writes.** Only `peaks.jsonl` (and the data folder holding it), by `measure.mjs`. The scan and headroom check write nothing. It reads your protected-process list and `peaks.jsonl`. It writes nothing when the data folder is inside the project being measured, or when `peaks.jsonl` is a link or a second name for another file, so a repository cannot point the record at another file of yours.
 
 **Network.** None. It makes no connection of its own. (The Windows account lookup above is an operating system call, not this skill's.)
 

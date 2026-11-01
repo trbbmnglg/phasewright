@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import { logicalCpus as countCpus, run, parseCpuTime } from "./snapshot.mjs";
 import { parseTypeperf, parseVmStat } from "./pressure.mjs";
 import { startTreeLoop } from "./powershell.mjs";
+import { bin, helperOptions } from "./bin.mjs";
 import { MACHINE_INTERVAL_MS, TREE_INTERVAL_MS } from "./rules.mjs";
 
 const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
@@ -214,14 +215,25 @@ export function createSampler({ platform = process.platform, rootPid, treeInterv
 
   function startWindows() {
     const counters = ["\\Memory\\Available MBytes", "\\Memory\\Pages/sec", "\\Processor(_Total)\\% Processor Time"];
-    const typeperf = spawnFn("typeperf", [...counters, "-si", String(Math.max(1, Math.round(machineIntervalMs / 1000)))], { stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
-    owned.push(typeperf);
-    typeperf.on("error", (e) => warnings.push(`typeperf could not start: ${e.message}`));
-    const stream = createTypeperfStream((s) => agg.addMachine(s));
-    typeperf.stdout?.setEncoding?.("utf8");
-    typeperf.stdout?.on("data", (d) => stream.feed(d));
+    // The counter reader from the Windows folder (lib/bin.mjs); without it the machine counters are skipped.
+    const typeperfPath = bin("typeperf", { platform: "win32" });
+    let typeperf = null;
+    if (typeperfPath) {
+      typeperf = spawnFn(typeperfPath, [...counters, "-si", String(Math.max(1, Math.round(machineIntervalMs / 1000)))], { ...helperOptions({}, { platform: "win32" }), stdio: ["ignore", "pipe", "ignore"] });
+      owned.push(typeperf);
+      typeperf.on("error", (e) => warnings.push(`typeperf could not start: ${e.message}`));
+      const stream = createTypeperfStream((s) => agg.addMachine(s));
+      typeperf.stdout?.setEncoding?.("utf8");
+      typeperf.stdout?.on("data", (d) => stream.feed(d));
+    } else warnings.push("typeperf was not found in the Windows folder, so the machine counters were not sampled");
 
-    const tree = startTreeLoop({ rootPid, auxPid: typeperf.pid ?? 0, intervalMs: treeIntervalMs, spawnFn });
+    let tree;
+    try {
+      tree = startTreeLoop({ rootPid, auxPid: typeperf?.pid ?? 0, intervalMs: treeIntervalMs, spawnFn });
+    } catch (e) {
+      warnings.push(`the process-tree sampler could not start: ${e.message}`);
+      return;
+    }
     owned.push(tree);
     tree.on("error", (e) => warnings.push(`the process-tree sampler could not start: ${e.message}`));
     const lines = lineSplitter((line) => {

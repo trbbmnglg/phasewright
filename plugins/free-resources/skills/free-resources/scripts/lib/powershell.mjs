@@ -1,6 +1,7 @@
 // The one fixed PowerShell script and the two ways it is started. Read-only: it only runs queries
 // that Task Manager and Activity Monitor also run. Nothing here closes, signals or changes a process.
 import { execFile, spawn } from "node:child_process";
+import { bin, helperOptions, powershellModulePath } from "./bin.mjs";
 
 // One fixed PowerShell script. It takes no user input: the mode comes from a fixed list set by this
 // file, and it receives no data at all (the tree mode gets two process numbers and an interval from
@@ -177,13 +178,19 @@ const POWERSHELL_ARGS = ["-NoProfile", "-NonInteractive", "-Command", POWERSHELL
 
 // Runs the fixed script as the -Command argument (no -EncodedCommand, no temp file and no
 // execution-policy change, which endpoint tools tend to flag). Resolves to the parsed JSON.
-export function runPowerShell(mode, env = {}, { timeoutMs = 60000, exec = execFile } = {}) {
+// Windows PowerShell from the Windows folder (lib/bin.mjs), started from System32 with only its own module
+// folder, so neither the project folder nor a changed PATH or PSModulePath can supply a different program.
+const powershellPath = () => bin("powershell", { platform: "win32" });
+const powershellEnv = (env) => ({ ...env, PSModulePath: powershellModulePath() });
+
+export function runPowerShell(mode, env = {}, { timeoutMs = 60000, exec = execFile, path = powershellPath() } = {}) {
   if (!MODES.has(mode)) throw new Error(`unknown mode ${mode}`);
+  if (!path) return Promise.reject(new Error("Windows PowerShell was not found in the Windows folder"));
   return new Promise((resolve, reject) => {
     exec(
-      "powershell.exe",
+      path,
       POWERSHELL_ARGS,
-      { env: { ...process.env, ...env, FR_MODE: mode }, maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs, windowsHide: true, encoding: "utf8" },
+      { ...helperOptions(powershellEnv({ ...env, FR_MODE: mode }), { platform: "win32" }), maxBuffer: 256 * 1024 * 1024, timeout: timeoutMs, encoding: "utf8" },
       (err, stdout, stderr) => {
         if (err) return reject(new Error(`PowerShell ${mode} failed: ${String(stderr || err.message).split(/\r?\n/)[0]}`));
         try {
@@ -199,12 +206,10 @@ export function runPowerShell(mode, env = {}, { timeoutMs = 60000, exec = execFi
 // Starts the persistent tree loop and returns Node's child handle (the caller owns it and ends it).
 // rootPid: the process whose descendants are measured. auxPid: one more process of the caller's own whose
 // CPU is added to the self-cost figure (the streaming counter reader). Both are plain integers.
-export function startTreeLoop({ rootPid, auxPid = 0, intervalMs, spawnFn = spawn }) {
+export function startTreeLoop({ rootPid, auxPid = 0, intervalMs, spawnFn = spawn, path = powershellPath() }) {
   if (!Number.isInteger(rootPid) || rootPid <= 0) throw new Error("rootPid must be a positive integer");
   if (!Number.isInteger(intervalMs) || intervalMs < 250) throw new Error("intervalMs must be a whole number of at least 250");
-  return spawnFn("powershell.exe", POWERSHELL_ARGS, {
-    env: { ...process.env, FR_MODE: "tree", FR_ROOT: String(rootPid), FR_AUX: String(Number.isInteger(auxPid) ? auxPid : 0), FR_INTERVAL: String(intervalMs) },
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
+  if (!path) throw new Error("Windows PowerShell was not found in the Windows folder");
+  const env = powershellEnv({ FR_MODE: "tree", FR_ROOT: String(rootPid), FR_AUX: String(Number.isInteger(auxPid) ? auxPid : 0), FR_INTERVAL: String(intervalMs) });
+  return spawnFn(path, POWERSHELL_ARGS, { ...helperOptions(env, { platform: "win32" }), stdio: ["pipe", "pipe", "pipe"] });
 }

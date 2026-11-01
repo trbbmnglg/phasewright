@@ -2,7 +2,7 @@
 
 ## What it is
 
-A skill, shipped as a Claude Code plugin, that tells you how pressured your machine is, which processes use the most memory and CPU, and which ones look safe to consider closing, with the reason for each. It can also run one of your own commands and record what that command really needed, then compare that with what is free now ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md)). The current plugin version is 0.1.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)).
+A skill, shipped as a Claude Code plugin, that tells you how pressured your machine is, which processes use the most memory and CPU, and which ones look safe to consider closing, with the reason for each. It can also run one of your own commands and record what that command really needed, then compare that with what is free now ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md)). The current plugin version is 0.1.2 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)).
 
 **It is report-only.** It never closes, kills or signals a process, and it tells the assistant not to either. It runs on demand only, so nothing happens unless you invoke it ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md)).
 
@@ -33,6 +33,7 @@ For Copilot and Cursor, copy the skill folder into your tool's skills folder. Wi
 
 ## What shipped when
 
+- Plugin version 0.1.2 is on main and not in a release yet: every helper program is started from its absolute system path, from that folder and not your project, so a file with a helper's name in a project folder can no longer run instead of it; and `peaks.jsonl` is never written through a link or inside the project ([What this runs on your machine](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md#what-this-runs-on-your-machine)).
 - Plugin version 0.1.1 is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/.claude-plugin/plugin.json)).
 - This plugin has no changelog, so its [README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/free-resources/README.md) is the source for what it does today.
 

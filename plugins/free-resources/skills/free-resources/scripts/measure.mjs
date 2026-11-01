@@ -21,6 +21,7 @@ import { createSampler } from "./lib/sampler.mjs";
 import { appendPeak, summarizeCommand, taskKey, PEAK_SCHEMA_VERSION } from "./lib/peaks.mjs";
 import { relativizePaths } from "./lib/snapshot.mjs";
 import { warnIfInsideSkillDir } from "./lib/skilldir.mjs";
+import { bin } from "./lib/bin.mjs";
 import { TREE_INTERVAL_MS, MACHINE_INTERVAL_MS, MIN_TREE_INTERVAL_MS } from "./lib/rules.mjs";
 
 const USAGE = "usage: node measure.mjs [--task <name>] [--interval-ms N] [--json] -- <command...>";
@@ -67,8 +68,12 @@ async function main() {
   const key = taskKey({ task: opts.task, argv: opts.command, project, home });
 
   const startedAt = Date.now();
+  // On Windows your command runs through cmd.exe from the Windows folder, never one found in the project or
+  // through ComSpec; the command itself is yours and runs in your project folder as typed.
+  const shell = process.platform === "win32" ? bin("cmd", { platform: "win32" }) : null;
+  if (process.platform === "win32" && !shell) usage("cmd.exe was not found in the Windows folder.");
   const child = process.platform === "win32"
-    ? spawn(windowsCommandLine(opts.command), [], { shell: true, stdio: "inherit" })
+    ? spawn(windowsCommandLine(opts.command), [], { shell, stdio: "inherit" })
     : spawn(opts.command[0], opts.command.slice(1), { stdio: "inherit" });
 
   // Ctrl+C reaches the command from the terminal itself (same console or process group). This script must
@@ -122,7 +127,7 @@ async function main() {
   };
   let file = null;
   try {
-    file = appendPeak(record, { home });
+    file = appendPeak(record, { home, project });
   } catch (e) {
     console.error(`free-resources: the result could not be saved: ${e.message}`);
   }
