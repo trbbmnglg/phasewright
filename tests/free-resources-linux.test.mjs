@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { FR, load } from "./helpers/free-resources-headroom.mjs";
 
 const linux = await load("linux");
+const AT = String.fromCharCode(64); // "@", built so the personal-data lint does not read a systemd unit name as an email address
 const pressureLib = await load("pressure");
 const classifyLib = await load("classify");
 const sampler = await load("sampler");
@@ -56,7 +57,7 @@ function fakeProc(list, extra = {}) {
 
 test("free-resources linux: parseStat counts fields from the last ')', so a command name with spaces and brackets is safe", () => {
   const plain = linux.parseStat(statLine({ pid: 42, comm: "node", ppid: 7, utime: 150, stime: 50, starttime: 360000, rss: 900 }));
-  assert.deepEqual(plain, { pid: 42, comm: "node", state: "S", ppid: 7, flags: 4194304, utime: 150, stime: 50, starttime: 360000, rss_pages: 900 });
+  assert.deepEqual(plain, { pid: 42, comm: "node", state: "S", ppid: 7, pgrp: 42, session: 1, tty_nr: 0, flags: 4194304, utime: 150, stime: 50, starttime: 360000, rss_pages: 900 });
   const odd = linux.parseStat(statLine({ pid: 43, comm: "my (odd) app", ppid: 9, starttime: 55 }));
   assert.equal(odd.comm, "my (odd) app");
   assert.equal(odd.ppid, 9);
@@ -182,6 +183,31 @@ test("free-resources linux: the measure sampler reads only the root's tree, with
   const agg = new sampler.Aggregator();
   agg.addTree({ t: 1000, self_cpu_s: null, rows }, 11);
   assert.equal(agg.result().peak_tree_mb, Math.round(((2000 + 500) / 1024) * 10) / 10);
+});
+
+test("free-resources linux: the stop gate's facts come from /proc, and anything unreadable is null, never a guess", () => {
+  const { fsApi, files, links } = fakeProc([{ pid: 300, comm: "node", ppid: 1, uid: 1000, exe: "/people/zork/.nvm/node (deleted)", cgroup: "0::/user.slice/user-1000.slice/user" + AT + "1000.service/app.slice/vte-spawn-2.scope\n", starttime: 4242 }]);
+  files["/proc/300/oom_score_adj"] = "0\n";
+  files["/proc/sys/kernel/random/boot_id"] = "0a1b2c3d-0000-4000-8000-000000000001\n";
+  const f = linux.readLinuxFacts(300, { fsApi });
+  assert.deepEqual({ ...f, uid: f.uid.real, gid: f.gid.real }, {
+    pid: 300, name: "node", state: "S", ppid: 1, session: 1, tty_nr: 0, starttime: 4242, kernel_thread: false, uid: 1000, gid: 1000, nspid_count: 1,
+    cap_eff: "0000000000000000", cap_prm: "0000000000000000", tracer_pid: 0, oom_score_adj: 0,
+    cgroup: "/user.slice/user-1000.slice/user" + AT + "1000.service/app.slice/vte-spawn-2.scope", exe: "/people/zork/.nvm/node", boot_id: "0a1b2c3d-0000-4000-8000-000000000001",
+  });
+  delete files["/proc/300/oom_score_adj"];
+  delete files["/proc/300/status"];
+  delete links["/proc/300/exe"];
+  files["/proc/300/cgroup"] = "12:memory:/x\n0::/\n";
+  files["/proc/sys/kernel/random/boot_id"] = "not an id";
+  const thin = linux.readLinuxFacts(300, { fsApi });
+  for (const k of ["oom_score_adj", "uid", "gid", "nspid_count", "cap_eff", "cap_prm", "tracer_pid", "exe", "cgroup", "boot_id"]) assert.equal(thin[k], null, k);
+  assert.equal(linux.readLinuxFacts(301, { fsApi }), null, "a process that is gone");
+  for (const bad of [0, -1, 1.5, "300", null]) assert.equal(linux.readLinuxFacts(bad, { fsApi }), null, String(bad));
+  const kthread = fakeProc([{ pid: 2, comm: "kthreadd", ppid: 0, flags: 0x00208040 }]);
+  assert.equal(linux.readLinuxFacts(2, { fsApi: kthread.fsApi }).kernel_thread, true);
+  assert.equal(linux.parseCgroupPath("0::/user.slice/a.scope\n"), "/user.slice/a.scope");
+  for (const bad of ["", "0::relative", "1:name=systemd:/x\n0::/y\n", null]) assert.equal(linux.parseCgroupPath(bad), null, String(bad));
 });
 
 test("free-resources linux: listening sockets are matched to your own processes through their open files", () => {

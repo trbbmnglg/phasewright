@@ -283,7 +283,7 @@ test("classifier: a browser group is Your call, with counts and total MB; embedd
   const group = [chrome(300), chrome(200), chrome(100)];
   const edge = rec({ name: "msedge.exe", exe: "C:\\Program Files (x86)\\Microsoft\\Edge\\msedge.exe", rss_mb: 150 });
   const webview = rec({ name: "msedgewebview2.exe", exe: "C:\\Program Files (x86)\\Microsoft\\Edge\\msedgewebview2.exe", rss_mb: 150 });
-  const playwright = rec({ name: "chrome.exe", exe: `${HOME}\\AppData\\Local\\ms-playwright\\chromium\\chrome.exe`, ppid: 99999 });
+  const playwright = rec({ name: "chrome.exe", exe: `${HOME}\\AppData\\Local\\ms-playwright\\chromium-1140\\chrome-win\\chrome.exe`, ppid: 99999 });
   const out = classify([...group, edge, webview, playwright], ctx());
   const g = out.your_call.find((x) => x.name === "chrome.exe");
   assert.equal(g.count, 3);

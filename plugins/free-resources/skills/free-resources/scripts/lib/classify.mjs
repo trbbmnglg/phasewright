@@ -9,7 +9,7 @@
 //   4 Your call         a browser, or a big unrecognised process of this user in a user-writable place
 //   5 Keep, not recognised
 import {
-  PROTECTED, PROTECTED_PATTERNS, SERVICE_OWNERS, DEV_LEFTOVER_NAMES, DEV_RUNTIMES, PLAYWRIGHT_PATH,
+  PROTECTED, PROTECTED_PATTERNS, SERVICE_OWNERS, DEV_LEFTOVER_NAMES, DEV_RUNTIMES, PLAYWRIGHT_PATH, PLAYWRIGHT_PROGRAMS,
   BROWSER_NAMES, BROWSER_PREFIXES, NOT_BROWSER, IDLE_CORE_PCT, ACTIVE_CORE_PCT, IDLE_MIN_AGE_H, BIG_RSS_MB, BIG_CPU_MACHINE_PCT, SMALL_MB,
 } from "./rules.mjs";
 import { isSystemPath, isUserWritable, isAbsolutePath, isUnder } from "./paths.mjs";
@@ -17,9 +17,12 @@ import { isSystemPath, isUserWritable, isAbsolutePath, isUnder } from "./paths.m
 const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 };
 const round1 = (n) => Math.round(n * 10) / 10;
 
-export const normName = (name) => String(name ?? "").toLowerCase().replace(/\.exe$/, "");
-const slashes = (p) => String(p ?? "").split("\\").join("/");
+export const normName = (name) => String(name ?? "").normalize("NFC").toLowerCase().replace(/\.exe$/, "");
+const slashes = (p) => String(p ?? "").normalize("NFC").split("\\").join("/");
 const lower = (p) => slashes(p).toLowerCase();
+
+// A browser Playwright downloaded, judged from the program's own path only (see PLAYWRIGHT_PATH).
+export const isPlaywrightBrowser = (exe) => PLAYWRIGHT_PATH.test(exe ?? "") && PLAYWRIGHT_PROGRAMS.includes(normName(slashes(exe).split("/").pop()));
 
 const PROTECTED_BY_NAME = new Map();
 for (const [category, names] of Object.entries(PROTECTED)) for (const n of names) PROTECTED_BY_NAME.set(n, category);
@@ -31,9 +34,9 @@ export function protectedCategory(name) {
   return null;
 }
 
-const wildcard = (pattern) => new RegExp(`^${pattern.toLowerCase().replace(/\.exe$/, "").replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
+const wildcard = (pattern) => new RegExp(`^${pattern.normalize("NFC").toLowerCase().replace(/\.exe$/, "").replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
 
-function localProtectedReason(rec, local) {
+export function localProtectedReason(rec, local) {
   const n = normName(rec.name);
   for (const p of local?.names ?? []) if (wildcard(p).test(n)) return `in the local protected list (name ${p})`;
   const exe = lower(rec.exe);
@@ -48,7 +51,7 @@ function localProtectedReason(rec, local) {
 export function isBrowser(rec) {
   const n = normName(rec.name);
   if (NOT_BROWSER.includes(n)) return false;
-  if (PLAYWRIGHT_PATH.test(rec.exe ?? "") || PLAYWRIGHT_PATH.test(rec.cmd_full ?? "")) return false;
+  if (isPlaywrightBrowser(rec.exe)) return false;
   return BROWSER_NAMES.includes(n) || BROWSER_PREFIXES.some((p) => n.startsWith(p));
 }
 
@@ -63,7 +66,7 @@ const toolBase = (token) => slashes(token).split("/").pop().toLowerCase().replac
 // The dev tool this process is, or null. Playwright browsers are found by their download folder.
 export function devTool(rec) {
   const n = normName(rec.name);
-  if (PLAYWRIGHT_PATH.test(rec.exe ?? "") || PLAYWRIGHT_PATH.test(rec.cmd_full ?? "")) return "playwright browser";
+  if (isPlaywrightBrowser(rec.exe)) return "playwright browser";
   if (DEV_LEFTOVER_NAMES.includes(n)) return n;
   if (DEV_RUNTIMES.includes(n)) {
     const args = splitArgs(rec.cmd_full).slice(1, 4);
@@ -110,7 +113,7 @@ export function projectPaths(rec, platform) {
   return [...new Set(out.filter(Boolean))];
 }
 
-function ancestorsAndDescendants(records, mePid) {
+export function ancestorsAndDescendants(records, mePid) {
   const byPid = new Map(records.map((r) => [r.pid, r]));
   const related = new Set([mePid]);
   for (let p = byPid.get(mePid)?.ppid, guard = 0; p && byPid.has(p) && !related.has(p) && guard < 64; p = byPid.get(p).ppid, guard++) related.add(p);

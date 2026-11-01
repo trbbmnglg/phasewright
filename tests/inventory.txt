@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 1012
+# tests: 1069
 linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
 linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
@@ -332,11 +332,12 @@ run	free-resources bin: no script starts a program by a bare name, through a she
 run	free-resources bin: the peaks store is never written inside the project folder
 run	free-resources bin: the peaks store refuses a link and leaves its target alone
 run	free-resources bin: the peaks store refuses a second name for another file and leaves that file alone
-run	free-resources bin: the plugin is at 0.2.0, and the README and wiki say what changed in 0.1.2 and since
+run	free-resources bin: the plugin is at 0.3.0, and the README and wiki say what changed in 0.1.2 and since
 run	free-resources config: 'stop': false in any list switches stopping off and says which
 run	free-resources config: a file that cannot be used is 'bad' with a reason, and never throws
 run	free-resources config: a file that is not there is absent, and a good file is trimmed and limited
 run	free-resources config: a list can only add protection; it cannot unprotect a built-in one
+run	free-resources config: a list with entries that cannot be used keeps its good entries for the report and switches stopping off
 run	free-resources config: a name and a path with the same text are kept apart
 run	free-resources config: an unreadable list is ignored, switches stopping off, and the warning does not print the home folder
 run	free-resources config: each system looks in its own place for the organization policy and the user's list
@@ -344,13 +345,60 @@ run	free-resources config: stop can be switched off and nothing else; true chang
 run	free-resources config: the committed example file is a valid list and uses made-up names
 run	free-resources config: the file named by FREE_RESOURCES_PROTECTED is read, and a missing one switches stopping off
 run	free-resources config: the lists are added together, without repeats, and the sources show counts only
+run	free-resources config: the policy and your list are also read where the system keeps them, so a variable cannot hide either
 run	free-resources config: with no file anywhere there is nothing to add and stopping is not blocked
+run	free-resources facts: a Windows program's subsystem comes from its PE header, and anything else is unknown
+run	free-resources facts: macOS rows, the real program from lsof, and the launchd job list are read strictly
+run	free-resources facts: the Windows program path is made canonical only on a local drive
+run	free-resources free: Windows acts only while the pin still holds the process, and nothing runs when the action log cannot be written
+run	free-resources free: Windows: a windowed program is asked to close without /F, and one that does not close is reported, not forced
+run	free-resources free: Windows: force pins the process, checks it again, runs taskkill /F once, waits on the pin and logs it; no signal is ever used
+run	free-resources free: a forged or changed plan cannot change how a process is stopped, last longer, or put its own text in the output
+run	free-resources free: a missing, old, replaced or foreign plan, or a pid it does not list, refuses with nothing done
+run	free-resources free: a number that changes hands right before the signal gets no signal, and a refusal is never retried
+run	free-resources free: a plan is refused, and nothing is read or saved, when the self-check fails or stopping is switched off
+run	free-resources free: a plan lists what passed every check with how it would be stopped, and saves the identities without printing them
+run	free-resources free: a process that changed since the plan is refused at stop time and left alone
+run	free-resources free: a process that ignores SIGTERM is reported as still running; force then sends SIGKILL once
+run	free-resources free: a stop refuses everything when the self-check fails or stopping was switched off since the plan
+run	free-resources free: a stop request is checked before anything else: plan id, numbers, at most 10, force takes one
+run	free-resources free: end to end, a plan finds the test's own left-over stub and a stop ends only it; where this tool may not stop anything it refuses and the stub lives
+run	free-resources free: free.mjs stop without a plan refuses with exit 4 before scanning or touching anything
+run	free-resources free: free.mjs takes only its own options and refuses with exit 2 otherwise
+run	free-resources free: macOS and Linux send SIGTERM, wait until the process is gone, and never call taskkill
+run	free-resources gate: Linux refuses a process inside any systemd service, not only one whose last part is a service
+run	free-resources gate: Linux refuses kernel threads, zombies, containers, tracing, capabilities, OOM shields, session leaders and anything outside your user slice
+run	free-resources gate: Windows refuses session 0, another session, critical, protected, elevated, other integrity and a parent of another account
+run	free-resources gate: a left-over dev tool of yours passes every check on Windows, Linux and macOS
+run	free-resources gate: a number now used by another process is refused
+run	free-resources gate: a process must have been started from a shell or terminal, or left behind; an editor, assistant, service or security tool refuses
+run	free-resources gate: a program that only mentions a Playwright folder is not a Playwright browser, and the label is checked against the program
+run	free-resources gate: a stop refuses when anything that pins the process differs from the plan
+run	free-resources gate: an assistant that runs as plain node still owns its session, and a tool started detached refuses everything
+run	free-resources gate: an identity has every field or is nothing
+run	free-resources gate: every spelling of a system folder refuses, and a runtime there running your own tool does not
+run	free-resources gate: fails closed: every field it reads, missing or wrong, refuses (and nothing it reads can throw it open)
+run	free-resources gate: macOS refuses a launchd job and an unknown answer, allows an app opened from the Dock, and compares the effective group
+run	free-resources gate: macOS refuses a process that a launchd job started, not only the job itself
+run	free-resources gate: on macOS only codesign's exit 3 (signed, but not by Apple) allows; Apple, unsigned, errors and timeouts refuse
+run	free-resources gate: only a recognised dev tool that the classifier put in Suggest closing, or a busy one, can be stopped
+run	free-resources gate: only a windowed Windows program with a main window is asked to close; every other Windows program needs force; elsewhere SIGTERM first
+run	free-resources gate: protected names, the protected lists and system folders refuse, whatever the classifier said
+run	free-resources gate: stopping switched off, an elevated tool, sudo, root or capabilities refuse every stop
+run	free-resources gate: the owner is compared by SID or by every user and group id, never by name
+run	free-resources gate: the runtime exception follows the account's own home folder, never the project folder or a root
+run	free-resources gate: the session is found through any number of shells, and a tool that ends in shells alone was started detached
+run	free-resources gate: this tool, its parents and children, and the editor or assistant session it runs in are never stopped
 run	free-resources guard: child processes come from the argument-list functions only, started through the fixed absolute helper table
+run	free-resources guard: free.mjs's code starts programs only through the fixed table with no shell, loads nothing by a computed name and imports only Node's own modules
+run	free-resources guard: in free.mjs's code only terminate.mjs ends a process; the pin ends only its own PowerShell; nothing elevates
 run	free-resources guard: no code in the closure can close, kill, signal or elevate a process, except one line in the sampler
 run	free-resources guard: nothing is loaded by a computed name, so the closure above is the whole program
 run	free-resources guard: only Node's own modules are imported, never a package
+run	free-resources guard: terminate.mjs runs only System32's taskkill with /PID and /F, and sends only SIGTERM or SIGKILL
+run	free-resources guard: the pin script makes only read-only native calls and opens processes with query and synchronize rights only
+run	free-resources guard: the read-only scripts and free.mjs together reach every module, and the read-only ones never reach the stop code
 run	free-resources guard: the sampler ends only the handles of the two helpers it started
-run	free-resources guard: the three entry scripts reach every module of the plugin, and the closure includes the newer ones
 run	free-resources linux: a runtime in a system folder that runs your own dev tool is your dev server; a system script or another tool binary stays protected
 run	free-resources linux: an orphan is one adopted by pid 1, or by your own systemd while in a scope, and never a process that a .service keeps
 run	free-resources linux: listening sockets are matched to your own processes through their open files
@@ -362,6 +410,11 @@ run	free-resources linux: system folders and system services are protected; /var
 run	free-resources linux: the measure sampler reads only the root's tree, with resident memory and CPU seconds
 run	free-resources linux: the process table is read from /proc with owner, memory, start time, command and unit; nothing unreadable throws
 run	free-resources linux: the second sample is light, and CPU is matched by pid and start time so a reused pid is never mixed up
+run	free-resources linux: the stop gate's facts come from /proc, and anything unreadable is null, never a guess
+run	free-resources plans: a plan is written whole, read back, replaced by the next one, and checked for age, id and system
+run	free-resources plans: an action is logged with a cleaned name and no command line
+run	free-resources plans: running from your home folder is not a project, but a repository inside it is, for writing and for reading
+run	free-resources plans: the plan and the action log are never written inside the project, through a second name, or as a link
 run	free-resources report: --explain says why one process is where it is, and a number that is not there says so
 run	free-resources report: --explain takes only a whole number from 1 to 10 digits
 run	free-resources report: a hostile process name cannot break a table or reach the output as anything but plain text
@@ -372,6 +425,10 @@ run	free-resources report: off-limits names are your protected processes and ser
 run	free-resources report: the path rules cover Windows short and long forms, shares, Linux folders and macOS folders
 run	free-resources report: the report says how many entries each protected list gave, and the summary never copies the entries
 run	free-resources report: virtual machines and daemons with their own stop command are advised, from a fixed table, above a size
+run	free-resources selfcheck: refuses an elevated tool, root, sudo, a container or a foreign session, and a macOS where the Apple check does not work
+run	free-resources terminate: Windows runs System32's taskkill with one /PID, /F only for force, from System32, with no shell
+run	free-resources terminate: elsewhere it sends SIGTERM or SIGKILL only, never on Windows, and reports a refusal without retrying
+run	free-resources terminate: refuses 0, 1, 2, negatives, fractions, text, this tool and its parent before anything runs
 run	git global options move to globals and leave the subcommand first
 run	git: the backup folder never shows up in git status and git add -A stages nothing from it
 run	guard.mjs and guard-rules.mjs agree on the role pattern

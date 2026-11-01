@@ -152,15 +152,16 @@ test("free-resources bin: the peaks store refuses a link and leaves its target a
   mkdirSync(join(dir, "sub"));
 });
 
-test("free-resources bin: the plugin is at 0.2.0, and the README and wiki say what changed in 0.1.2 and since", () => {
+test("free-resources bin: the plugin is at 0.3.0, and the README and wiki say what changed in 0.1.2 and since", () => {
   const plugin = JSON.parse(readFileSync(join(FR, "..", "..", ".claude-plugin", "plugin.json"), "utf8"));
-  assert.equal(plugin.version, "0.2.0");
+  assert.equal(plugin.version, "0.3.0");
   const readme = readFileSync(join(FR, "..", "..", "README.md"), "utf8");
   assert.ok(readme.includes("Every program above is started from its absolute path"), "README: absolute paths");
   assert.ok(readme.includes("Before 0.1.2 the programs were started by name"), "README: what changed");
-  assert.ok(readme.includes("so a repository cannot point the record at another file of yours"), "README: the store refusals");
+  assert.ok(readme.includes("so a repository cannot point a record at another file of yours"), "README: the store refusals");
   const wiki = readFileSync(join(FR, "..", "..", "..", "..", "docs", "wiki", "Free-resources.md"), "utf8");
-  assert.ok(wiki.includes("The current plugin version is 0.2.0"), "wiki: current version");
-  assert.ok(wiki.includes("Plugin version 0.2.0 is on main"), "wiki: what shipped when");
+  assert.ok(wiki.includes("The current plugin version is 0.3.0"), "wiki: current version");
+  assert.ok(wiki.includes("Plugin version 0.3.0 is on main"), "wiki: what shipped when");
+  assert.ok(wiki.includes("Plugin version 0.2.0, also on main"), "wiki: what 0.3.0 builds on");
   assert.ok(wiki.includes("Plugin version 0.1.2, also on main"), "wiki: what 0.2.0 builds on");
 });

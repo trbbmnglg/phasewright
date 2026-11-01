@@ -49,13 +49,16 @@ export function parseStat(text) {
     comm: t.slice(open + 1, close),
     state: rest[0],
     ppid: n(1),
+    pgrp: n(2),
+    session: n(3),
+    tty_nr: n(4),
     flags: n(6),
     utime: n(11),
     stime: n(12),
     starttime: n(19),
     rss_pages: n(21),
   };
-  return [st.pid, st.ppid, st.flags, st.utime, st.stime, st.starttime, st.rss_pages].every(Number.isFinite) ? st : null;
+  return [st.pid, st.ppid, st.pgrp, st.session, st.tty_nr, st.flags, st.utime, st.stime, st.starttime, st.rss_pages].every(Number.isFinite) ? st : null;
 }
 
 // /proc/<pid>/status: "Key:\tvalue" lines. Uid and Gid hold real, effective, saved and filesystem ids.
@@ -133,9 +136,15 @@ export function parsePressure(text) {
 // root, on cgroup v1 (several lines) or when the file is unreadable. cgroup(7) says the path-to-unit mapping is not a
 // public interface, so this is used to tell a service from a scope, never to look anything up.
 export function parseCgroupUnit(text) {
+  return parseCgroupPath(text)?.split("/").filter(Boolean).pop() ?? null;
+}
+
+// The whole cgroup v2 path ("/user.slice/user-1000.slice/..."), or null on cgroup v1, at an unreadable file, or for a
+// path that is not absolute.
+export function parseCgroupPath(text) {
   const lines = String(text ?? "").split(/\r?\n/).filter(Boolean);
-  if (lines.length !== 1 || !lines[0].startsWith("0::")) return null;
-  return lines[0].slice(3).split("/").filter(Boolean).pop() ?? null;
+  if (lines.length !== 1 || !lines[0].startsWith("0::/")) return null;
+  return lines[0].slice(3);
 }
 
 // /etc/passwd: "name:x:uid:gid:...". A map from uid to name.
@@ -306,4 +315,54 @@ export function readPressure({ procRoot = "/proc", fsApi = realFs } = {}) {
 }
 export function readPasswd({ fsApi = realFs, path = "/etc/passwd" } = {}) {
   return parsePasswd(tryRead(fsApi, path));
+}
+
+// ---------- facts for the stop gate ----------
+
+// A kernel thread has this flag in /proc/<pid>/stat (PF_KTHREAD in the kernel's include/linux/sched.h).
+const PF_KTHREAD = 0x00200000;
+
+// The boot's random id (proc(5): /proc/sys/kernel/random/boot_id). Two reads in the same boot give the same text, so a
+// plan made before a reboot never matches a process after it.
+export function readBootId({ procRoot = "/proc", fsApi = realFs } = {}) {
+  const t = tryRead(fsApi, `${procRoot}/sys/kernel/random/boot_id`);
+  return t && /^[0-9a-f-]{36}$/.test(t.trim()) ? t.trim() : null;
+}
+
+// Everything the stop gate asks about one process, read now, or null when the process is gone (its stat file cannot be
+// read). A field that cannot be read is null; the gate treats null as "unknown" and refuses. Read-only.
+export function readLinuxFacts(pid, { procRoot = "/proc", fsApi = realFs } = {}) {
+  if (!Number.isSafeInteger(pid) || pid < 1) return null;
+  const dir = `${procRoot}/${pid}`;
+  const st = parseStat(tryRead(fsApi, `${dir}/stat`));
+  if (!st || st.pid !== pid) return null;
+  const status = parseStatus(tryRead(fsApi, `${dir}/status`));
+  const oomText = tryRead(fsApi, `${dir}/oom_score_adj`);
+  const oom = oomText != null && /^-?\d+\s*$/.test(oomText) ? Number(oomText.trim()) : null;
+  const cgroup = parseCgroupPath(tryRead(fsApi, `${dir}/cgroup`));
+  const exe = cleanExe(tryLink(fsApi, `${dir}/exe`));
+  // The files are read one by one, so read stat again: if the number went to another process in the meantime, the
+  // fields could mix two processes, and the answer is "gone".
+  const again = parseStat(tryRead(fsApi, `${dir}/stat`));
+  if (!again || again.starttime !== st.starttime) return null;
+  return {
+    pid,
+    name: status.name ?? st.comm,
+    state: st.state,
+    ppid: st.ppid,
+    session: st.session,
+    tty_nr: st.tty_nr,
+    starttime: st.starttime,
+    kernel_thread: (st.flags & PF_KTHREAD) !== 0,
+    uid: status.uid,
+    gid: status.gid,
+    nspid_count: status.nspid ? status.nspid.length : null,
+    cap_eff: status.cap_eff,
+    cap_prm: status.cap_prm,
+    tracer_pid: Number.isSafeInteger(status.tracer_pid) ? status.tracer_pid : null,
+    oom_score_adj: oom,
+    cgroup,
+    exe,
+    boot_id: readBootId({ procRoot, fsApi }),
+  };
 }

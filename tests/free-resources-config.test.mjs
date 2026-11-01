@@ -23,13 +23,13 @@ const SCRIPTS = "/plugin/scripts";
 const POLICY = "/etc/free-resources/policy.json";
 const USER = "/people/zork/.config/free-resources/protected.json";
 const LOCAL = "/plugin/scripts/protected.local.json";
-const loadOn = (files, extra = {}) => loadProtection({ env: {}, platform: "linux", home: HOME, skillScripts: SCRIPTS, io: disk(files), ...extra });
+const loadOn = (files, extra = {}) => loadProtection({ env: {}, platform: "linux", home: HOME, profile: HOME, skillScripts: SCRIPTS, io: disk(files), ...extra });
 
 // ---------- where the files are ----------
 
 test("free-resources config: each system looks in its own place for the organization policy and the user's list", () => {
-  assert.deepEqual(configPaths({ env: { ProgramData: "D:\\PD", APPDATA: "D:\\Roam" }, platform: "win32", home: "D:\\Users\\zork" }), { policy: "D:\\PD\\free-resources\\policy.json", user: "D:\\Roam\\free-resources\\protected.json" });
-  assert.deepEqual(configPaths({ env: {}, platform: "win32", home: "D:\\Users\\zork" }), { policy: "C:\\ProgramData\\free-resources\\policy.json", user: "D:\\Users\\zork\\AppData\\Roaming\\free-resources\\protected.json" }, "defaults when the variables are missing");
+  assert.deepEqual(configPaths({ env: { ProgramData: "D:\\PD", APPDATA: "D:\\Roam" }, platform: "win32", home: "D:\\Profiles\\zork" }), { policy: "D:\\PD\\free-resources\\policy.json", user: "D:\\Roam\\free-resources\\protected.json" });
+  assert.deepEqual(configPaths({ env: {}, platform: "win32", home: "D:\\Profiles\\zork" }), { policy: "C:\\ProgramData\\free-resources\\policy.json", user: "D:\\Profiles\\zork\\AppData\\Roaming\\free-resources\\protected.json" }, "defaults when the variables are missing");
   assert.deepEqual(configPaths({ env: {}, platform: "linux", home: HOME }), { policy: POLICY, user: USER });
   assert.equal(configPaths({ env: { XDG_CONFIG_HOME: "/cfg" }, platform: "linux", home: HOME }).user, "/cfg/free-resources/protected.json");
   assert.equal(configPaths({ env: { XDG_CONFIG_HOME: "cfg/relative" }, platform: "linux", home: HOME }).user, USER, "a relative XDG_CONFIG_HOME is ignored, as the XDG specification says");
@@ -140,6 +140,34 @@ test("free-resources config: the file named by FREE_RESOURCES_PROTECTED is read,
   assert.deepEqual(missing.sources, [{ label: "the file named by FREE_RESOURCES_PROTECTED", status: "bad", names: 0, paths: 0 }]);
   const empty = loadOn({}, { env: { FREE_RESOURCES_PROTECTED: "" } });
   assert.deepEqual(empty.sources, [], "an empty variable is the same as none");
+});
+
+test("free-resources config: a list with entries that cannot be used keeps its good entries for the report and switches stopping off", () => {
+  const p = loadOn({ [USER]: json({ names: ["ok", 7, "", "x".repeat(201)], paths: "d:/not-a-list" }) });
+  assert.deepEqual(p.names, ["ok"]);
+  assert.equal(p.stop_allowed, false);
+  assert.deepEqual(p.stop_blockers, ["your list has entries that could not be used"]);
+  assert.match(p.warnings[0], /"names" has an entry that is not text, or is empty; "names" has an entry longer than 200 characters; "paths" is not a list\. The others were read, and stopping is switched off$/);
+  const many = loadOn({ [USER]: json({ names: Array.from({ length: 501 }, (_, i) => `n${i}`) }) });
+  assert.equal(many.names.length, 500);
+  assert.equal(many.stop_allowed, false);
+  const fine = loadOn({ [USER]: json({ names: ["  spaced  "] }) });
+  assert.equal(fine.stop_allowed, true, "trimming is not a problem");
+});
+
+test("free-resources config: the policy and your list are also read where the system keeps them, so a variable cannot hide either", () => {
+  const files = { "C:/ProgramData/free-resources/policy.json": json({ names: ["corp-agent"], stop: false }), "D:/Profiles/zork/AppData/Roaming/free-resources/protected.json": json({ names: ["mine"] }) };
+  const p = loadProtection({ env: { ProgramData: "D:\\Elsewhere", APPDATA: "D:\\Roam", SystemRoot: "C:\\Windows" }, platform: "win32", home: "D:\\Profiles\\zork", profile: "D:\\Profiles\\zork", skillScripts: "/plugin/scripts", io: disk(files) });
+  assert.deepEqual(p.names.sort(), ["corp-agent", "mine"]);
+  assert.equal(p.stop_allowed, false, "the organization's stop: false still holds");
+  assert.deepEqual(p.sources.map((s) => s.label).sort(), ["organization policy (the system's own place)", "your list (your profile's own place)"]);
+  const same = loadProtection({ env: { ProgramData: "C:\\ProgramData", SystemRoot: "C:\\Windows", APPDATA: "D:\\Profiles\\zork\\AppData\\Roaming" }, platform: "win32", home: "D:\\Profiles\\zork", profile: "D:\\Profiles\\zork", skillScripts: "/plugin/scripts", io: disk(files) });
+  assert.deepEqual(same.sources.map((s) => s.label).sort(), ["organization policy", "your list"], "read once when both places are the same");
+  const moved = loadProtection({ env: { ProgramData: "D:\\Elsewhere", SystemRoot: "D:\\Windows" }, platform: "win32", home: "D:\\Profiles\\zork", profile: "D:\\Profiles\\zork", skillScripts: "/plugin/scripts", io: disk(files) });
+  assert.equal(moved.stop_allowed, false, "moving both ProgramData and SystemRoot still leaves the usual place read");
+  assert.ok(moved.sources.some((s) => s.label === "organization policy (the usual place)"));
+  const xdg = loadOn({ [USER]: json({ names: ["mine"] }) }, { env: { XDG_CONFIG_HOME: "/elsewhere" } });
+  assert.deepEqual(xdg.names, ["mine"], "your list in your profile is read even when XDG_CONFIG_HOME points elsewhere");
 });
 
 test("free-resources config: the committed example file is a valid list and uses made-up names", () => {

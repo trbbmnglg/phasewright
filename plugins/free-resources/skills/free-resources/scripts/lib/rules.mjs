@@ -59,8 +59,11 @@ export const ADVICE_MIN_MB = 300;
 export const DEV_LEFTOVER_NAMES = ["workerd", "esbuild", "vite", "wrangler", "nodemon", "ts-node", "webpack", "next", "tsx"];
 // Runtimes that run those tools as a script; the tool is then found in the first arguments.
 export const DEV_RUNTIMES = ["node", "bun", "deno"];
-// Browsers that test frameworks download live under this folder name.
-export const PLAYWRIGHT_PATH = /ms-playwright/i;
+// Browsers that Playwright downloads live in ms-playwright/<browser>-<build>/ (for example
+// ms-playwright/chromium-1140/chrome-win/chrome.exe). Only the program's own path counts, never its command line (any
+// program can mention that folder), and only one of these browser programs in that layout.
+export const PLAYWRIGHT_PATH = /[\\/]ms-playwright[\\/](chromium|chromium_headless_shell|chromium-headless-shell|firefox|webkit)-\d+[\\/]/i;
+export const PLAYWRIGHT_PROGRAMS = ["chrome", "chromium", "headless_shell", "chrome-headless-shell", "google chrome for testing", "firefox", "playwright", "minibrowser", "pw_run.sh"];
 
 // ---- Browsers: always "Your call", never suggested ----
 export const BROWSER_NAMES = ["chrome", "msedge", "firefox", "brave", "opera", "vivaldi", "safari", "arc", "chromium"];
@@ -94,9 +97,12 @@ export const PROTECTED = {
     "sentinelagent", "sentinelservicehost", "cbdefense", "cylancesvc", "mcshield", "mfemms", "sophosfs", "xagt", "ccsvchst",
     "endpointsecurityd", "xprotect", "xprotectservice", "syspolicyd", "amfid", "taniumclient", "wdavdaemon",
   ],
+  // SHELLS (below) are the shells in this list; everything else here is a terminal window or a terminal multiplexer.
   "terminals and shells": [
     "cmd", "powershell", "pwsh", "windowsterminal", "wt", "openconsole", "bash", "zsh", "sh", "fish", "mintty", "terminal", "iterm2",
-    "alacritty", "wezterm", "kitty", "wsl", "wslhost",
+    "alacritty", "wezterm", "kitty", "wsl", "wslhost", "dash", "ksh", "tcsh", "csh", "nu", "gnome-terminal-server", "gnome-terminal",
+    "kgx", "ptyxis", "konsole", "xterm", "uxterm", "urxvt", "rxvt", "xfce4-terminal", "mate-terminal", "lxterminal", "qterminal",
+    "terminator", "tilix", "foot", "ghostty", "warp", "hyper", "tmux", "tmux: server", "screen",
   ],
   "editors and IDEs": [
     "code", "code - insiders", "cursor", "devenv", "idea", "idea64", "webstorm64", "pycharm64", "rider64", "clion64", "goland64",
@@ -111,6 +117,9 @@ export const PROTECTED = {
     "claude", "claude-code", "copilot", "copilot-language-server", "copilot-runtime", "codex", "aider", "gemini", "cursor-agent",
   ],
 };
+// The shells among "terminals and shells". A chain of processes that ends after shells alone, with no terminal window,
+// is how a program started detached looks.
+export const SHELLS = ["cmd", "powershell", "pwsh", "bash", "zsh", "sh", "fish", "dash", "ksh", "tcsh", "csh", "nu", "wsl", "wslhost"];
 // Name patterns for families with many members.
 export const PROTECTED_PATTERNS = [
   [/^code helper/, "editors and IDEs"],

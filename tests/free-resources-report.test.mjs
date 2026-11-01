@@ -117,7 +117,7 @@ test("free-resources report: every listed group gets what, why, what to do and w
   const workerd = r.analysis.items.find((i) => i.name === "workerd.exe");
   assert.match(workerd.what, /workerd/);
   assert.equal(workerd.gain.cpu, "none: it is idle");
-  assert.match(workerd.action, /Close it yourself where you started it/);
+  assert.match(workerd.action, /Close it yourself where you started it .*or have free\.mjs stop it: its plan checks it again, and nothing is stopped until you pick it/);
   assert.match(r.analysis.items.find((i) => i.name === "chrome.exe").what, /web browser/);
   assert.match(r.analysis.items.find((i) => i.name === "chrome.exe").why_heavy, /3 processes using 900 MB \(5\.5% of this machine's memory\)/);
   assert.equal(r.analysis.summary.freeable_up_to_mb, r.buckets.suggest_closing.reduce((s, g) => s + g.total_mb, 0));
@@ -210,7 +210,7 @@ test("free-resources report: the report says how many entries each protected lis
   assert.ok(off.length >= 2 && off.every((h) => h.why === "in a protected list that you or your organization set"), "a list match is described, not quoted");
   const analysisText = reportLib.renderHuman(r).split("## Analysis")[1].split("\n## ")[0];
   assert.ok(!analysisText.includes("corp-tools") && !analysisText.includes("fakesvc*"));
-  assert.equal(r.protection.stopping, "not available in this version");
+  assert.equal(r.protection.stopping, "through free.mjs, for the dev tools you pick");
 });
 
 // ---------- --explain ----------

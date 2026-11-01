@@ -76,7 +76,7 @@ Everything here is a plain Markdown file or folder you can read, copy and adapt.
 
 **Plugins** (`plugins/`):
 - [`phased-shipping`](plugins/phased-shipping/README.md) plans work as small phases with one deploy each, and picks the model and effort for every kind of task.
-- [`free-resources`](plugins/free-resources/README.md) reports how pressured your machine is, which processes use the most, and what a task really needs. It never closes anything.
+- [`free-resources`](plugins/free-resources/README.md) reports how pressured your machine is, which processes use the most, and what a task really needs, and stops the left-over dev tools of yours that you pick.
 
 `library.json` is generated from these files and lists every item with its install steps per tool.
 
@@ -137,7 +137,7 @@ Every release attaches one zip per item (`skill-planner.zip`, `agent-debugger.zi
 
 - It is not a sandbox. The guard is an extra layer on top of the agents' own rules, and it has known gaps: see [The guard](plugins/phased-shipping/README.md#the-guard) and [Limits](plugins/phased-shipping/README.md#limits).
 - It never commits, pushes or deploys without your approval: see [How approval works](plugins/phased-shipping/README.md#how-approval-works).
-- It never closes your processes. `free-resources` only reports: see [What this runs on your machine](plugins/free-resources/README.md#what-this-runs-on-your-machine).
+- It never closes a process you did not pick. `free-resources` stops only left-over dev tools of yours that you choose, each checked again first, and never system, security, managed or other users' processes: see [Stopping](plugins/free-resources/README.md#stopping).
 - It sends none of your files anywhere. The one network use is a web search for current model guidance: see [What it touches](plugins/phased-shipping/README.md#what-it-touches).
 - The plugins do not run in Copilot or Cursor, only the skills do: see [Compatibility](plugins/free-resources/README.md#compatibility).
 - Releases are not signed and have no build provenance yet: see [SECURITY.md](SECURITY.md#how-releases-are-built).

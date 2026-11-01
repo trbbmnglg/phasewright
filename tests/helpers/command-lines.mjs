@@ -35,6 +35,8 @@ export const BARE = new Map([
   ["state", { after: opt("--state"), where: "--state", states: "fixed lists" }],
   ["command", { after: /roadmap\.mjs\s+$/, where: "roadmap.mjs", states: "one of `read`, `check`, `standardize`, `set`, `restore` or `adopt`" }],
   ["command...", { after: /--\s+$/, where: "--", states: "the user's own command" }],
+  ["plan id", { after: opt("--plan"), where: "--plan", states: "^[0-9a-f]{12}$" }],
+  ["pid", { after: opt("--pid"), where: "--pid", states: "^[1-9][0-9]{0,9}$" }],
 ]);
 
 // The unsafe-character rule: each piece must be in the file.

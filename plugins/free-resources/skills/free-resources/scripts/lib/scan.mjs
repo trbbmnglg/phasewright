@@ -40,6 +40,16 @@ export function loadFixture(file) {
 
 // opts: { project, sampleMs, all, top, fixture }. Throws UsageError for a missing fixture or an unsupported platform.
 export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_MS, all = false, top, fixture = null, explain = null } = {}) {
+  const s = await collectState({ project, sampleMs, all, fixture });
+  return buildReport({
+    platform: s.platform, records: s.records, classification: s.classification, pressure: s.pressure, me: s.me, opts: { all, top, explain },
+    meta: { now_iso: new Date(s.now_ms).toISOString(), scan_seconds: Math.round((Date.now() - s.started) / 100) / 10, interval_s: s.interval_s, logical_cpus: s.logical_cpus, protection: s.protection, project_dir: project },
+  });
+}
+
+// The scan before the report: the records, their classification and what they were judged with. free.mjs uses this to
+// pick the processes the stop gate then checks one by one.
+export async function collectState({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_MS, all = false, fixture = null } = {}) {
   const started = Date.now();
   const protection = loadProtection();
   let platform, me, home, records, pressure, listening, logical_cpus, interval_s, now_ms, pathExists;
@@ -71,8 +81,5 @@ export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_
   }
 
   const classification = classify(records, { me, home, platform, logical_cpus, now_ms, localProtected: protection, projectDir: project, listening, pathExists, all });
-  return buildReport({
-    platform, records, classification, pressure, me, opts: { all, top, explain },
-    meta: { now_iso: new Date(now_ms).toISOString(), scan_seconds: Math.round((Date.now() - started) / 100) / 10, interval_s, logical_cpus, protection, project_dir: project },
-  });
+  return { platform, me, home, records, classification, pressure, listening, logical_cpus, interval_s, now_ms, protection, project, started };
 }

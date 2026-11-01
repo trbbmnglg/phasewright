@@ -14,7 +14,7 @@ This wiki describes what has shipped. Each page links the file its claims come f
 ## Features
 
 - [Phased shipping](Phased-shipping): the plugin that plans work as small phases with one deploy each.
-- [Free resources](Free-resources): the report-only plugin that shows how pressured your machine is.
+- [Free resources](Free-resources): the plugin that shows how pressured your machine is and stops the left-over dev tools you pick.
 - [The guard](The-guard): the hook that keeps each phased-shipping agent inside its job.
 - [Approval check](Approval-check): approval bound to the commands you saw at the preview.
 - [Roadmap standard](Roadmap-standard): one roadmap format, with a check and a standardize command that writes only after you say yes.

@@ -1,7 +1,7 @@
 // The peaks store: one JSON line per measured run, in a folder that belongs to this skill (not to any
 // other tool). Append-only. Read-only towards processes: it only reads and writes its own file.
-import { closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
-import { homedir } from "node:os";
+import { chmodSync, closeSync, constants, existsSync, lstatSync, mkdirSync, openSync, readFileSync, statSync, writeSync } from "node:fs";
+import { homedir, userInfo } from "node:os";
 import { join, posix, win32 } from "node:path";
 import { maskSecrets, relativizePaths, baseName } from "./snapshot.mjs";
 import { PEAKS_WINDOW } from "./rules.mjs";
@@ -45,17 +45,45 @@ export function isInside(path, folder, platform = process.platform) {
   return rel === "" || (!rel.startsWith("..") && !rules.isAbsolute(rel));
 }
 
+// The account's own profile folder, from the system rather than HOME or USERPROFILE; null when it cannot be read.
+export function profileDir() {
+  try {
+    return userInfo().homedir || null;
+  } catch {
+    return null;
+  }
+}
+
+// Whether the data folder is inside the project folder, where a repository could ship a link or point
+// FREE_RESOURCES_DATA into itself. Running from your home folder, or a folder above it, is not a project: the default data
+// folder is inside your home folder by design.
+export function dataInsideProject(dir, project, platform = process.platform, profile = profileDir()) {
+  if (!project || !isInside(dir, project, platform)) return false;
+  return !(profile && isInside(profile, project, platform));
+}
+
+// Makes the data folder, private to you. On macOS and Linux a folder of yours that others can read or write is narrowed to
+// you alone; a folder of another user's is left as it is (writing into it then fails).
+export function privateDir(dir) {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (typeof process.getuid !== "function") return dir;
+  const st = statSync(dir);
+  if (st.uid === process.getuid() && (st.mode & 0o077) !== 0) chmodSync(dir, 0o700);
+  return dir;
+}
+
 // Opens the store for appending without following a link. A repository being measured, or an environment
 // variable it sets, could otherwise point the store at another file of yours (a link, or a second hard link
 // to it), and the record would be appended there. Anything that is not a plain file with one name is refused.
-function openStore(file) {
+// Also used for free.mjs's action log (lib/plans.mjs); `label` names the file in the error.
+export function openAppend(file, label = PEAKS_FILE) {
   let st = null;
   try {
     st = lstatSync(file);
   } catch (e) {
     if (e.code !== "ENOENT") throw e;
   }
-  if (st && (!st.isFile() || st.nlink > 1)) throw new Error(`${PEAKS_FILE} is not a plain file (a link or a second name for another file), so nothing was written`);
+  if (st && (!st.isFile() || st.nlink > 1)) throw new Error(`${label} is not a plain file (a link or a second name for another file), so nothing was written`);
   // O_NOFOLLOW is not available on Windows; there the lstat check above is the guard.
   const flags = constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | (constants.O_NOFOLLOW ?? 0);
   return openSync(file, flags, 0o600);
@@ -66,11 +94,11 @@ function openStore(file) {
 // there, or set FREE_RESOURCES_DATA to point into itself).
 export function appendPeak(record, opts = {}) {
   const dir = dataDir(opts);
-  if (opts.project && isInside(dir, opts.project, opts.platform)) throw new Error("the data folder is inside the project folder, so nothing was written; set FREE_RESOURCES_DATA to a folder outside it");
-  mkdirSync(dir, { recursive: true });
+  if (dataInsideProject(dir, opts.project, opts.platform, opts.profile)) throw new Error("the data folder is inside the project folder, so nothing was written; set FREE_RESOURCES_DATA to a folder outside it");
+  privateDir(dir);
   const safe = { schema_version: PEAK_SCHEMA_VERSION, ...record, cmd_summary: mask(record.cmd_summary, opts.home ?? homedir()), key: mask(record.key, opts.home ?? homedir()) };
   const file = join(dir, PEAKS_FILE);
-  const fd = openStore(file);
+  const fd = openAppend(file);
   try {
     writeSync(fd, `${JSON.stringify(safe)}\n`, null, "utf8");
   } finally {

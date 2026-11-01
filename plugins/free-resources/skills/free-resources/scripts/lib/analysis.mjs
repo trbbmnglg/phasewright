@@ -38,9 +38,9 @@ function whatIs(g) {
 }
 
 function actionFor(bucket, g) {
-  if (bucket === "suggest_closing") return "Close it yourself where you started it (the terminal or the editor task that runs it). This skill only reports.";
+  if (bucket === "suggest_closing") return "Close it yourself where you started it (the terminal or the editor task that runs it), or have free.mjs stop it: its plan checks it again, and nothing is stopped until you pick it.";
   if (g.category === "browser") return "Close the tabs and windows you do not need; only you know which matter.";
-  if (g.category === "dev_busy") return "It is working right now. Leave it, or stop it where you started it once it has finished.";
+  if (g.category === "dev_busy") return "It is working right now. Leave it, or stop it where you started it once it has finished; free.mjs can stop it too if you pick it.";
   return "Find out what it is. If you do not need it, close it from the program itself.";
 }
 

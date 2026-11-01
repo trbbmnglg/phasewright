@@ -1,12 +1,12 @@
 {
   "name": "free-resources",
-  "description": "Report-only check of how pressured your machine is (Windows, macOS, Linux), which processes use the most and why, and what a task really needs (peak memory and CPU cores). It never closes anything.",
-  "version": "0.2.0",
+  "description": "Checks how pressured your machine is (Windows, macOS, Linux), which processes use the most and why, and what a task really needs, and stops the left-over dev tools of yours that you pick. Never system, security, managed or other users' processes.",
+  "version": "0.3.0",
   "author": {
     "name": "trbbmnglg"
   },
   "license": "MIT",
   "homepage": "https://github.com/trbbmnglg/phasewright/tree/main/plugins/free-resources",
   "repository": "https://github.com/trbbmnglg/phasewright",
-  "keywords": ["performance", "memory", "cpu", "processes", "report-only"]
+  "keywords": ["performance", "memory", "cpu", "processes", "dev-servers"]
 }

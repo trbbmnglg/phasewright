@@ -97,7 +97,7 @@ export function buildReport({ platform, records, classification, pressure, me, o
       },
     },
     analysis,
-    protection: { lists: meta.protection?.sources ?? [], stopping: "not available in this version", stop_allowed_by_settings: meta.protection?.stop_allowed ?? true },
+    protection: { lists: meta.protection?.sources ?? [], stopping: meta.protection?.stop_allowed === false ? "switched off by a protected list" : "through free.mjs, for the dev tools you pick", stop_allowed_by_settings: meta.protection?.stop_allowed ?? true },
     ...(opts.explain != null ? { explain: explainPid(opts.explain, classification.decisions) } : {}),
     totals: classification.totals,
     notes,

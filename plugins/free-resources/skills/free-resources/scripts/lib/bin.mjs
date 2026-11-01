@@ -28,6 +28,10 @@ const POSIX = {
     memory_pressure: ["/usr/bin/memory_pressure"],
     top: ["/usr/bin/top"],
     vm_stat: ["/usr/bin/vm_stat"],
+    // Only free.mjs: checks whether a program is signed by Apple, so no part of macOS is ever stopped, and lists the jobs
+    // launchd runs for you (its "list" command, which only reads), so a job it keeps running is never taken for a left-over.
+    codesign: ["/usr/bin/codesign"],
+    launchctl: ["/bin/launchctl"],
   },
   // The Linux process table is read from /proc, so only the tick rate comes from a helper.
   linux: {
