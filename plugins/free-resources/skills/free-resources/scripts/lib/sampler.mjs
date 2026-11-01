@@ -8,11 +8,13 @@
 //            PowerShell in `tree` mode (see powershell.mjs). No PowerShell launch per tick.
 //   macOS    `ps` each tick and `vm_stat` for available memory. Written from documented commands and
 //            checked against sample data only: untested on a real Mac.
+//   Linux    /proc read each tick (the root's process tree) and MemAvailable from /proc/meminfo. No helper process.
 import { spawn } from "node:child_process";
-import { logicalCpus as countCpus, run, parseCpuTime } from "./snapshot.mjs";
+import { logicalCpus as countCpus, run, parseCpuTime, linuxConstants } from "./snapshot.mjs";
 import { parseTypeperf, parseVmStat } from "./pressure.mjs";
 import { startTreeLoop } from "./powershell.mjs";
 import { bin, helperOptions } from "./bin.mjs";
+import { readMeminfo, readTreeRows } from "./linux.mjs";
 import { MACHINE_INTERVAL_MS, TREE_INTERVAL_MS } from "./rules.mjs";
 
 const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
@@ -205,7 +207,7 @@ function endOwnChild(child, waitMs = 5000) {
 //   start()    begins sampling; returns at once
 //   stop()     ends the sampler's own children, waits for them to exit, resolves to the result numbers
 //   children() the sampler's own child handles (tests check they have exited)
-export function createSampler({ platform = process.platform, rootPid, treeIntervalMs = TREE_INTERVAL_MS, machineIntervalMs = MACHINE_INTERVAL_MS, spawnFn = spawn, runFn = run } = {}) {
+export function createSampler({ platform = process.platform, rootPid, treeIntervalMs = TREE_INTERVAL_MS, machineIntervalMs = MACHINE_INTERVAL_MS, spawnFn = spawn, runFn = run, procRoot, fsApi } = {}) {
   const agg = new Aggregator();
   const owned = [];
   const warnings = [];
@@ -271,12 +273,33 @@ export function createSampler({ platform = process.platform, rootPid, treeInterv
     }, machineIntervalMs);
   }
 
+  function startLinux() {
+    const loop = (fn, ms) => {
+      const tick = async () => {
+        if (stopped) return;
+        await fn().catch(() => {});
+        if (!stopped) timers.push(setTimeout(tick, ms));
+      };
+      tick();
+    };
+    loop(async () => {
+      const { clkTck } = await linuxConstants();
+      const rows = readTreeRows({ procRoot, fsApi, clkTck, rootPid });
+      if (!stopped && rows.length) agg.addTree({ t: Date.now(), self_cpu_s: null, rows }, rootPid);
+    }, treeIntervalMs);
+    loop(async () => {
+      const m = readMeminfo({ procRoot, fsApi });
+      if (!stopped && m.available_kb != null) agg.addMachine({ avail_mb: m.available_kb / 1024 });
+    }, machineIntervalMs);
+  }
+
   return {
     start() {
       if (started) return;
       started = true;
       if (platform === "win32") startWindows();
       else if (platform === "darwin") startMac();
+      else if (platform === "linux") startLinux();
       else warnings.push(`sampling is not supported on ${platform}`);
     },
     async stop() {

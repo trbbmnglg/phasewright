@@ -51,6 +51,8 @@ export const BIG_CPU_MACHINE_PCT = 5;
 export const SMALL_MB = 50;
 // The report lists this many top consumers unless --top says otherwise.
 export const DEFAULT_TOP = 8;
+// A virtual machine or daemon with its own stop command is mentioned in the advice only when it holds at least this much.
+export const ADVICE_MIN_MB = 300;
 
 // ---- Dev leftovers: the only processes that can ever be "Suggest closing" ----
 // Their own process name (Windows .exe suffix is ignored).
@@ -77,10 +79,20 @@ export const PROTECTED = {
     "mdworker", "mdworker_shared", "cfprefsd", "distnoted", "notifyd", "syslogd", "opendirectoryd", "configd", "powerd", "coreaudiod",
     "bluetoothd", "airportd", "trustd", "secd", "logd", "diskarbitrationd", "fseventsd", "uninstalld", "usernoted", "sharingd",
   ],
+  // Linux system services and the desktop session. Names are the process "comm", which Linux cuts at 15 characters,
+  // so families are also matched by prefix in PROTECTED_PATTERNS. A name missing here only means less protection
+  // from this list: a process owned by another user is already kept, and the local lists add more.
+  "Linux system services and desktop": [
+    "systemd", "init", "kthreadd", "dbus-daemon", "dbus-broker", "xorg", "xwayland", "gnome-shell", "gdm", "gdm3", "sddm", "lightdm",
+    "plasmashell", "kwin_x11", "kwin_wayland", "mutter", "pipewire", "pipewire-pulse", "wireplumber", "pulseaudio", "gpg-agent",
+    "polkitd", "gnome-keyring-daemon", "networkmanager", "wpa_supplicant", "auditd", "cron", "crond", "rsyslogd", "agetty", "login",
+    "upowerd", "udisksd", "accounts-daemon", "avahi-daemon", "cupsd", "snapd", "containerd", "dockerd", "irqbalance", "chronyd",
+    "fwupd", "colord", "thermald", "rtkit-daemon", "ibus-daemon",
+  ],
   "security and endpoint protection": [
     "msmpeng", "nissrv", "mssense", "senseir", "securityhealthservice", "securityhealthsystray", "csfalconservice", "csfalconcontainer",
     "sentinelagent", "sentinelservicehost", "cbdefense", "cylancesvc", "mcshield", "mfemms", "sophosfs", "xagt", "ccsvchst",
-    "endpointsecurityd", "xprotect", "xprotectservice", "syspolicyd", "amfid", "taniumclient",
+    "endpointsecurityd", "xprotect", "xprotectservice", "syspolicyd", "amfid", "taniumclient", "wdavdaemon",
   ],
   "terminals and shells": [
     "cmd", "powershell", "pwsh", "windowsterminal", "wt", "openconsole", "bash", "zsh", "sh", "fish", "mintty", "terminal", "iterm2",
@@ -103,11 +115,19 @@ export const PROTECTED = {
 export const PROTECTED_PATTERNS = [
   [/^code helper/, "editors and IDEs"],
   [/^(sense|taniumc|tanium|crowdstrike|sentinel|defender|mpdefender|windowsdefender)/, "security and endpoint protection"],
+  // Linux families: systemd units, D-Bus and desktop helpers, portals, input methods, audio, compositor parts.
+  [/^(systemd|dbus|gvfs|xdg-|at-spi|polkit|gnome-|kwin|kded|plasma|ibus|fcitx|pipewire|wireplumber|pulse|nm-|networkmanager)/, "Linux system services and desktop"],
 ];
 
 // ---- System locations: nothing under these is ever Suggest closing ----
 export const SYSTEM_PATHS_WIN = [/^[a-z]:[\\/]windows[\\/]/i, /^[a-z]:[\\/]program files( \(x86\))?[\\/]/i, /^[a-z]:[\\/]programdata[\\/]/i];
 export const SYSTEM_PATHS_MAC = [/^\/system\//i, /^\/library\//i, /^\/usr\//i, /^\/bin\//i, /^\/sbin\//i, /^\/private\/var\/db\//i];
+// Linux: the operating system's folders, the places packages install to (/opt is where vendor agents and many
+// third-party programs go) and the runtime folders. /var/tmp is a temporary folder, so it is not here.
+export const SYSTEM_PATHS_LINUX = [
+  /^\/(usr|bin|sbin|lib|lib32|lib64|libx32|opt|snap|etc|boot|proc|sys|run|dev)\//,
+  /^\/var\/(?!tmp\/)/,
+];
 // Accounts that mean "not a person": never ours to close.
 export const SERVICE_OWNERS = /^(nt authority|nt service|font driver host|window manager|umfd-|dwm-)|^(system|local service|network service|root|daemon)$|^_/i;
 

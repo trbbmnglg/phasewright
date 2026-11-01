@@ -62,7 +62,7 @@ const fmt = (v, unit = "") => (v == null ? "n/a" : `${v}${unit}`);
 async function main() {
   warnIfInsideSkillDir();
   const opts = parseArgs(process.argv.slice(2));
-  if (process.platform !== "win32" && process.platform !== "darwin") usage(`Platform ${process.platform} is not supported. Windows and macOS only.`);
+  if (process.platform !== "win32" && process.platform !== "darwin" && process.platform !== "linux") usage(`Platform ${process.platform} is not supported. Windows, macOS and Linux only.`);
   const home = homedir();
   const project = process.cwd();
   const key = taskKey({ task: opts.task, argv: opts.command, project, home });

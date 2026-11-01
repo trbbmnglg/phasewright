@@ -3,6 +3,7 @@
 // macOS uses vm_stat, sysctl, memory_pressure and top (documented commands; untested on a real Mac).
 import { totalmem, freemem, cpus } from "node:os";
 import { run } from "./snapshot.mjs";
+import { readMeminfo, readPressure, readVmstat } from "./linux.mjs";
 import { MEM_AVAILABLE_PCT_LOW, PAGING_PER_S_HIGH, CPU_AVG_PCT_HIGH } from "./rules.mjs";
 
 export const THRESHOLDS = {
@@ -18,8 +19,11 @@ const round1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
 // Pure. measures: { avail_pct, paging_per_s, cpu_pct }, each a number or null (not measured).
 // Memory pressure: available below the threshold, or paging above it. A boundary value is not pressure
 // for memory (15% free, 200 pages/s) and is pressure for CPU (85%), as the thresholds are worded.
+// `unmeasured` names every reading that is missing, so a report never calls a machine unpressured on the
+// strength of a number it did not get. With nothing measured at all the verdict is "not_measured", not "none".
 export function verdict({ avail_pct = null, paging_per_s = null, cpu_pct = null } = {}) {
   const reasons = [];
+  const unmeasured = [avail_pct == null && "memory", paging_per_s == null && "paging", cpu_pct == null && "CPU"].filter(Boolean);
   const memory = avail_pct != null && avail_pct < THRESHOLDS.memory_available_pct_below;
   const paging = paging_per_s != null && paging_per_s > THRESHOLDS.paging_per_s_above;
   const cpu = cpu_pct != null && cpu_pct >= THRESHOLDS.cpu_avg_pct_at_least;
@@ -27,8 +31,8 @@ export function verdict({ avail_pct = null, paging_per_s = null, cpu_pct = null 
   if (paging) reasons.push(`paging ${round1(paging_per_s)} pages/s is above ${THRESHOLDS.paging_per_s_above}`);
   if (cpu) reasons.push(`CPU average ${round1(cpu_pct)}% is at least ${THRESHOLDS.cpu_avg_pct_at_least}%`);
   const mem = memory || paging;
-  const value = mem && cpu ? "memory+cpu" : mem ? "memory" : cpu ? "cpu" : "none";
-  return { verdict: value, reasons, thresholds: { ...THRESHOLDS } };
+  const value = unmeasured.length === 3 ? "not_measured" : mem && cpu ? "memory+cpu" : mem ? "memory" : cpu ? "cpu" : "none";
+  return { verdict: value, reasons, unmeasured, thresholds: { ...THRESHOLDS } };
 }
 
 // ---------- macOS parsers ----------
@@ -114,12 +118,14 @@ export function parseTypeperf(text) {
 }
 
 // macOS runs its own commands; Windows reads typeperf (a read-only counter reader that ships with Windows).
-export async function measure(platform) {
-  const total_mb = totalmem() / 1048576;
+// opts (tests only): procRoot and fsApi point the Linux reads at a made-up /proc; cpu replaces the CPU reading.
+export async function measure(platform, opts = {}) {
+  let total_mb = totalmem() / 1048576;
   const warnings = [];
   let avail_mb = freemem() / 1048576;
   let paging_per_s = null;
   let cpu_pct = null;
+  let memory_stall_pct = null;
   let samples = 0;
   if (platform === "win32") {
     const text = await run("typeperf", ["\\Memory\\Available MBytes", "\\Memory\\Pages/sec", "\\Processor(_Total)\\% Processor Time", "-sc", "3"], { timeoutMs: 40000 });
@@ -131,7 +137,7 @@ export async function measure(platform) {
       cpu_pct = avg(u);
       samples = u.length;
     } else {
-      warnings.push("performance counters were not readable (for example a non-English Windows); paging was not measured, and memory and CPU come from Node");
+      warnings.push("performance counters were not readable (a non-English Windows, or an account that is not allowed to read them: the Performance Log Users group); paging was not measured, and memory and CPU come from Node");
       cpu_pct = await cpuFromNode();
     }
   } else if (platform === "darwin") {
@@ -162,8 +168,27 @@ export async function measure(platform) {
     samples = 1;
     const swap = parseSwapUsage(swapText ?? "");
     if (swap.used_mb != null) warnings.push(`swap used: ${Math.round(swap.used_mb)} MB`);
+  } else if (platform === "linux") {
+    // Memory from MemAvailable, paging as pages swapped in per second between two /proc/vmstat reads taken around the
+    // one-second CPU reading, and the kernel's own memory-stall figure (PSI) when the kernel provides it.
+    const io = { procRoot: opts.procRoot, fsApi: opts.fsApi };
+    const v0 = readVmstat(io);
+    const startedAt = Date.now();
+    cpu_pct = await (opts.cpu ?? cpuFromNode)(1000);
+    const seconds = Math.max(0.5, (Date.now() - startedAt) / 1000);
+    const v1 = readVmstat(io);
+    const mem = readMeminfo(io);
+    if (mem.available_kb != null) {
+      avail_mb = mem.available_kb / 1024;
+      if (mem.total_kb != null) total_mb = mem.total_kb / 1024;
+    } else warnings.push("MemAvailable could not be read from /proc/meminfo, so memory comes from Node");
+    if (v0.pswpin != null && v1.pswpin != null) paging_per_s = Math.max(0, v1.pswpin - v0.pswpin) / seconds;
+    else warnings.push("the swap counters in /proc/vmstat could not be read, so paging was not measured");
+    const psi = readPressure(io);
+    if (psi) memory_stall_pct = psi.some.avg10;
+    samples = 1;
   }
   const avail_pct = total_mb > 0 ? (avail_mb / total_mb) * 100 : null;
-  const measures = { total_mb: round1(total_mb), avail_mb: round1(avail_mb), avail_pct: round1(avail_pct), paging_per_s: round1(paging_per_s), cpu_pct: round1(cpu_pct), samples };
+  const measures = { total_mb: round1(total_mb), avail_mb: round1(avail_mb), avail_pct: round1(avail_pct), paging_per_s: round1(paging_per_s), cpu_pct: round1(cpu_pct), memory_stall_pct: round1(memory_stall_pct), samples };
   return { ...measures, ...verdict(measures), warnings };
 }

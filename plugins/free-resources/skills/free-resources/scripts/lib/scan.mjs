@@ -6,7 +6,8 @@ import { collect, listeningPids, logicalCpus } from "./snapshot.mjs";
 import { measure, verdict } from "./pressure.mjs";
 import { classify } from "./classify.mjs";
 import { buildReport } from "./report.mjs";
-import { loadLocalProtected, DEFAULT_SAMPLE_MS } from "./rules.mjs";
+import { DEFAULT_SAMPLE_MS } from "./rules.mjs";
+import { loadProtection } from "./config.mjs";
 
 // An error the CLI should print as a usage problem (exit 2) rather than a failed scan.
 export class UsageError extends Error {}
@@ -38,9 +39,9 @@ export function loadFixture(file) {
 }
 
 // opts: { project, sampleMs, all, top, fixture }. Throws UsageError for a missing fixture or an unsupported platform.
-export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_MS, all = false, top, fixture = null } = {}) {
+export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_MS, all = false, top, fixture = null, explain = null } = {}) {
   const started = Date.now();
-  const localProtected = loadLocalProtected();
+  const protection = loadProtection();
   let platform, me, home, records, pressure, listening, logical_cpus, interval_s, now_ms, pathExists;
 
   if (fixture) {
@@ -51,7 +52,7 @@ export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_
     pathExists = (p) => !f.gone.has(p);
   } else {
     platform = process.platform;
-    if (platform !== "win32" && platform !== "darwin") throw new UsageError(`Platform ${platform} is not supported. Windows and macOS only.`);
+    if (platform !== "win32" && platform !== "darwin" && platform !== "linux") throw new UsageError(`Platform ${platform} is not supported. Windows, macOS and Linux only.`);
     me = { user: userInfo().username, pid: process.pid };
     home = homedir();
     // Pressure counters and the listening-port list are read side by side with the process snapshots
@@ -69,9 +70,9 @@ export async function scan({ project = process.cwd(), sampleMs = DEFAULT_SAMPLE_
     pathExists = (p) => existsSync(p);
   }
 
-  const classification = classify(records, { me, home, platform, logical_cpus, now_ms, localProtected, projectDir: project, listening, pathExists, all });
+  const classification = classify(records, { me, home, platform, logical_cpus, now_ms, localProtected: protection, projectDir: project, listening, pathExists, all });
   return buildReport({
-    platform, records, classification, pressure, me, opts: { all, top },
-    meta: { now_iso: new Date(now_ms).toISOString(), scan_seconds: Math.round((Date.now() - started) / 100) / 10, interval_s, logical_cpus, local_protected: localProtected, project_dir: project },
+    platform, records, classification, pressure, me, opts: { all, top, explain },
+    meta: { now_iso: new Date(now_ms).toISOString(), scan_seconds: Math.round((Date.now() - started) / 100) / 10, interval_s, logical_cpus, protection, project_dir: project },
   });
 }

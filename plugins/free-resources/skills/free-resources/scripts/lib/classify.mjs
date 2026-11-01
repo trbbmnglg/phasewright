@@ -9,9 +9,10 @@
 //   4 Your call         a browser, or a big unrecognised process of this user in a user-writable place
 //   5 Keep, not recognised
 import {
-  PROTECTED, PROTECTED_PATTERNS, SYSTEM_PATHS_WIN, SYSTEM_PATHS_MAC, SERVICE_OWNERS, DEV_LEFTOVER_NAMES, DEV_RUNTIMES, PLAYWRIGHT_PATH,
+  PROTECTED, PROTECTED_PATTERNS, SERVICE_OWNERS, DEV_LEFTOVER_NAMES, DEV_RUNTIMES, PLAYWRIGHT_PATH,
   BROWSER_NAMES, BROWSER_PREFIXES, NOT_BROWSER, IDLE_CORE_PCT, ACTIVE_CORE_PCT, IDLE_MIN_AGE_H, BIG_RSS_MB, BIG_CPU_MACHINE_PCT, SMALL_MB,
 } from "./rules.mjs";
+import { isSystemPath, isUserWritable, isAbsolutePath, isUnder } from "./paths.mjs";
 
 const CONFIDENCE_RANK = { low: 0, medium: 1, high: 2 };
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -81,18 +82,18 @@ const ownerUser = (owner) => String(owner ?? "").split(/[\\/]/).pop().toLowerCas
 const isMe = (owner, me) => owner != null && ownerUser(owner) === ownerUser(me?.user);
 const isServiceOwner = (owner) => SERVICE_OWNERS.test(String(owner)) || SERVICE_OWNERS.test(ownerUser(owner));
 
-function isSystemPath(exe, platform) {
-  if (!exe) return false;
-  const list = platform === "darwin" ? SYSTEM_PATHS_MAC : SYSTEM_PATHS_WIN;
-  return list.some((re) => re.test(exe));
-}
-
-function isUserWritable(exe, home, platform) {
-  if (!exe) return false;
-  const e = lower(exe);
-  const h = lower(home);
-  if (h && e.startsWith(h.endsWith("/") ? h : `${h}/`)) return true;
-  return platform === "darwin" ? e.startsWith("/tmp/") || e.startsWith("/private/var/folders/") : /\/appdata\/local\/temp\//.test(e);
+// Whether a process was left behind by whatever started it. On Windows its parent is gone, or started after it (the
+// parent's number was reused). On macOS and Linux an orphan is adopted by pid 1; on Linux it can also be adopted by the
+// user's own systemd (a subreaper), but then only a process in a scope counts: one in a .service is that service's job,
+// started and kept by the service manager, not left behind.
+function isOrphan(rec, byPid, ctx) {
+  if (!(rec.ppid > 0)) return false;
+  const parent = byPid.get(rec.ppid);
+  if (ctx.platform !== "win32" && rec.ppid === 1) return true;
+  if (!parent) return true;
+  if (parent.start_iso && rec.start_iso && Date.parse(parent.start_iso) > Date.parse(rec.start_iso)) return true;
+  const userManager = ctx.platform === "linux" && parent.name === "systemd" && parent.ppid === 1 && isMe(parent.owner, ctx.me);
+  return userManager && !String(rec.unit ?? "").endsWith(".service");
 }
 
 // Folders named on the command line: the part before node_modules, or the folder of a file path.
@@ -100,8 +101,7 @@ export function projectPaths(rec, platform) {
   const out = [];
   const args = splitArgs(rec.cmd_full).slice(1);
   for (const t of args) {
-    const abs = platform === "darwin" ? /^\/[^/]/.test(t) : /^[A-Za-z]:[\\/]/.test(t);
-    if (!abs) continue;
+    if (!isAbsolutePath(t, platform)) continue;
     const p = slashes(t);
     const nm = p.toLowerCase().indexOf("/node_modules/");
     if (nm > 0) out.push(p.slice(0, nm));
@@ -172,12 +172,15 @@ export function classify(records, ctx) {
     if (cat) { keep("protected", `protected: ${cat}`); continue; }
     const local = localProtectedReason(rec, ctx.localProtected);
     if (local) { keep("protected", local); continue; }
-    if (isSystemPath(rec.exe, ctx.platform) && !isBrowser(rec)) { keep("protected", "runs from a Windows, Program Files or system folder"); continue; }
+    const tool = devTool(rec);
+    const paths = projectPaths(rec, ctx.platform);
+    // A runtime (node, bun, deno) installed in a system folder (Program Files, /usr/bin) that runs a dev tool from the
+    // user's own folder or the project is the user's dev server, not a system program: where the tool lives decides.
+    const userScript = tool != null && DEV_RUNTIMES.includes(normName(rec.name)) && paths.some((p) => isUnder(p, ctx.home) || isUnder(p, ctx.projectDir));
+    if (isSystemPath(rec.exe, ctx.platform) && !isBrowser(rec) && !userScript) { keep("protected", "runs from a system or program-install folder"); continue; }
 
     const coreCpu = rec.cpu_pct == null ? null : rec.cpu_pct * cpus;
     const active = (coreCpu != null && coreCpu > ACTIVE_CORE_PCT) || listening.has(rec.pid);
-    const tool = devTool(rec);
-    const paths = projectPaths(rec, ctx.platform);
 
     // 2. Keep, in use
     if (related.has(rec.pid)) { keep("in_use", "this scan, or its parent or child process"); continue; }
@@ -190,13 +193,12 @@ export function classify(records, ctx) {
     if (tool) {
       d.tool = tool;
       if (!me) { keep("owner_unknown", `dev tool (${tool}) but its owner could not be confirmed as you`, "medium"); continue; }
-      const parent = byPid.get(rec.ppid);
-      const orphaned = rec.ppid > 0 && (!parent || (parent.start_iso && rec.start_iso && Date.parse(parent.start_iso) > Date.parse(rec.start_iso)));
+      const orphaned = isOrphan(rec, byPid, ctx);
       const ageH = rec.start_iso && ctx.now_ms != null ? (ctx.now_ms - Date.parse(rec.start_iso)) / 3.6e6 : null;
       const idle = coreCpu != null && coreCpu < IDLE_CORE_PCT;
       const idleLong = idle && ageH != null && ageH > IDLE_MIN_AGE_H;
       const signals = [`dev leftover tool: ${tool}`];
-      if (orphaned) signals.push(`orphaned: its parent process ${rec.ppid} is not running`);
+      if (orphaned) signals.push("orphaned: the process that started it is gone");
       if (idleLong) signals.push(`idle: under ${IDLE_CORE_PCT}% of one core over the sample, running over ${IDLE_MIN_AGE_H} h`);
       if (active && !idle) {
         d.bucket = "your_call"; d.category = "dev_busy"; d.confidence = "low";

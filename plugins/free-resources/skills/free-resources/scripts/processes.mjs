@@ -2,13 +2,14 @@
 // Read-only scan: how pressured is this machine, who is using it, and what is safe to consider closing.
 // It never closes, kills or signals anything.
 //
-//   node processes.mjs [--json] [--all] [--top N] [--project <dir>] [--sample-ms N] [--fixture <file>]
+//   node processes.mjs [--json] [--all] [--top N] [--project <dir>] [--sample-ms N] [--explain <pid>] [--fixture <file>]
 //
 //   --json            print the report as JSON (schema_version 1) instead of tables
 //   --all             also list processes owned by other users (hidden by default)
 //   --top N           rows in the top-consumer tables (default 8)
 //   --project <dir>   the project folder whose processes count as in use (default: the current folder)
 //   --sample-ms N     how long to sample per-process CPU (default 3000, 500 to 30000)
+//   --explain <pid>   add the reason that process is in the bucket it is in (a whole number)
 //   --fixture <file>  classify a recorded snapshot (JSON) instead of scanning this machine
 import { resolve } from "node:path";
 import { scan, UsageError } from "./lib/scan.mjs";
@@ -18,12 +19,12 @@ import { DEFAULT_SAMPLE_MS, MIN_SAMPLE_MS, MAX_SAMPLE_MS } from "./lib/rules.mjs
 
 function usage(msg) {
   if (msg) console.error(msg);
-  console.error("usage: node processes.mjs [--json] [--all] [--top N] [--project <dir>] [--sample-ms N] [--fixture <file>]");
+  console.error("usage: node processes.mjs [--json] [--all] [--top N] [--project <dir>] [--sample-ms N] [--explain <pid>] [--fixture <file>]");
   process.exit(2);
 }
 
 function parseArgs(argv) {
-  const o = { json: false, all: false, top: undefined, project: process.cwd(), sampleMs: DEFAULT_SAMPLE_MS, fixture: null };
+  const o = { json: false, all: false, top: undefined, project: process.cwd(), sampleMs: DEFAULT_SAMPLE_MS, fixture: null, explain: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const value = () => (i + 1 < argv.length ? argv[++i] : usage(`${a} needs a value`));
@@ -32,6 +33,7 @@ function parseArgs(argv) {
     else if (a === "--top") o.top = Number(value());
     else if (a === "--project") o.project = resolve(value());
     else if (a === "--sample-ms") o.sampleMs = Number(value());
+    else if (a === "--explain") { const v = value(); if (!/^[1-9][0-9]{0,9}$/.test(v)) usage("--explain needs a whole number (a process number)"); o.explain = Number(v); }
     else if (a === "--fixture") o.fixture = resolve(value());
     else if (a === "--help" || a === "-h") usage();
     else usage(`unknown option ${a}`);
@@ -46,7 +48,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   let report;
   try {
-    report = await scan({ project: opts.project, sampleMs: opts.sampleMs, all: opts.all, top: opts.top, fixture: opts.fixture });
+    report = await scan({ project: opts.project, sampleMs: opts.sampleMs, all: opts.all, top: opts.top, fixture: opts.fixture, explain: opts.explain });
   } catch (e) {
     if (e instanceof UsageError) usage(e.message);
     throw e;

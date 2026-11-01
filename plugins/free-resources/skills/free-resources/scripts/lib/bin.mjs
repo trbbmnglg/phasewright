@@ -29,8 +29,9 @@ const POSIX = {
     top: ["/usr/bin/top"],
     vm_stat: ["/usr/bin/vm_stat"],
   },
+  // The Linux process table is read from /proc, so only the tick rate comes from a helper.
   linux: {
-    ps: ["/usr/bin/ps", "/bin/ps"],
+    getconf: ["/usr/bin/getconf", "/bin/getconf"],
   },
 };
 

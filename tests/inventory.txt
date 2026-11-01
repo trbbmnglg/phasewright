@@ -2,7 +2,9 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 971
+# tests: 1012
+linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
+linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
 linux:run,win32:skip	the release zip step puts an agent's Codex and Antigravity versions next to its Claude file
 linux:skip,win32:run	measure CLI: a child that holds about 150 MB records a tree peak of at least 100 MB
@@ -330,7 +332,46 @@ run	free-resources bin: no script starts a program by a bare name, through a she
 run	free-resources bin: the peaks store is never written inside the project folder
 run	free-resources bin: the peaks store refuses a link and leaves its target alone
 run	free-resources bin: the peaks store refuses a second name for another file and leaves that file alone
-run	free-resources bin: the plugin is at 0.1.2, and the README and wiki say what changed
+run	free-resources bin: the plugin is at 0.2.0, and the README and wiki say what changed in 0.1.2 and since
+run	free-resources config: 'stop': false in any list switches stopping off and says which
+run	free-resources config: a file that cannot be used is 'bad' with a reason, and never throws
+run	free-resources config: a file that is not there is absent, and a good file is trimmed and limited
+run	free-resources config: a list can only add protection; it cannot unprotect a built-in one
+run	free-resources config: a name and a path with the same text are kept apart
+run	free-resources config: an unreadable list is ignored, switches stopping off, and the warning does not print the home folder
+run	free-resources config: each system looks in its own place for the organization policy and the user's list
+run	free-resources config: stop can be switched off and nothing else; true changes nothing
+run	free-resources config: the committed example file is a valid list and uses made-up names
+run	free-resources config: the file named by FREE_RESOURCES_PROTECTED is read, and a missing one switches stopping off
+run	free-resources config: the lists are added together, without repeats, and the sources show counts only
+run	free-resources config: with no file anywhere there is nothing to add and stopping is not blocked
+run	free-resources guard: child processes come from the argument-list functions only, started through the fixed absolute helper table
+run	free-resources guard: no code in the closure can close, kill, signal or elevate a process, except one line in the sampler
+run	free-resources guard: nothing is loaded by a computed name, so the closure above is the whole program
+run	free-resources guard: only Node's own modules are imported, never a package
+run	free-resources guard: the sampler ends only the handles of the two helpers it started
+run	free-resources guard: the three entry scripts reach every module of the plugin, and the closure includes the newer ones
+run	free-resources linux: a runtime in a system folder that runs your own dev tool is your dev server; a system script or another tool binary stays protected
+run	free-resources linux: an orphan is one adopted by pid 1, or by your own systemd while in a scope, and never a process that a .service keeps
+run	free-resources linux: listening sockets are matched to your own processes through their open files
+run	free-resources linux: meminfo, vmstat, proc stat, pressure, passwd, listening sockets and cgroup units parse
+run	free-resources linux: parseStat counts fields from the last ')', so a command name with spaces and brackets is safe
+run	free-resources linux: parseStatus reads ids, memory, namespaces, capabilities and tracer; a kernel thread has no VmRSS
+run	free-resources linux: pressure uses MemAvailable, pages swapped in per second, and the kernel's memory stall figure
+run	free-resources linux: system folders and system services are protected; /var/tmp is not a system folder
+run	free-resources linux: the measure sampler reads only the root's tree, with resident memory and CPU seconds
+run	free-resources linux: the process table is read from /proc with owner, memory, start time, command and unit; nothing unreadable throws
+run	free-resources linux: the second sample is light, and CPU is matched by pid and start time so a reused pid is never mixed up
+run	free-resources report: --explain says why one process is where it is, and a number that is not there says so
+run	free-resources report: --explain takes only a whole number from 1 to 10 digits
+run	free-resources report: a hostile process name cannot break a table or reach the output as anything but plain text
+run	free-resources report: a name is cleaned before it is printed, and a clean name is left alone
+run	free-resources report: every listed group gets what, why, what to do and what it would give, in the same numbers as the tables
+run	free-resources report: nothing measured says 'not measured', one missing reading is named, and a full reading is unchanged
+run	free-resources report: off-limits names are your protected processes and service accounts; other people's processes are only counted
+run	free-resources report: the path rules cover Windows short and long forms, shares, Linux folders and macOS folders
+run	free-resources report: the report says how many entries each protected list gave, and the summary never copies the entries
+run	free-resources report: virtual machines and daemons with their own stop command are advised, from a fixed table, above a size
 run	git global options move to globals and leave the subcommand first
 run	git: the backup folder never shows up in git status and git add -A stages nothing from it
 run	guard.mjs and guard-rules.mjs agree on the role pattern

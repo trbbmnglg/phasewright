@@ -130,7 +130,8 @@ export function computeHeadroom({ key, peaks = [], report = null }) {
     notes.push("No CPU figure was recorded for this task (it needs at least two tree samples), so CPU is not compared.");
   }
 
-  if (scan.verdict && scan.verdict !== "none") notes.push(`The scan says the machine is under ${scan.verdict} pressure right now${scan.reasons.length ? `: ${scan.reasons.join("; ")}` : ""}.`);
+  if (scan.verdict === "not_measured") notes.push("The scan could not measure memory, paging or CPU pressure, so only the available figures above were used.");
+  else if (scan.verdict && scan.verdict !== "none") notes.push(`The scan says the machine is under ${scan.verdict} pressure right now${scan.reasons.length ? `: ${scan.reasons.join("; ")}` : ""}.`);
   return { ...base, memory, cpu, scan, picks_from: "Suggest closing only" };
 }
 

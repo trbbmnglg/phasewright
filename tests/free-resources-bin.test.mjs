@@ -35,8 +35,10 @@ test("free-resources bin: helpers resolve to fixed absolute paths, never through
   assert.equal(bins.bin("cmd", { platform: "win32", env, exists: all }), join("C:\\Windows", "System32", "cmd.exe"));
   assert.equal(bins.bin("ps", { platform: "darwin", exists: all }), "/bin/ps");
   assert.equal(bins.bin("lsof", { platform: "darwin", exists: all }), "/usr/sbin/lsof");
-  // Linux: the first fixed candidate that exists
-  assert.equal(bins.bin("ps", { platform: "linux", exists: (p) => p === "/bin/ps" }), "/bin/ps");
+  // Linux: the first fixed candidate that exists (the process table itself is read from /proc, so only getconf is a helper)
+  assert.equal(bins.bin("getconf", { platform: "linux", exists: (p) => p === "/bin/getconf" }), "/bin/getconf");
+  assert.equal(bins.bin("getconf", { platform: "linux", exists: all }), "/usr/bin/getconf");
+  assert.equal(bins.bin("ps", { platform: "linux", exists: all }), null, "no ps helper on Linux");
   // missing, or not a helper of this platform: null, so callers treat it as not readable
   assert.equal(bins.bin("typeperf", { platform: "win32", env, exists: () => false }), null);
   assert.equal(bins.bin("typeperf", { platform: "darwin", exists: all }), null);
@@ -150,14 +152,15 @@ test("free-resources bin: the peaks store refuses a link and leaves its target a
   mkdirSync(join(dir, "sub"));
 });
 
-test("free-resources bin: the plugin is at 0.1.2, and the README and wiki say what changed", () => {
+test("free-resources bin: the plugin is at 0.2.0, and the README and wiki say what changed in 0.1.2 and since", () => {
   const plugin = JSON.parse(readFileSync(join(FR, "..", "..", ".claude-plugin", "plugin.json"), "utf8"));
-  assert.equal(plugin.version, "0.1.2");
+  assert.equal(plugin.version, "0.2.0");
   const readme = readFileSync(join(FR, "..", "..", "README.md"), "utf8");
   assert.ok(readme.includes("Every program above is started from its absolute path"), "README: absolute paths");
   assert.ok(readme.includes("Before 0.1.2 the programs were started by name"), "README: what changed");
   assert.ok(readme.includes("so a repository cannot point the record at another file of yours"), "README: the store refusals");
   const wiki = readFileSync(join(FR, "..", "..", "..", "..", "docs", "wiki", "Free-resources.md"), "utf8");
-  assert.ok(wiki.includes("The current plugin version is 0.1.2"), "wiki: current version");
-  assert.ok(wiki.includes("Plugin version 0.1.2 is on main"), "wiki: what shipped when");
+  assert.ok(wiki.includes("The current plugin version is 0.2.0"), "wiki: current version");
+  assert.ok(wiki.includes("Plugin version 0.2.0 is on main"), "wiki: what shipped when");
+  assert.ok(wiki.includes("Plugin version 0.1.2, also on main"), "wiki: what 0.2.0 builds on");
 });

@@ -1,0 +1,4 @@
+{
+  "names": ["example-agent*", "example-vpn"],
+  "paths": ["d:/example-corp-tools/", "/opt/example-corp/"]
+}

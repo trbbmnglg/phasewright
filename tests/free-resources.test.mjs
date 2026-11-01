@@ -363,7 +363,10 @@ test("pressure verdict: each threshold and its boundary", () => {
   assert.equal(v({ paging_per_s: 200 }), "none");
   assert.equal(v({ cpu_pct: 85 }), "cpu");
   assert.equal(v({ cpu_pct: 84.9 }), "none");
-  assert.equal(v({}), "none", "nothing measured is no verdict of pressure");
+  assert.equal(v({}), "not_measured", "nothing measured is not a verdict of 'none'");
+  assert.deepEqual(pressureLib.verdict({}).unmeasured, ["memory", "paging", "CPU"]);
+  assert.deepEqual(pressureLib.verdict({ avail_pct: 40, cpu_pct: 30 }).unmeasured, ["paging"], "a missing reading is named, and the rest still gives a verdict");
+  assert.deepEqual(pressureLib.verdict({ avail_pct: 40, paging_per_s: 1, cpu_pct: 30 }).unmeasured, []);
   const r = pressureLib.verdict({ avail_pct: 12, paging_per_s: 400, cpu_pct: 90 });
   assert.equal(r.reasons.length, 3);
   assert.deepEqual(r.thresholds, { memory_available_pct_below: 15, paging_per_s_above: 200, cpu_avg_pct_at_least: 85 });
@@ -444,7 +447,7 @@ test("CLI: the human output has the pressure numbers, the numbered tables and en
   assert.match(out, /above 200 pages\/s/);
   assert.match(out, /at 85% or more/);
   assert.match(out, /starting values/);
-  assert.match(out, /phase 2/);
+  assert.match(out, /measure it with measure\.mjs/);
   assert.match(out, /\| # \| Name \| Count \| MB \| CPU % \| Reasons \| Confidence \|/);
   assert.match(out, /\| 1 \| workerd\.exe \|/);
   assert.ok(!out.includes("Mac support is untested"));

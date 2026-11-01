@@ -6,65 +6,19 @@
 //   cmd_full  the command line with secrets masked (absolute paths kept, to find project folders)
 //   cpu_pct   % of the whole machine over the sample, or null when it was not sampled
 import { execFile } from "node:child_process";
-import { homedir, cpus } from "node:os";
+import { homedir, cpus, userInfo } from "node:os";
 import { runPowerShell } from "./powershell.mjs";
 import { bin, helperOptions } from "./bin.mjs";
+import { CLK_TCK_DEFAULT, applyLaterCpu, readListeningPids, readPasswd, readProcStat, readProcessTable } from "./linux.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const round1 = (n) => Math.round(n * 10) / 10;
 
 // ---------- masking and summaries ----------
 
-const SECRET_FLAG = /(--?[\w-]*(?:token|password|passwd|secret|key))(=|\s+)("[^"]*"|'[^']*'|\S+)/gi;
-const SECRET_ASSIGN = /\b((?:api[_-]?key|access[_-]?token|auth[_-]?token|token|password|passwd|secret)=)("[^"]*"|'[^']*'|[^\s&]+)/gi;
-const BEARER = /\b((?:Bearer|Basic)\s+)[A-Za-z0-9._~+/=-]+/gi;
-
-// Masks the values of secret-looking flags and assignments. Used on every command line before
-// anything is stored, so a secret never reaches the report, the JSON or a test failure message.
-export function maskSecrets(text) {
-  if (!text) return text;
-  return text.replace(SECRET_FLAG, "$1$2***").replace(SECRET_ASSIGN, "$1***").replace(BEARER, "$1***");
-}
-
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// Shows paths inside the user's profile folder as ~ so a report can be shared without the account name.
-export function relativizePaths(text, home = homedir()) {
-  if (!text || !home) return text;
-  const variants = new Set([home, home.split("\\").join("/"), home.split("/").join("\\")]);
-  let out = text;
-  for (const v of variants) out = out.replace(new RegExp(escapeRe(v), "gi"), "~");
-  return out;
-}
-
-export function baseName(p) {
-  return p ? p.split(/[\\/]/).pop() : p;
-}
-
-// The executable name plus its arguments, masked, profile paths relative, cut to 120 characters.
-export function summarizeCmd(cmd, { name = "", exe = "", home = homedir(), max = 120 } = {}) {
-  if (!cmd || !cmd.trim()) return name || baseName(exe) || "";
-  let rest;
-  let head;
-  const c = cmd.trim();
-  if (exe && c.toLowerCase().startsWith(exe.toLowerCase())) {
-    head = baseName(exe);
-    rest = c.slice(exe.length);
-  } else if (exe && c.toLowerCase().startsWith(`"${exe.toLowerCase()}"`)) {
-    head = baseName(exe);
-    rest = c.slice(exe.length + 2);
-  } else if (c.startsWith('"') && c.indexOf('"', 1) > 0) {
-    const end = c.indexOf('"', 1);
-    head = baseName(c.slice(1, end));
-    rest = c.slice(end + 1);
-  } else {
-    const m = c.match(/^(\S+)([\s\S]*)$/);
-    head = baseName(m[1]);
-    rest = m[2];
-  }
-  const text = relativizePaths(maskSecrets(`${head}${rest}`.replace(/\s+/g, " ").trim()), home);
-  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
-}
+// Moved to text.mjs (so the Linux collector can use them without a circular import); re-exported so older imports keep working.
+export { maskSecrets, relativizePaths, baseName, summarizeCmd } from "./text.mjs";
+import { maskSecrets, baseName, summarizeCmd } from "./text.mjs";
 
 // ---------- Windows ----------
 
@@ -197,7 +151,19 @@ export function run(name, args, { timeoutMs = 20000 } = {}) {
 export async function listeningPids(platform) {
   if (platform === "win32") return parseNetstat((await run("netstat", ["-ano", "-p", "tcp"])) ?? "");
   if (platform === "darwin") return parseLsof((await run("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN", "-Fp"])) ?? "");
+  if (platform === "linux") return readListeningPids();
   return new Set();
+}
+
+// The ticks per second of the times in /proc/<pid>/stat, from `getconf CLK_TCK`; 100 (the value on every common
+// Linux architecture) when that cannot be read. Asked once per run.
+let linuxConstantsPromise = null;
+export function linuxConstants() {
+  linuxConstantsPromise ??= (async () => {
+    const n = Number(String((await run("getconf", ["CLK_TCK"])) ?? "").trim());
+    return Number.isInteger(n) && n > 0 ? { clkTck: n, assumed: false } : { clkTck: CLK_TCK_DEFAULT, assumed: true };
+  })();
+  return linuxConstantsPromise;
 }
 
 // ---------- collection with a CPU sample ----------
@@ -281,5 +247,19 @@ export async function collect({ platform, sampleMs, home = homedir() }) {
     const interval = (b.at - a.at) / 1000;
     return { records: applyCpuSample(a.records, b.records, interval, n), interval_s: interval, logical_cpus: n };
   }
-  throw new Error(`Platform ${platform} is not supported. Windows and macOS only.`);
+  if (platform === "linux") {
+    const { clkTck, assumed } = await linuxConstants();
+    const { btime_s } = readProcStat();
+    const opts = { clkTck, btimeS: btime_s, passwd: readPasswd(), self: { uid: process.getuid?.(), user: userInfo().username }, home };
+    const first = readProcessTable(opts);
+    const t0 = Date.now();
+    await sleep(sampleMs);
+    const second = readProcessTable({ ...opts, light: true });
+    const interval = (Date.now() - t0) / 1000;
+    const out = { records: applyLaterCpu(first, second, interval, n), interval_s: interval, logical_cpus: n };
+    if (assumed) out.warning = `getconf CLK_TCK could not be read, so ${CLK_TCK_DEFAULT} ticks per second was assumed for process start times and CPU`;
+    if (!first.length) out.warning = "no process could be read from /proc";
+    return out;
+  }
+  throw new Error(`Platform ${platform} is not supported. Windows, macOS and Linux only.`);
 }
