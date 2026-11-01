@@ -3,27 +3,16 @@
 // Windows (lib/pin-windows.mjs). It never signals anything. Every value that cannot be read is null, and the gate refuses
 // on null.
 import { execFile } from "node:child_process";
-import { closeSync, openSync, readSync, realpathSync } from "node:fs";
+import { closeSync, openSync, readSync } from "node:fs";
 import { bin, helperOptions } from "./bin.mjs";
+import { isLocalDrivePath, canonicalWindowsPath } from "./canonical.mjs";
 import { pinWindows, readWindowsFacts } from "./pin-windows.mjs";
 import { readLinuxFacts, readProcStat } from "./linux.mjs";
 import { linuxConstants } from "./snapshot.mjs";
 
-// A path on a local drive letter ("C:\..."). A share or device path ("\\server\...", "\\?\...", "\\.\...") is never
-// opened: opening one can make Windows sign in to another machine with your account.
-export const isLocalDrivePath = (p) => typeof p === "string" && /^[A-Za-z]:\\/.test(p) && !p.includes("\0");
-
-// The program's canonical long path: Windows can report a short (8.3) name or another spelling of the same file, and
-// the protected lists and the system-folder rules compare paths. Null when it is not a local path or cannot be resolved.
-export function canonicalWindowsPath(p, { realpath = realpathSync.native } = {}) {
-  if (!isLocalDrivePath(p)) return null;
-  try {
-    const r = String(realpath(p)).replace(/^\\\\\?\\/, "");
-    return isLocalDrivePath(r) ? r : null;
-  } catch {
-    return null;
-  }
-}
+// The program's canonical long path (lib/canonical.mjs): Windows can report a short (8.3) name or another spelling of the
+// same file, and the protected lists and the system-folder rules compare paths. A share or device path is never opened.
+export { isLocalDrivePath, canonicalWindowsPath };
 
 // The Windows subsystem a program was built for, from its PE header: 2 is a windowed (GUI) program, 3 a console one.
 // Only a windowed program can be asked to close; closing a console window would end every program attached to it.

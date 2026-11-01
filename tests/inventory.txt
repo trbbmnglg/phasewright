@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 1069
+# tests: 1071
 linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
 linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
@@ -333,6 +333,7 @@ run	free-resources bin: the peaks store is never written inside the project fold
 run	free-resources bin: the peaks store refuses a link and leaves its target alone
 run	free-resources bin: the peaks store refuses a second name for another file and leaves that file alone
 run	free-resources bin: the plugin is at 0.3.0, and the README and wiki say what changed in 0.1.2 and since
+run	free-resources canonical: paths are turned into their long form on Windows only, and only on a local drive
 run	free-resources config: 'stop': false in any list switches stopping off and says which
 run	free-resources config: a file that cannot be used is 'bad' with a reason, and never throws
 run	free-resources config: a file that is not there is absent, and a good file is trimmed and limited
@@ -369,6 +370,7 @@ run	free-resources free: macOS and Linux send SIGTERM, wait until the process is
 run	free-resources gate: Linux refuses a process inside any systemd service, not only one whose last part is a service
 run	free-resources gate: Linux refuses kernel threads, zombies, containers, tracing, capabilities, OOM shields, session leaders and anything outside your user slice
 run	free-resources gate: Windows refuses session 0, another session, critical, protected, elevated, other integrity and a parent of another account
+run	free-resources gate: a dev server started from a short (8.3) spelling of the home folder still counts as yours, in the classifier and the gate
 run	free-resources gate: a left-over dev tool of yours passes every check on Windows, Linux and macOS
 run	free-resources gate: a number now used by another process is refused
 run	free-resources gate: a process must have been started from a shell or terminal, or left behind; an editor, assistant, service or security tool refuses

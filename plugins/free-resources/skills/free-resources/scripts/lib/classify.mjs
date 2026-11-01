@@ -152,13 +152,18 @@ function summarizeGroup(members, tool) {
 }
 
 // ctx: { me:{user,pid}, home, platform, logical_cpus, now_ms, localProtected:{names,paths},
-//        projectDir, listening:Iterable<pid>, pathExists:(path)=>boolean|undefined, all:boolean }
+//        projectDir, listening:Iterable<pid>, pathExists:(path)=>boolean|undefined, all:boolean,
+//        canonicalPath:(path)=>string (optional; the long form of a path, see lib/canonical.mjs) }
 export function classify(records, ctx) {
   const cpus = ctx.logical_cpus || 1;
   const listening = new Set(ctx.listening ?? []);
   const byPid = new Map(records.map((r) => [r.pid, r]));
   const related = ancestorsAndDescendants(records, ctx.me?.pid);
   const project = lower(ctx.projectDir).replace(/\/$/, "");
+  // Paths are compared in their long form, so a short (8.3) spelling of the home folder still counts as the home folder.
+  const canon = typeof ctx.canonicalPath === "function" ? ctx.canonicalPath : (p) => p;
+  const homeLong = ctx.home ? canon(ctx.home) : ctx.home;
+  const projectLong = ctx.projectDir ? canon(ctx.projectDir) : ctx.projectDir;
   const decisions = [];
 
   for (const rec of records) {
@@ -179,7 +184,10 @@ export function classify(records, ctx) {
     const paths = projectPaths(rec, ctx.platform);
     // A runtime (node, bun, deno) installed in a system folder (Program Files, /usr/bin) that runs a dev tool from the
     // user's own folder or the project is the user's dev server, not a system program: where the tool lives decides.
-    const userScript = tool != null && DEV_RUNTIMES.includes(normName(rec.name)) && paths.some((p) => isUnder(p, ctx.home) || isUnder(p, ctx.projectDir));
+    const userScript = tool != null && DEV_RUNTIMES.includes(normName(rec.name)) && paths.some((p) => {
+      const long = canon(p);
+      return isUnder(long, homeLong) || isUnder(long, projectLong);
+    });
     if (isSystemPath(rec.exe, ctx.platform) && !isBrowser(rec) && !userScript) { keep("protected", "runs from a system or program-install folder"); continue; }
 
     const coreCpu = rec.cpu_pct == null ? null : rec.cpu_pct * cpus;

@@ -173,6 +173,19 @@ test("free-resources facts: a Windows program's subsystem comes from its PE head
   assert.equal(facts.peSubsystem(process.execPath), process.platform === "win32" ? 3 : null, "node itself is a console program on Windows, and not a PE file elsewhere");
 });
 
+test("free-resources canonical: paths are turned into their long form on Windows only, and only on a local drive", async () => {
+  const canonical = await load("canonical");
+  // Like Windows' own answer: backslashes, and the long name for the short one.
+  const realpath = (p) => String(p).split("/").join("\\").replace(/^C:\\PROGRA~1/i, "C:\\Program Files");
+  assert.equal(canonical.canonicalPathFor("win32", { realpath })("C:/PROGRA~1/x"), "C:\\Program Files\\x", "forward slashes are a local path too");
+  assert.equal(canonical.canonicalPathFor("win32", { realpath: () => { throw new Error("ENOENT"); } })("C:\\gone\\x"), "C:\\gone\\x", "a path that cannot be resolved stays as it was");
+  let opened = 0;
+  const count = (p) => { opened += 1; return p; };
+  for (const p of ["\\\\server\\share\\x", "//server/share/x", "\\\\?\\C:\\x"]) assert.equal(canonical.canonicalPathFor("win32", { realpath: count })(p), p);
+  assert.equal(opened, 0, "a share or device path is never opened");
+  for (const platform of ["linux", "darwin"]) assert.equal(canonical.canonicalPathFor(platform, { realpath: () => "changed" })("/a/b"), "/a/b");
+});
+
 test("free-resources facts: the Windows program path is made canonical only on a local drive", () => {
   assert.equal(facts.canonicalWindowsPath("C:\\PROGRA~1\\x.exe", { realpath: () => "C:\\Program Files\\x.exe" }), "C:\\Program Files\\x.exe");
   assert.equal(facts.canonicalWindowsPath("C:\\x.exe", { realpath: () => "\\\\?\\C:\\x.exe" }), "C:\\x.exe");
@@ -524,10 +537,13 @@ function startStub(dir, name, { ignoreTerm = false } = {}) {
   const script = join(dir, "node_modules", name, "bin", `${name}.js`);
   mkdirSync(join(dir, "node_modules", name, "bin"), { recursive: true });
   writeFileSync(script, `${ignoreTerm ? "process.on('SIGTERM', () => {});\n" : ""}setInterval(() => {}, 60000);\n`);
-  // The stub runs from the system's temp folder, not from `dir`: Windows will not remove a folder a process is using.
-  const launcher = spawnSync(process.execPath, ["-e", `const c = require("child_process").spawn(process.execPath, [${JSON.stringify(script)}], { detached: true, stdio: "ignore", windowsHide: true, cwd: require("os").tmpdir() }); c.unref(); console.log(c.pid);`], { encoding: "utf8", cwd: tmpdir() });
-  const pid = Number(launcher.stdout.trim());
-  assert.ok(Number.isSafeInteger(pid) && pid > 0, launcher.stderr);
+  // The stub runs from the system's temp folder, not from `dir`: Windows will not remove a folder a process is using. The
+  // launcher writes the number as plain text: in a colour terminal the test runner turns colours on for what it starts,
+  // and console.log would wrap a number in colour codes.
+  const launcher = spawnSync(process.execPath, ["-e", `const c = require("child_process").spawn(process.execPath, [${JSON.stringify(script)}], { detached: true, stdio: "ignore", windowsHide: true, cwd: require("os").tmpdir() }); c.on("error", (e) => process.stderr.write("spawn error " + e.code)); c.unref(); process.stdout.write(String(c.pid));`], { encoding: "utf8", cwd: tmpdir() });
+  const pid = Number(String(launcher.stdout ?? "").replace(/\u001b\[[0-9;]*m/g, "").trim());
+  const seen = { status: launcher.status, signal: launcher.signal, error: launcher.error?.code ?? null, stdout: launcher.stdout, stderr: launcher.stderr, script };
+  assert.ok(Number.isSafeInteger(pid) && pid > 0, `the stub's launcher gave no process number: ${JSON.stringify(seen)}`);
   return pid;
 }
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
@@ -537,12 +553,16 @@ const waitGone = async (pid, ms = 15000) => { for (const until = Date.now() + ms
 test("free-resources free: end to end, a plan finds the test's own left-over stub and a stop ends only it; where this tool may not stop anything it refuses and the stub lives", { timeout: 240000 }, async () => {
   const project = tmp();
   const data = tmp();
-  const stub = startStub(project, "vite");
-  const stubborn = process.platform === "win32" ? null : startStub(project, "esbuild", { ignoreTerm: true });
-  const bystander = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
   const env = { FREE_RESOURCES_DATA: data };
   const run = (args) => spawnSync(process.execPath, [FREE, ...args, "--json"], { encoding: "utf8", cwd: project, env: { ...process.env, ...env }, timeout: 180000 });
+  // Started inside the try, so whatever fails later, everything that was started is ended.
+  let stub = null;
+  let stubborn = null;
+  let bystander = null;
   try {
+    stub = startStub(project, "vite");
+    stubborn = process.platform === "win32" ? null : startStub(project, "esbuild", { ignoreTerm: true });
+    bystander = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { stdio: "ignore", windowsHide: true });
     await new Promise((r) => setTimeout(r, 1500));
     const plan = run(["plan"]);
     const p = JSON.parse(plan.stdout);
@@ -579,10 +599,10 @@ test("free-resources free: end to end, a plan finds the test's own left-over stu
     const log = readFileSync(join(data, "actions.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     assert.ok(log.every((l) => [stub, stubborn].includes(l.pid)), "only the stubs were ever acted on");
   } finally {
-    endOwnStub(stub);
+    if (stub) endOwnStub(stub);
     if (stubborn) endOwnStub(stubborn);
-    bystander.kill();
-    await waitGone(stub, 5000);
+    bystander?.kill();
+    if (stub) await waitGone(stub, 5000);
     if (stubborn) await waitGone(stubborn, 5000);
   }
 });

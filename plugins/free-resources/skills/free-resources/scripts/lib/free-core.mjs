@@ -54,7 +54,7 @@ export async function makePlan(deps) {
   for (const d of pool) {
     try {
       const facts = read.get(d.pid) ?? null;
-      const verdict = evaluate({ platform: deps.platform, decision: d, record: byPid.get(d.pid), records: st.records, me: self.me, facts, protection: st.protection, home: st.home, expected: null });
+      const verdict = evaluate({ platform: deps.platform, decision: d, record: byPid.get(d.pid), records: st.records, me: self.me, facts, protection: st.protection, home: st.home, canonicalPath: st.canonicalPath, expected: null });
       const identity = verdict.allowed ? identityOf(deps.platform, facts) : null;
       if (verdict.allowed && identity) items.push({ ...view(d), method: methodFor(deps.platform, facts), identity });
       else refused.push({ ...view(d), rule: verdict.refused_by ?? "identity", reason: verdict.reason ?? "it could not be pinned to one process" });
@@ -145,7 +145,7 @@ export async function stopPids({ command, planId, pids }, deps) {
     try {
       assertPid(pid, deps.self);
       pinned = await deps.factsFor(pid);
-      const verdict = evaluate({ platform: deps.platform, decision, record: byPid.get(pid), records: st.records, me: self.me, facts: pinned.facts, protection: st.protection, home: st.home, expected: item.identity });
+      const verdict = evaluate({ platform: deps.platform, decision, record: byPid.get(pid), records: st.records, me: self.me, facts: pinned.facts, protection: st.protection, home: st.home, canonicalPath: st.canonicalPath, expected: item.identity });
       // How to stop it is worked out again from what was read now; the plan's word for it must agree.
       const method = verdict.allowed ? methodFor(deps.platform, pinned.facts) : null;
       if (!verdict.allowed) refuse(verdict.refused_by, verdict.reason);

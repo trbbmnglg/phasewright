@@ -198,7 +198,7 @@ The rest is ordinary .NET: process list, CPU time, start time, working set, and 
 - **Linux:** supported. The scan, measure and headroom run against a real Linux in the project's automated tests, and the `/proc` readers are tested on sample files. Nobody has tried it by hand yet.
 - **macOS:** untested. It was written from documented commands and checked against sample data; the project's automated tests also run on macOS, which is not the same as trying it by hand.
 - **Copilot and Cursor:** untested until tried. Both read `SKILL.md`; the skill uses no Claude Code-only features.
-- **Stopping:** the stop gate is tested on made-up processes for each system, including a test that sets every fact it reads to missing or wrong and checks each one refuses. The end-to-end test starts its own stub dev server and stops it where this tool may stop things, and checks that it refuses and leaves the stub alone where it may not (the Windows CI runner is elevated, and the Linux one runs outside a user session).
+- **Stopping:** the stop gate is tested on made-up processes for each system, including a test that sets every fact it reads to missing or wrong and checks each one refuses. The end-to-end test starts its own stub dev server and stops it where this tool may stop things, and checks that it refuses and leaves the stub alone where it may not. It has stopped its stub for real on Windows (a normal, unelevated session) and on macOS (CI). On Linux the CI runner runs outside a user session, so there it refuses, and the stop itself is covered only by tests on sample `/proc` data. The Windows CI runner is elevated, so it refuses too.
 
 ## Limits
 

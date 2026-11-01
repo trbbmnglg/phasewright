@@ -220,6 +220,7 @@
         "plugins/free-resources/skills/free-resources/scripts/headroom.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/analysis.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/bin.mjs",
+        "plugins/free-resources/skills/free-resources/scripts/lib/canonical.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/classify.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/config.mjs",
         "plugins/free-resources/skills/free-resources/scripts/lib/facts.mjs",

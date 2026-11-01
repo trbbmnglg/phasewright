@@ -491,3 +491,28 @@ test("free-resources gate: macOS refuses a launchd job and an unknown answer, al
   assert.equal(refusedBy(mine), "same_owner", "this tool with an effective group of its own");
 });
 
+// ---------- found by running the end-to-end test in a normal Windows session ----------
+
+test("free-resources gate: a dev server started from a short (8.3) spelling of the home folder still counts as yours, in the classifier and the gate", async () => {
+  const classify = await load("classify");
+  // The temporary folder is often given in its short form; the home folder comes in its long one.
+  const SHORT = "D:\\Profiles\\TESTER~1\\AppData\\Local\\Temp\\proj";
+  const LONG = "D:\\Profiles\\tester.long\\AppData\\Local\\Temp\\proj";
+  const longOf = (p) => String(p).replace(/^D:[\\/]Profiles[\\/]TESTER~1/i, "D:\\Profiles\\tester.long");
+  const rec = { pid: 5001, ppid: 4999, name: "node.exe", owner: "WORKGROUP\\tester", rss_mb: 120, cpu_pct: 0, start_iso: T_TOOL, exe: "C:\\Program Files\\nodejs\\node.exe", cmd_full: `node ${SHORT}\\node_modules\\vite\\bin\\vite.js` };
+  const ctx = (canonicalPath) => ({ me: { user: "tester", pid: 9000 }, home: "D:\\Profiles\\tester.long", platform: "win32", logical_cpus: 4, now_ms: Date.parse("2026-10-30T12:00:00.000Z"), localProtected: { names: [], paths: [] }, projectDir: "D:\\elsewhere", listening: [], pathExists: () => true, canonicalPath });
+  assert.equal(classify.classify([rec], ctx(undefined)).decisions[0].bucket, "keep", "compared as written, the short form is not the home folder");
+  const d = classify.classify([rec], ctx(longOf)).decisions[0];
+  assert.deepEqual([d.bucket, d.tool], ["suggest", "vite"], "compared in the long form, it is your dev server");
+  const c = windowsCase();
+  c.facts.image_path = "C:\\Program Files\\nodejs\\node.exe";
+  c.expected = gate.identityOf("win32", c.facts);
+  c.home = "D:\\Profiles\\tester.long";
+  c.record = { ...c.record, cmd_full: rec.cmd_full };
+  c.records = c.records.map((r) => (r.pid === 5001 ? c.record : r));
+  assert.equal(refusedBy(c), "not_system_path", "without the long form the gate refuses, safely");
+  assert.equal(run({ ...c, canonicalPath: longOf }).allowed, true);
+  assert.equal(refusedBy({ ...c, canonicalPath: () => "C:\\Program Files\\x" }), "not_system_path", "a long form in a system folder is still refused");
+  assert.ok(LONG.startsWith("D:\\Profiles\\tester.long"));
+});
+

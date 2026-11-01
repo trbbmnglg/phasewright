@@ -8,6 +8,7 @@ import { classify } from "./classify.mjs";
 import { buildReport } from "./report.mjs";
 import { DEFAULT_SAMPLE_MS } from "./rules.mjs";
 import { loadProtection } from "./config.mjs";
+import { canonicalPathFor } from "./canonical.mjs";
 
 // An error the CLI should print as a usage problem (exit 2) rather than a failed scan.
 export class UsageError extends Error {}
@@ -80,6 +81,8 @@ export async function collectState({ project = process.cwd(), sampleMs = DEFAULT
     pathExists = (p) => existsSync(p);
   }
 
-  const classification = classify(records, { me, home, platform, logical_cpus, now_ms, localProtected: protection, projectDir: project, listening, pathExists, all });
-  return { platform, me, home, records, classification, pressure, listening, logical_cpus, interval_s, now_ms, protection, project, started };
+  // A recorded fixture's paths are made up, so they are compared as written; a live scan compares long forms.
+  const canonicalPath = fixture ? (p) => p : canonicalPathFor(platform);
+  const classification = classify(records, { me, home, platform, logical_cpus, now_ms, localProtected: protection, projectDir: project, listening, pathExists, all, canonicalPath });
+  return { platform, me, home, records, classification, pressure, listening, logical_cpus, interval_s, now_ms, protection, project, started, canonicalPath };
 }

@@ -138,19 +138,21 @@ function notProtected(platform, record, facts, protection) {
 // or file-system root). The caller passes the account's own profile folder, not one taken from the environment.
 const usableHome = (home, platform) => isStr(home) && isAbsolutePath(home, platform) && !isSystemPath(home, platform) && normalizePath(home).split("/").filter(Boolean).length >= 2;
 
-function notSystemPath(platform, record, facts, home) {
+function notSystemPath(platform, record, facts, home, canonicalPath) {
   const id = "not_system_path";
   const path = programPath(platform, facts);
   if (!isStr(path) || !isAbsolutePath(path, platform)) return unknown(id, "its program's path could not be read");
   if (!isSystemPath(path, platform)) return yes(id, "runs from a folder of yours");
   // A runtime (node, bun, deno) installed in a system folder running a dev tool from your own home folder is your dev
   // server. Anything else in a system folder is a system program. The project folder does not count here: it comes from
-  // the command line.
+  // the command line. Paths are compared in their long form (a short 8.3 spelling of the home folder is still home).
   const runtime = DEV_RUNTIMES.includes(normName(baseName(path)));
   if (!runtime) return no(id, "runs from a system or program-install folder");
-  if (!usableHome(home, platform)) return unknown(id, "your home folder could not be read");
-  const paths = projectPaths(record, platform);
-  if (paths.length && paths.every((p) => isUnder(p, home) && !isSystemPath(p, platform))) return yes(id, "a runtime in a system folder, running your own dev tool from your home folder");
+  const canon = typeof canonicalPath === "function" ? canonicalPath : (p) => p;
+  const homeLong = isStr(home) ? canon(home) : home;
+  if (!usableHome(homeLong, platform)) return unknown(id, "your home folder could not be read");
+  const paths = projectPaths(record, platform).map(canon);
+  if (paths.length && paths.every((p) => isUnder(p, homeLong) && !isSystemPath(p, platform))) return yes(id, "a runtime in a system folder, running your own dev tool from your home folder");
   return no(id, "runs from a system or program-install folder");
 }
 
@@ -370,10 +372,11 @@ function sameIdentity(platform, facts, expected) {
 //   records   the whole scan (for parent chains)                       facts    read now, by lib/facts.mjs
 //   me        this tool: its pid, its own facts, and whether SUDO_UID or SUDO_USER is set
 //   home      the account's own profile folder, from the system (os.userInfo), never from HOME or USERPROFILE
+//   canonicalPath  optional: the long form of a path (lib/canonical.mjs), so a short 8.3 spelling still compares equal
 //   expected  the identity the plan recorded, or null when making the plan
 // Returns { allowed, refused_by, reason, checks }. A check that throws counts as unknown.
 export function evaluate(input) {
-  const { platform, decision, record, records, me, facts, protection, home, expected = null } = input ?? {};
+  const { platform, decision, record, records, me, facts, protection, home, expected = null, canonicalPath } = input ?? {};
   if (!PLATFORMS.has(platform)) {
     const c = unknown("platform", "this system is not supported");
     return { allowed: false, refused_by: c.id, reason: c.detail, checks: [c] };
@@ -384,7 +387,7 @@ export function evaluate(input) {
     ["dev_tool", () => devTool(platform, decision, record, facts)],
     ["same_process", () => sameProcess(record, facts)],
     ["not_protected", () => notProtected(platform, record, facts, protection)],
-    ["not_system_path", () => notSystemPath(platform, record, facts, home)],
+    ["not_system_path", () => notSystemPath(platform, record, facts, home, canonicalPath)],
     ["same_owner", () => sameOwner(platform, facts, me)],
     ["not_session", () => notSession(platform, record, records, me)],
     ["launcher", () => launcher(platform, record, records)],
