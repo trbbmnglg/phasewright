@@ -50,6 +50,8 @@
 // main(argv, io) is the test seam. io.out and io.err take a string; io.now is the clock in epoch ms;
 // io.nodeVersion replaces process.version; io.tmpdir is the folder for the temp index; io.git(args, { cwd, env })
 // returns git's stdout and throws on a non-zero exit; io.rename replaces the rename step of a write.
+// treeId(root, io) (the id that `id` prints), changedPaths(root, from, to, io) and headId(root, io) are exported: commands-hash.mjs binds a
+// preview to the tree id, and ship.mjs checks that binding before it runs anything.
 
 import { createHash, randomBytes } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -91,8 +93,9 @@ function realPath(p) {
   }
 }
 
-export function defaultGit(args, { cwd, env }) {
-  return execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024, windowsHide: true });
+// git with an argument array, never a shell. `timeout` (ms, optional) kills a call that runs longer; it then throws, like a failure.
+export function defaultGit(args, { cwd, env, timeout }) {
+  return execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 64 * 1024 * 1024, windowsHide: true, timeout });
 }
 
 // A command is a backtick span with something other than white space in it (an empty or blank span is not one).
@@ -177,7 +180,8 @@ function validRecord(r) {
     && isIsoTime(r.at);
 }
 
-class Refusal extends Error {
+// A refusal with an exit code and a fixed phrase (treeId and changedPaths throw it; commands-hash.mjs and ship.mjs catch it).
+export class Refusal extends Error {
   constructor(code, phrase) { super(phrase); this.code = code; }
 }
 
@@ -237,8 +241,9 @@ function isInside(child, parent) {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
-// "tree <hex>" for the working tree at `root`. Throws a Refusal with a fixed phrase.
-function treeId(root, io) {
+// The tree id (hex) of the working tree at `root`, as `id` prints it. Throws a Refusal with a fixed phrase.
+// commands-hash.mjs and ship.mjs bind an approval to it.
+export function treeId(root, io = {}) {
   const git = io.git ?? defaultGit;
   const NOT_TOP = "tree-state: root is not the top of a git work tree";
   let isDir = false;
@@ -281,6 +286,28 @@ function treeId(root, io) {
   } finally {
     try { rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); } catch { /* left for the OS temp cleaner */ }
   }
+}
+
+// The commit id HEAD points at, at `root`. Throws a Refusal when there is none or git can't say. commands-hash.mjs binds a preview
+// to it, so ship.mjs can refuse a commit made after the preview even when its tree is the previewed one.
+export function headId(root, io = {}) {
+  const git = io.git ?? defaultGit;
+  let out = "";
+  try { out = String(git(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], { cwd: root, env: gitEnv() })).trim(); } catch { out = ""; }
+  if (!HEX_TREE.test(out)) throw new Refusal(3, "tree-state: HEAD can't be read");
+  return out;
+}
+
+// The paths that differ between two tree ids (`git diff-tree -r --no-renames --name-only -z`, so a rename names both
+// sides and no path is quoted). Throws a Refusal when an id is not a tree id or git cannot compare them (an object gone).
+export function changedPaths(root, from, to, io = {}) {
+  if (!HEX_TREE.test(String(from)) || !HEX_TREE.test(String(to))) throw new Refusal(3, "tree-state: not a tree id");
+  const git = io.git ?? defaultGit;
+  let out;
+  try {
+    out = git(["-c", "core.fsmonitor=false", "diff-tree", "-r", "--no-renames", "--name-only", "-z", from, to], { cwd: root, env: gitEnv() });
+  } catch { throw new Refusal(3, "tree-state: can't compare the two trees"); }
+  return String(out).split("\0").filter(Boolean);
 }
 
 const VALUE_OPTIONS = ["--root", "--plan", "--data", "--since"];

@@ -7,13 +7,13 @@
 // is allowed. Over-denying costs the agent one retry; under-denying is the failure that matters.
 // Publish and deploy tools are denylists, and they are not exhaustive. The guard is an extra layer on
 // top of the agents' prompt rules and the run skill's gates. It stops direct commands, not a script
-// an agent writes and then runs, and it can't see inside a variable that holds a program name or a script
-// file. PowerShell and cmd are refused outright for every role (their syntax hides commands), and so is a
+// an agent writes and then runs, and it can't see inside a script file (a program name built from a variable or $(...) is
+// denied: rule hidden-program). PowerShell and cmd are refused outright for every role (their syntax hides commands), and so is a
 // shell that reads its commands from stdin.
 import { posix } from "node:path";
 import { splitCommands } from "./lib/shell.mjs";
 
-export const GUARD_VERSION = "0.11.1";
+export const GUARD_VERSION = "0.12.0";
 export const PROBE_COMMAND = "echo phased-shipping-guard-probe";
 export const ROLES = ["builder", "checker", "shipper", "model-scout"];
 export const ROLE_PATTERN = /^phased-shipping:(builder|checker|shipper|model-scout)$/;
@@ -54,8 +54,9 @@ const ghWords = (args) => {
 // ---------- shared rules: every role ----------
 
 // Environment that changes what git (or a hook runner) does. Matches leading assignments, `env X=y`
-// and `sudo X=y` (the splitter returns those in `env`), and export/set style commands.
-const DANGEROUS_ENV = /^(GIT_\w*|HOME|XDG_CONFIG_HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|SSH_ASKPASS|HUSKY\w*|SKIP|LEFTHOOK\w*|BASH_ENV|SHELLOPTS|BASHOPTS|PROMPT_COMMAND|LD_PRELOAD)$/i;
+// and `sudo X=y` (the splitter returns those in `env`), and export/set style commands. Exported: ship.mjs
+// leaves these names (but the home folders) out of the environment its commands inherit.
+export const DANGEROUS_ENV = /^(GIT_\w*|HOME|XDG_CONFIG_HOME|USERPROFILE|HOMEDRIVE|HOMEPATH|SSH_ASKPASS|HUSKY\w*|SKIP|LEFTHOOK\w*|OVERCOMMIT_DISABLE|PRE_COMMIT_ALLOW_NO_CONFIG|BASH_ENV|SHELLOPTS|BASHOPTS|PROMPT_COMMAND|LD_PRELOAD)$/i;
 const ENV_SETTERS = new Set(["export", "declare", "typeset", "readonly", "local", "setenv", "set", "setx", "set-item", "si", "new-item", "ni", "set-variable", "sv"]);
 const envName = (w) => w.replace(/^\$?env:\\?/i, "").split(/[=+]/, 1)[0];
 // Commands that set a variable without an = : read and getopts (every plain word is a target), mapfile and
@@ -101,11 +102,57 @@ const protectedPath = (c) => [c.program, ...c.globals, ...c.args, ...c.env.map((
 const ghToken = (c) => c.program === "gh" && ghWords(c.args)[0] === "auth"
   && c.args.some((a) => /^-[A-Za-z]*t[A-Za-z]*$/.test(a) || lf([a], "show-token"));
 
+// A program the guard can't name. Every other rule reads the program word, so one that comes from an expansion would pass
+// them all: `$(echo git) push -f`, `x=git; $x push -f`, `${G:-git} push -f`, `gi$(echo t) push -f` (the splitter marks the
+// word, see programExpanded), an empty program word with arguments (`"" push -f`), a program word holding $ or a backtick,
+// and command text that is an expansion: the -c text of a shell, su, script or flock, env -S, npx -c, npm exec --call.
+const SHELL_NAMES = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "csh", "tcsh", "rbash", "mksh", "posh", "yash", "su", "script", "flock"]);
+const CALLERS = new Set(["npx", "bunx", "pnpx", "npm", "pnpm", "yarn", "bun"]);
+const textFlag = (c) => {
+  if (SHELL_NAMES.has(c.program)) return c.args.some((a) => /^-[A-Za-z]*c[A-Za-z]*$/.test(a) || /^--command(=|$)/.test(a));
+  if (c.program === "env") return c.args.some((a) => /^-[A-Za-z]*S/.test(a) || /^--split-string(=|$)/.test(a));
+  if (CALLERS.has(c.program)) return c.args.some((a) => /^(-c|--call)(=|$)/.test(a));
+  return false;
+};
+// The script a shell, source or . runs, when the guard can't read it: a process substitution (`bash <(echo git push -f)`: the
+// splitter keeps no text for it), an fd or stdin path (`bash /dev/fd/3` after `exec 3<<<'...'`, /dev/stdin, /proc/<pid>/fd/N) or an
+// expansion. A script file written out in full is not followed (see the header), but it is a file the agent wrote, not a hidden one.
+const SOURCERS = new Set(["source", "."]);
+const FD_PATH = /^\/dev\/(fd\/|stdin$)|^\/proc\/[^/]+\/fd\//;
+const SHELL_VALUED = new Set(["-o", "-O", "+o", "+O", "--rcfile", "--init-file"]);
+// The same for a shell (or source or .) with no -c text whose stdin is redirected: `bash < <(...)`, `bash 0<&3`, `bash <&3 3< <(...)`,
+// `sh < file`, even with a script file named (a pipe into a shell is the dynamic-exec rule's stdin case).
+const STDIN_REDIRECT = /^0?<(?!\()/;
+const hiddenScript = (c) => {
+  let i = 0;
+  if ((SHELL_NAMES.has(c.program) || SOURCERS.has(c.program)) && !textFlag(c) && c.args.some((a) => STDIN_REDIRECT.test(a))) return true;
+  if (SHELL_NAMES.has(c.program)) {
+    if (textFlag(c)) return false;
+    for (; i < c.args.length; i++) {
+      const a = c.args[i];
+      if (a === "--") { i++; break; }
+      if (/^[-+]./.test(a)) { if (SHELL_VALUED.has(a)) i++; continue; }
+      break;
+    }
+  } else if (!SOURCERS.has(c.program)) return false;
+  const w = c.args[i];
+  return w !== undefined && (c.expanded?.[i] === true || w === "" || /[<>]\(/.test(w) || FD_PATH.test(w));
+};
+// A glob in the program word, folders included (`/mingw64/bin/g?t.exe push -f`, `gi[t] push`): the file it matches runs, and the
+// guard can't know which. `[` and `[[` are programs of their own. Arguments may glob.
+const globProgram = (c) => {
+  const word = String(c.programWord ?? c.program);
+  return /[*?[]/.test(word) && word !== "[" && word !== "[[";
+};
+const hiddenProgram = (c) => c.programExpanded === true || /[$`]/.test(c.program) || (c.program === "" && c.args.length > 0)
+  || (textFlag(c) && (c.expanded ?? []).some(Boolean)) || hiddenScript(c) || globProgram(c);
+
+// match(entry, command): entry is one simple command from the splitter, command the whole text it came from.
 const rule = (id, description, reason, samples, match) => ({ id, description, reason, samples, match });
 
 const SHARED = [
   rule("env-override", "no environment that changes git's behaviour or skips hooks",
-    "Agents don't set any GIT_* variable (GIT_CONFIG*, GIT_DIR, GIT_EXEC_PATH, GIT_SSH*, GIT_PAGER and so on), HOME, XDG_CONFIG_HOME, USERPROFILE, HOMEDRIVE, HOMEPATH (they move git's config; read, printf -v, mapfile and getopts that fill one count too), BASH_ENV and similar, or the hook skips HUSKY, SKIP and LEFTHOOK*. Run git as it is.",
+    "Agents don't set any GIT_* variable (GIT_CONFIG*, GIT_DIR, GIT_EXEC_PATH, GIT_SSH*, GIT_PAGER and so on), HOME, XDG_CONFIG_HOME, USERPROFILE, HOMEDRIVE, HOMEPATH (they move git's config; read, printf -v, mapfile and getopts that fill one count too), BASH_ENV and similar, or the hook skips HUSKY, SKIP, LEFTHOOK*, OVERCOMMIT_DISABLE and PRE_COMMIT_ALLOW_NO_CONFIG. Run git as it is.",
     ["GIT_DIR=/tmp/x git status", "GIT_CONFIG_COUNT=1 git status", "GIT_SSH_COMMAND=zork git fetch", "GIT_EXTERNAL_DIFF=zork git diff", "GIT_PAGER=zork git log", "GIT_ASKPASS=zork git fetch",
       "env GIT_EXEC_PATH=/tmp git status", "sudo GIT_DIR=x git status", "export GIT_DIR=/tmp/x", "HUSKY=0 git status", "SKIP=lint git status", "A=1 GIT_TRACE=/tmp/t git status",
       "$env:GIT_DIR = 'x'", "setx GIT_PAGER zork", "set GIT_PAGER=zork", "HOME=/tmp/h git commit -m x", "XDG_CONFIG_HOME=/tmp/h git commit -m x", "USERPROFILE=C:/tmp git status", "GIT_AUTHOR_NAME=x git commit -m x", "BASH_ENV=/tmp/x ls", "export HOME=/tmp/h",
@@ -135,6 +182,11 @@ const SHARED = [
     dynamicExec),
   rule("gh-token", "no gh auth status -t or --show-token", "gh auth status -t and --show-token print the GitHub token. Agents never print a token.",
     ["gh auth status -t", "gh auth status --show-token", "gh auth status --show-t", "gh auth status -ht github.com", "gh auth status -a -t", "gh -R x/y auth status -t"], ghToken),
+  rule("hidden-program", "no program name, command text or shell script built from a variable, $(...), backticks, <(...), an fd path or a glob",
+    "The guard can't see which program a variable, $(...) or backticks in the program name turn into ($(echo git) push -f runs git push -f), and the same goes for the command text of bash -c, env -S or npx -c when it is an expansion, and for a script that bash, sh, source or . read from <(...), /dev/fd, /dev/stdin, an expansion or a redirected stdin (bash < <(...), bash 0<&3), and for a glob in the program name (/usr/bin/g?t). Write the program name and the command text out in full.",
+    ["$(echo git) push --force", "`echo git` push -f", "\"$(printf git)\" push -f", "x=git; $x push -f", "${G:-git} push -f", "bash -c \"$(echo git push -f)\"", "$(echo git push -f)", "A=1 $(echo git push -f)", "gi$(echo t) push -f",
+      "/usr/bin/$(echo git) push -f", "nohup$(echo ' git') push -f", "command $(echo git) push -f", "'' push -f", "env -S \"$(echo git push -f)\"", "sh -c \"$X\"", "zsh -c \"$X\"", "npx -c \"$X\"", "'$x' push -f", "bash <(echo git push -f)", "source <(echo git push -f)", ". <(echo git push -f)", "exec 3<<<'git push -f'; bash /dev/fd/3", "bash < <(echo git push -f)", "bash <&3 3< <(echo git push -f)", "bash 0<&3", "/mingw64/bin/g?t.exe push -q --force origin HEAD~1:main", "gi[t] push -f", "./sh?p.mjs run"],
+    hiddenProgram),
 ];
 
 // ---------- git: allowlists by role ----------
@@ -559,6 +611,64 @@ const NET_WRITE = rule("net-write", "no curl, wget or Invoke-WebRequest calls th
       "curl -sSd@f https://example.com", "curl -sSLd@f https://example.com", "curl -XPOST https://example.com", "curl -sXPUT https://example.com", "curl -sT f https://example.com", "curl -Tf https://example.com", "curl -Kcfg https://example.com", "curl -s -d@f https://example.com", "wget --post-data=x https://example.com", "wget --post-file=f https://example.com", "wget --method=POST https://example.com",
       "Invoke-WebRequest -Method Post -Uri https://example.com", "iwr -Method:Delete https://example.com", "irm https://example.com -Body x", "Invoke-RestMethod -Uri https://example.com -InFile f"], netWrite);
 
+// Running ship.mjs (the run skill's one-approval ship). Best effort, like the plan-file rules: it reads the words of a command,
+// not what a script, a package script or a copy made some other way does. Denied:
+// - the program itself names it, or has a glob (./sh?p.mjs);
+// - node, bun, deno, npx or tsx gets a word that names it, or a script word the guard can't read: a glob (node s*.mjs), an
+//   expansion (node "$(echo ship).mjs") or the {} that find -exec and xargs -I fill in (except globs of test files with --test);
+// - eval or preload text (-e, -p, --eval, --print, --import, -r, --require, --loader) that names ship, imports or requires
+//   anything but one plain quoted name, or starts a process (child_process, spawn, exec*, fork);
+// - a script read from stdin (node -, cat x.mjs | node, node < x.mjs, /dev/stdin or an fd path) and eval text that is an expansion;
+// - xargs given a runner, and a copy of it (cp, mv, install, ln, rsync, tee, dd, or any command with an output redirect).
+// Reading or testing it (cat ship.mjs, node --test tests/ship.test.mjs) is fine.
+const SHIP_WORD = /(^|[\\/'"(\s=])ship\.mjs(['")\s<>|&;]|$)/i;
+const SCRIPT_RUNNERS = /^(node|nodejs|node\.exe|bun|bunx|deno|npx|tsx)$/i;
+const GLOB_CHARS = /[*?[]/;
+const CODE_FLAG = /^(-[A-Za-z]*[epr]|--(eval|print|import|require|loader|experimental-loader))(=|$)/;
+const LOAD_FLAG = /^(-r|--require|--import|--loader|--experimental-loader)$/;
+// Runner options whose value is the next word (so it is not the script).
+const RUNNER_VALUED = new Set(["-r", "--require", "--import", "--loader", "--experimental-loader", "--input-type", "-C", "--conditions", "--env-file", "--title", "--stack-trace-limit", "--test-reporter", "--test-reporter-destination", "--test-name-pattern"]);
+const LOADS = /\b(import|require)\s*\(/g;
+const PLAIN_LOAD = /^\s*(['"])[^'"`$+\\]*\1\s*\)/;
+const evalHides = (text) => /\bship\b|hip\.mjs/i.test(text) || /\bchild_process\b|\b(spawn|spawnSync|execSync|execFile|execFileSync|fork)\s*\(/.test(text)
+  || [...text.matchAll(LOADS)].some((m) => !PLAIN_LOAD.test(text.slice(m.index + m[0].length)));
+const COPIERS = new Set(["cp", "mv", "install", "ln", "rsync", "tee", "dd"]);
+// The script word (the first plain word, after deno's or bun's `run`), a preload value, or any word naming a module, that the
+// guard can't read: a glob, {}, or an expansion. With --test, a glob of test files is fine. A variable in the folder part
+// (node "${CLAUDE_SKILL_DIR}/scripts/commands-hash.mjs") is readable when the file name after the last slash is plain and the
+// command has no $(...), backticks or <(...) anywhere: a substitution leaves no trace in the word's text.
+const SUBSTITUTION = /\$\(|`|[<>]\(/;
+const PLAIN_NAME = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+// Flags with which node runs no script from stdin.
+const NO_SCRIPT_RUNS = /^(-v|--version|-h|--help|--test|--check|-c|-i|--interactive|--run|--v8-options)(=|$)|^--test-/;
+const runnerHides = (c, command = "") => {
+  const test = c.args.includes("--test");
+  const readableVariable = (a) => !SUBSTITUTION.test(command) && a.includes("/") && PLAIN_NAME.test(a.slice(a.lastIndexOf("/") + 1));
+  const unreadable = (i) => (c.expanded?.[i] === true && !readableVariable(c.args[i])) || c.args[i] === "{}" || (GLOB_CHARS.test(c.args[i]) && !(test && !c.expanded?.[i] && /test/i.test(c.args[i])));
+  let script = -1;
+  for (let i = 0; i < c.args.length; i++) {
+    const a = c.args[i];
+    if (LOAD_FLAG.test(a) && i + 1 < c.args.length && unreadable(i + 1)) return true;
+    // Eval text that is an expansion, given after the flag or with = (node --eval="$(cat x)").
+    if ((/^--(eval|print)=/.test(a) && c.expanded?.[i] === true) || (/^(-[A-Za-z]*[ep]|--(eval|print))$/.test(a) && c.expanded?.[i + 1] === true)) return true;
+    if (a === "-") { if (script < 0) script = i; continue; }
+    if (/^\d*(<|>|&>)/.test(a)) { if (REDIRECT_ONLY.test(a) || /^\d*<$/.test(a)) i++; continue; } // a redirection and its target are not the script
+    if (a.startsWith("-")) { if (RUNNER_VALUED.has(a)) i++; continue; }
+    if (script < 0 && !(i === 0 && a === "run" && /^(deno|bun)$/i.test(c.program))) script = i;
+  }
+  // The script read from stdin: `-`, /dev/stdin or an fd path, or node given no script, no code and nothing that runs without one in a
+  // command that pipes or redirects into something (cat ship.mjs | node, node < x.mjs). A bare `node` on its own stays allowed.
+  if (script >= 0 && (c.args[script] === "-" || FD_PATH.test(c.args[script]))) return true;
+  if (script < 0 && /^(node|nodejs|node\.exe)$/i.test(c.program) && /[|<]/.test(command) && !c.args.some((a) => CODE_FLAG.test(a) || NO_SCRIPT_RUNS.test(a))) return true;
+  if (script >= 0 && unreadable(script)) return true;
+  if (c.args.some((a, i) => unreadable(i) && /mjs|ship/i.test(a))) return true;
+  return c.args.some((a) => CODE_FLAG.test(a)) && evalHides(c.args.join(" "));
+};
+const shipScript = (c, command) => SHIP_WORD.test(c.program) || (GLOB_CHARS.test(c.program) && c.program !== "[" && c.program !== "[[")
+  || (SCRIPT_RUNNERS.test(c.program) && (c.args.some((a) => SHIP_WORD.test(a)) || runnerHides(c, command)))
+  || (c.program === "xargs" && c.args.some((a) => SCRIPT_RUNNERS.test(a)))
+  || (c.args.some((a) => SHIP_WORD.test(a)) && (COPIERS.has(c.program) || c.args.some((a) => REDIRECT_START.test(a) || (SHIP_WORD.test(a) && a.includes(">")))));
+
 // Builder and checker: no commits, pushes, merges, publishes or deploys.
 const BUILD_RULES = [
   ...SHARED,
@@ -613,6 +723,13 @@ const BUILD_RULES = [
       "helm uninstall x", "helm rollback x 1", "pulumi up", "pulumi destroy", "cdk deploy", "sam deploy", "serverless deploy", "sls deploy", "aws cloudformation deploy --stack-name x", "aws s3 sync . s3://zork", "aws s3 cp x s3://zork/x",
       "aws s3 rm s3://zork/x", "aws s3api put-object --bucket zork", "aws lambda invoke zork", "gcloud run deploy zork", "gcloud builds submit .", "az webapp deploy --name x", "az webapp up --name x", "gh-pages -d dist", "release-it", "surge dist",
       "wrangler workflows trigger x", "node node_modules/.bin/wrangler deploy", "node ./node_modules/wrangler/bin/wrangler.js deploy", "node ../node_modules/.bin/wrangler publish", "node --no-warnings node_modules/.bin/vercel --prod", "node -r dotenv/config node_modules/netlify-cli/bin/run.js deploy"], deployTool),
+  rule("ship-script", "no running ship.mjs (the approved ship runs in the main session)", "Builders and checkers never run ship.mjs: it commits and deploys the approved phase, and only the main session runs it after approval. A script path, eval text or copy the guard can't read counts too (a glob, $(...), a variable file name, find -exec or xargs, a dynamic import): write the script path out in full.",
+    ["node plugins/phased-shipping/skills/run/scripts/ship.mjs run --plan x.md --root . --roadmap PHASES.md --data d", "node ~/.claude/skills/ps-run/scripts/ship.mjs run", "node ship.mjs", "nodejs ./ship.mjs run", "node.exe C:/x/scripts/ship.mjs run",
+      "node --no-warnings 'skills/run/scripts/ship.mjs' run", "./ship.mjs run", "skills/run/scripts/ship.mjs run", "bun ship.mjs run", "deno run -A ship.mjs run", "node -e \"require('./ship.mjs')\"", "node --eval \"import('/x/scripts/' + 'ship.mjs').then((m) => m.main([]))\"", "npx tsx ship.mjs run",
+      "bash -c 'node ship.mjs run'", "cd x && node ship.mjs run",
+      "node s*.mjs run", "node scripts/sh?p.mjs run", "node \"$(echo ship).mjs\" run", "node $SCRIPT run", "node ship.mjs>out.txt run", "node ship.mjs|cat", "find . -name ship.mjs -exec node {} run \\;", "echo ship.mjs | xargs node",
+      "cp plugins/phased-shipping/skills/run/scripts/ship.mjs /tmp/zork.mjs", "cat ship.mjs > zork.mjs", "tee zork.mjs < ship.mjs", "node --input-type=module -e \"import('./s'+'hip.mjs')\"", "node -e \"require('child_process').execSync('node x.mjs run')\"",
+      "node --import ./s*.mjs zork.mjs", "cat ship.mjs | node -", "cat x.mjs | node", "node --eval=\"$(cat x)\""], shipScript),
 ];
 
 // Shipper: it commits and pushes, but never forces, skips checks or rewrites history.
@@ -671,13 +788,13 @@ const SHIP_RULES = [
   NET_WRITE,
 ];
 
-// ---------- plan files: builder only ----------
+// ---------- plan files: builder and checker ----------
 
 // The approval binding (commands-hash.mjs) compares the plan's "## Commands" section at preview with the
-// one at approve. The builder works before the preview, so it never edits the plan files: PHASES.md, or
-// a phase-*.md inside a folder named `phases`. The shell rule is best effort: it reads literal paths in
+// one at approve. The builder and the checker work before the preview, so they never edit the plan files: PHASES.md, or
+// a phase-*.md inside a folder named `phases` (the checker since 0.12.0). The shell rule is best effort: it reads literal paths in
 // the common write forms, not a path built from a variable, a glob, or a cd followed by a bare file name.
-const PLAN_FILE_REASON = "The builder doesn't edit the plan files (PHASES.md, or phase-*.md inside a folder named phases): the approval is bound to the commands the user saw at preview. Report what should change in the plan and let the main session edit it.";
+const PLAN_FILE_REASON = "Builders and checkers don't edit the plan files (PHASES.md, or phase-*.md inside a folder named phases): the approval is bound to the commands the user saw at preview. Report what should change in the plan and let the main session edit it.";
 const slashes = (p) => String(p).replace(/\\/g, "/");
 // Slashes made forward, `.` and `..` segments and doubled slashes resolved, a trailing slash (or `/.`) dropped;
 // a quote left at the end of a shell word stays. Drive letters are plain text here, so C:/r keeps working.
@@ -762,7 +879,7 @@ const gitRestoresPlanFile = (c) => {
   return rest.some(planFileWord);
 };
 const planFileWrite = (c) => writesTo(c, planFileWord, (name) => /^phase-.*\.md$/i.test(name)) || gitRestoresPlanFile(c);
-const PLAN_FILE_RULE = rule("plan-file-write", "the builder doesn't write PHASES.md or phases/phase-*.md",
+const PLAN_FILE_RULE = rule("plan-file-write", "the builder and the checker don't write PHASES.md or phases/phase-*.md",
   PLAN_FILE_REASON,
   ["echo x >> PHASES.md", "echo x > PHASES.md", "echo x >.plans/phases/phase-7-x.md", "echo x 2> PHASES.md", "printf x | tee PHASES.md", "cat y | tee -a docs/phases/phase-3-x.md",
     "echo x>PHASES.md", "echo x>>PHASES.md", "echo x>.plans/phases/phase-7-x.md", "git show HEAD:PHASES.md>PHASES.md", "git checkout -- PHASES.md", "git checkout HEAD~1 -- .plans/phases/phase-7-x.md", "git restore PHASES.md", "git restore --source=HEAD~1 docs/phases/phase-3-x.md",
@@ -777,12 +894,12 @@ const PLAN_FILE_RULE = rule("plan-file-write", "the builder doesn't write PHASES
   planFileWrite);
 
 // The approval records (<data>/previews/<12 hex>.planned.json and .previewed.json) and the plugin's own
-// data and installed copies are what the binding trusts, so the builder never writes them either. Reading
+// data and installed copies are what the binding trusts, so the builder and the checker never write them either. Reading
 // stays allowed. A folder that is merely named `previews` is fine. Same best-effort reach as the plan files.
-const PLUGIN_FILE_REASON = "The builder doesn't write the approval records (previews/<key>.planned.json and .previewed.json), the plugin's data folder (.claude/phased-shipping/), the installed copies of its skills and agents (.claude/skills/ps-run, .claude/skills/ps-plan, .claude/agents/ps-*), or the phased-shipping plugin install folders (.claude/plugins/cache, marketplaces and data), and it doesn't run commands-hash.mjs with --record (only the run skill records approval fingerprints): the approval binding depends on them. Report what should change and let the main session do it.";
+const PLUGIN_FILE_REASON = "Builders and checkers don't write the approval records (previews/<key>.planned.json and .previewed.json), the plugin's data folder (.claude/phased-shipping/), the installed copies of its skills and agents (.claude/skills/ps-run, .claude/skills/ps-plan, .claude/agents/ps-*), or the phased-shipping plugin install folders (.claude/plugins/cache, marketplaces and data), and they don't run commands-hash.mjs with --record (only the run skill records approval fingerprints): the approval binding depends on them. Report what should change and let the main session do it.";
 const PLUGIN_FILE_WORD = /(^|[\\/<>='"])(previews\/[0-9a-f]{12}\.(planned|previewed)\.json['"]?[. ]*$|\.claude\/(phased-shipping|skills\/ps-(run|plan))(\/|['"]?[. ]*$)|\.claude\/agents\/ps-|\.claude\/plugins\/(cache|marketplaces|data)\/[^'" ]*phased-shipping)/i;
 const pluginFileWord = (w) => PLUGIN_FILE_WORD.test(slashes(w)) || PLUGIN_FILE_WORD.test(norm(w));
-// Recording an approval fingerprint is the run skill's step: the builder may hash (--short) or --check, never --record.
+// Recording an approval fingerprint is the run skill's step: the builder and the checker may hash (--short) or --check, never --record.
 const HASH_SCRIPT = /(^|[\\/])commands-hash\.mjs['"]?$/i;
 const recordsApproval = (c) => {
   const words = [c.program, ...c.args];
@@ -795,7 +912,7 @@ const forgesRecord = (c) => {
   const text = slashes(c.args.join(" "));
   return /previews/i.test(text) && /(write(File|Stream|Sync)|\.claude\/phased-shipping)/i.test(text);
 };
-const PLUGIN_FILE_RULE = rule("protected-plugin-files", "the builder doesn't write the approval records, the plugin's own data, skills, agents and install folders, or run commands-hash.mjs --record",
+const PLUGIN_FILE_RULE = rule("protected-plugin-files", "the builder and the checker don't write the approval records, the plugin's own data, skills, agents and install folders, or run commands-hash.mjs --record",
   PLUGIN_FILE_REASON,
   ["echo x > /h/data/previews/0123456789ab.previewed.json", "echo x>>/h/data/previews/0123456789ab.planned.json", "rm /h/data/previews/0123456789ab.previewed.json", "cp /tmp/x.json /h/data/previews/0123456789ab.planned.json",
     "echo x >> ~/.claude/phased-shipping/hook.mjs", "echo x > ~/.claude/phased-shipping/previews/0123456789ab.previewed.json", "echo x >> ~/.claude/skills/ps-run/SKILL.md", "tee ~/.claude/skills/ps-plan/SKILL.md < x", "sed -i s/a/b/ ~/.claude/agents/ps-shipper.md",
@@ -807,9 +924,10 @@ const PLUGIN_FILE_RULE = rule("protected-plugin-files", "the builder doesn't wri
     "echo x > ~/.claude/x/../phased-shipping/hooks/guard-rules.mjs", "echo x > ~/.claude/./phased-shipping/x", "echo x >> ~/.claude/skills/./ps-run/SKILL.md", "cp -t ~/.claude/skills/ps-run /tmp/SKILL.md", "rsync -a /tmp/x/ ~/.claude/phased-shipping/", "git apply ~/.claude/phased-shipping/x.patch"],
   (c) => writesTo(c, pluginFileWord) || recordsApproval(c) || forgesRecord(c));
 
+// The checker has the same rules as the builder (since 0.12.0): it too works before the approval and must not touch what binds it.
 const BUILDER_RULES = [...BUILD_RULES, PLAN_FILE_RULE, PLUGIN_FILE_RULE];
 
-export const RULES = { builder: BUILDER_RULES, checker: BUILD_RULES, shipper: SHIP_RULES };
+export const RULES = { builder: BUILDER_RULES, checker: BUILDER_RULES, shipper: SHIP_RULES };
 
 // model-scout has no shell. It may write only PHASES.md in the project folder.
 export const SCOUT_RULES = {
@@ -845,7 +963,7 @@ export function decide(role, toolName, toolInput, cwd) {
     if (command.length > MAX_COMMAND_LENGTH) return { rule: "command-length", reason: `command too long to check (over ${MAX_COMMAND_LENGTH} characters). Split it into smaller commands.` };
     const rules = RULES[role];
     for (const cmd of splitCommands(command)) {
-      for (const r of rules) if (r.match(cmd)) return { rule: r.id, reason: r.reason };
+      for (const r of rules) if (r.match(cmd, command)) return { rule: r.id, reason: r.reason };
     }
     return null;
   }
@@ -859,10 +977,11 @@ export function decide(role, toolName, toolInput, cwd) {
     const paths = [input.file_path, input.notebook_path].filter((p) => p !== undefined);
     if (paths.some((p) => typeof p !== "string")) throw new TypeError("the file path is not text");
     if (paths.some((p) => PROTECTED_PATH.test(p))) return { rule: "protected-path", reason: PROTECTED_REASON };
-    // The builder works before the preview and never edits the plan files (see PLAN_FILE_RULE).
-    if (role === "builder" && paths.some(isPlanFilePath)) return { rule: PLAN_FILE_RULE.id, reason: PLAN_FILE_REASON };
+    // The builder and the checker work before the preview and never edit the plan files (see PLAN_FILE_RULE).
+    const early = role === "builder" || role === "checker";
+    if (early && paths.some(isPlanFilePath)) return { rule: PLAN_FILE_RULE.id, reason: PLAN_FILE_REASON };
     // Nor the approval records or the plugin's own data and installed files (see PLUGIN_FILE_RULE).
-    if (role === "builder" && paths.some(pluginFileWord)) return { rule: PLUGIN_FILE_RULE.id, reason: PLUGIN_FILE_REASON };
+    if (early && paths.some(pluginFileWord)) return { rule: PLUGIN_FILE_RULE.id, reason: PLUGIN_FILE_REASON };
   }
   return null;
 }

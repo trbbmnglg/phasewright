@@ -2,12 +2,12 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.11.1 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.12.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
 | `/phased-shipping:plan` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/plan/SKILL.md)) | Sizes the work as trivial (skip), small (one phase) or large (roadmap), then writes one detailed phase plan at a time. |
-| `/phased-shipping:run` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)) | Runs one phase: gates, a baseline (reused from an earlier green full verify on the same tree when it can), the build, fast checks against the baseline, one full verify on the final tree and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. |
+| `/phased-shipping:run` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)) | Runs one phase: gates, a baseline (reused from an earlier green full verify on the same tree when it can), the build, fast checks against the baseline, one full verify on the final tree and a preview. It stops for your approval before anything is committed, deployed or pushed, then rolls back automatically if the prod check fails. With a ship block in the plan, approve runs the approved commands in one script, `ship.mjs`, with one permission prompt ([Speed](Speed#shipping)). |
 | `/phased-shipping:roadmap` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/roadmap/SKILL.md)) | Checks a project's roadmap file against the roadmap format, standardizes an older roadmap into it, adopts existing plan files into a roadmap, or restores a kept copy. It writes only after you say yes, with copies kept first in `.roadmap-backups/`. See [Roadmap standard](Roadmap-standard). |
 | `/phased-shipping:onboard` ([skill](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/onboard/SKILL.md)) | The first run in a project: lists the files it would read, reads nothing until you confirm, saves a survey of the project's commands, CI and conventions, and points to standardize, adopt or a fresh roadmap. See [Onboarding](Onboarding). |
 | `model-scout` ([agent](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/agents/model-scout.md)) | Combines which models you can use, current official guidance and how each model did in your phase history. |
@@ -59,6 +59,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.10.0 | [v1.1.0](Release-1.1.0-Baggao) | The dashboard page: projects, sessions and the loops back in a phase, one local file rebuilt at every step, no network. See [Dashboard](Dashboard). |
 | 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
 | 0.11.1 | [v1.1.0](Release-1.1.0-Baggao) | Every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. |
+| 0.12.0 | [v1.2.0](Release-1.2.0-Buguey) | One approval ships: the plan's ship block runs in one script, `ship.mjs`, in the main session, bound to the previewed commands and code. See [Speed](Speed#shipping). |
 
 ## Limits
 

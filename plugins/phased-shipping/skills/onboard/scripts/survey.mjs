@@ -149,6 +149,18 @@ function secretIn(text, assign) {
   return null;
 }
 
+// The matcher ship.mjs reuses (skills/run/scripts/ship.mjs): the category of the first SECRET_SHAPES match in a text, raw or
+// with the invisible characters removed, or null. With names, the NAME=value shapes (ASSIGN_SHAPES) count too.
+export function secretShapeIn(text, { names = false } = {}) {
+  const s = String(text ?? "");
+  for (const view of [s, s.replace(ZERO_WIDTH, "")]) {
+    const hit = secretIn(view, names);
+    if (hit) return hit;
+  }
+  return null;
+}
+export { SECRET_SHAPES };
+
 // \uXXXX, \u{X} and \xNN escapes turned into the characters they stand for (JSON, YAML and TOML strings use them).
 function unescapeText(s) {
   return s.replace(/\\u\{([0-9a-fA-F]{1,6})\}|\\[uU]([0-9a-fA-F]{4})|\\x([0-9a-fA-F]{2})/g, (m, a, b, c) => {

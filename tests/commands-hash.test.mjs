@@ -4,11 +4,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, realpathSync, symlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { main, commandsSection, hashOf, planKey, lineDiff } from "../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs";
+import { shipCase, recordPreview, checkPreview, git, planText, linkFolder, unlinkLink } from "./helpers/ship.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, "..", "plugins", "phased-shipping", "skills", "run", "scripts", "commands-hash.mjs");
@@ -273,11 +274,215 @@ test("lineDiff lists only removed and added lines", () => {
 
 test("the script imports only node: built-ins and writes only under --data", () => {
   const text = readFileSync(SCRIPT, "utf8");
-  for (const m of text.matchAll(/^import .* from "([^"]+)";/gm)) assert.match(m[1], /^node:/, m[1]);
+  // node: built-ins, plus the one sibling it shares the tree id with (phase 7r: treeId is reused, not copied)
+  for (const m of text.matchAll(/^import .* from "([^"]+)";/gm)) assert.ok(/^node:/.test(m[1]) || m[1] === "./tree-state.mjs", m[1]);
   assert.doesNotMatch(text, /fetch\(|node:https?|node:net|child_process/);
   // Run it from a fresh folder: nothing is written beside the plan.
   const { dir, plan, data } = withPlan(PLAN);
   run(plan, "--record", "planned", "--data", data);
   assert.deepEqual(readdirSync(dir).sort(), ["data", "phase-3-zork.md"]);
   rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------- phase 7r: the preview is bound to the code (--root, --roadmap) and to the commit message file ----------
+// These run git on a copy of a temp repo (tests/helpers/ship.mjs); the plan, the roadmap and the message file are under a git-ignored .plans.
+const SHIP_LINES = ["branch: main", "step: git commit -q -F '.plans/commits/zork-commit.txt'", "check: true", "rollback: true"];
+
+test("phase 7r: --record previewed --root stores the project folder, the tree id and the commit message file's SHA-256", () => {
+  const c = shipCase(SHIP_LINES);
+  const r = recordPreview(c);
+  assert.equal(r.status, 0, r.out + r.err);
+  assert.match(r.out, /^recorded previewed [0-9a-f]{12}\n## Commands\n/);
+  const saved = JSON.parse(readFileSync(join(c.data, "previews", `${planKey(c.plan)}.previewed.json`), "utf8"));
+  assert.deepEqual(Object.keys(saved).sort(), ["allowed", "at", "hash", "head", "messages", "plan", "root", "text", "tree"]);
+  assert.equal(saved.head, git(c.repo, "rev-parse", "HEAD"), "the commit HEAD points at (fix round 2)");
+  assert.equal(saved.tree, git(c.repo, "rev-parse", "HEAD^{tree}"), "the ignored .plans folder is not in the tree");
+  assert.equal(saved.root.toLowerCase(), realpathSync.native(c.repo).replace(/\\/g, "/").toLowerCase());
+  const message = join(c.repo, ".plans", "commits", "zork-commit.txt");
+  assert.deepEqual(saved.messages.map((m) => [m.file, m.sha256]), [[".plans/commits/zork-commit.txt", hashOf(readFileSync(message, "utf8"))]]);
+  // A message file that can't be read: exit 1 and nothing is recorded.
+  rmSync(message);
+  rmSync(join(c.data, "previews"), { recursive: true });
+  const missing = recordPreview(c);
+  assert.equal(missing.status, 1);
+  assert.match(missing.err, /can't read the commit message file .plans\/commits\/zork-commit.txt named in the ship block; nothing was recorded/);
+  assert.throws(() => readdirSync(join(c.data, "previews")), "nothing was written");
+});
+
+test("phase 7r: --check previewed --root passes a plan-only or roadmap-only change and refuses any other changed path, by name", () => {
+  const c = shipCase(null);
+  // Here the plan and the roadmap are tracked, so they are in the tree and their changes show in the diff.
+  const plan = join(c.repo, "docs", "phases", "phase-1-zork.md");
+  const roadmap = join(c.repo, "PHASES.md");
+  mkdirSync(dirname(plan), { recursive: true });
+  writeFileSync(plan, PLAN);
+  writeFileSync(roadmap, "# Roadmap\n");
+  git(c.repo, "add", "-A");
+  git(c.repo, "commit", "-q", "-m", "plan");
+  const bind = ["--data", c.data, "--root", c.repo, "--roadmap", roadmap];
+  assert.equal(run(plan, "--record", "previewed", ...bind).status, 0);
+  writeFileSync(plan, `${PLAN}\n## Phase report\n- built\n`);
+  assert.equal(run(plan, "--check", "previewed", ...bind).status, 0, "the plan changed outside its Commands section");
+  writeFileSync(roadmap, "# Roadmap\n| 1 | zork | shipped |\n");
+  const both = run(plan, "--check", "previewed", ...bind);
+  assert.equal(both.status, 0, both.out + both.err);
+  assert.match(both.out, /^match [0-9a-f]{12}\n## Commands\n/);
+  mkdirSync(join(c.repo, "src"));
+  writeFileSync(join(c.repo, "src", "zork.js"), "export {};\n");
+  writeFileSync(join(c.repo, "a.txt"), "alpha changed\n");
+  const other = run(plan, "--check", "previewed", ...bind);
+  assert.equal(other.status, 3);
+  assert.ok(other.out.startsWith("the code changed since it was previewed (only the plan and the roadmap may change); changed paths:\n"), other.out);
+  assert.deepEqual(other.out.trim().split("\n").slice(1).sort(), ["  a.txt", "  src/zork.js"]);
+  assert.doesNotMatch(other.out, /^match /m);
+  // Without --roadmap, the roadmap is not an allowed difference.
+  rmSync(join(c.repo, "src"), { recursive: true });
+  writeFileSync(join(c.repo, "a.txt"), "alpha\n");
+  const noRoadmap = run(plan, "--check", "previewed", "--data", c.data, "--root", c.repo);
+  assert.equal(noRoadmap.status, 3);
+  assert.match(noRoadmap.out, /^ {2}PHASES\.md$/m);
+});
+
+test("phase 7r: a changed -F message file is refused, and so is an old record with --root, another project folder, or a lost tree", () => {
+  const c = shipCase(SHIP_LINES);
+  assert.equal(recordPreview(c).status, 0);
+  assert.equal(checkPreview(c).status, 0);
+  const message = join(c.repo, ".plans", "commits", "zork-commit.txt");
+  writeFileSync(message, "Ship zork\n\nAn edited message.\n");
+  const changed = checkPreview(c);
+  assert.equal(changed.status, 3);
+  assert.equal(changed.out, "the commit message file changed since it was previewed: .plans/commits/zork-commit.txt\n");
+  // An old record (no tree) with --root: refused. Without --root it is the commands-only check, as before.
+  const old = shipCase(SHIP_LINES);
+  assert.equal(recordPreview(old, { root: false }).status, 0);
+  const refused = checkPreview(old);
+  assert.equal(refused.status, 3);
+  assert.equal(refused.out, "the previewed record holds no tree id, so the code can't be checked: preview again\n");
+  // Another project folder than the one previewed.
+  const elsewhere = checkPreview(c, ["--root", old.repo, "--roadmap", old.roadmap]);
+  assert.equal(elsewhere.status, 3);
+  assert.match(elsewhere.out, /the project folder is not the one that was previewed/);
+  // A stored tree whose objects are gone: refused, preview again.
+  const key = join(c.data, "previews", `${planKey(c.plan)}.previewed.json`);
+  writeFileSync(message, "Ship zork\n\nShips the zork change.\n");
+  const saved = JSON.parse(readFileSync(key, "utf8"));
+  writeFileSync(key, JSON.stringify({ ...saved, tree: "0123456789abcdef0123456789abcdef01234567" }));
+  const lost = checkPreview(c);
+  assert.equal(lost.status, 3);
+  assert.match(lost.out, /can't be compared with the current one/);
+});
+
+test("phase 7r: without --root the check is unchanged (old and new records, code changes unseen); --root and --roadmap need their stage", () => {
+  const c = shipCase(SHIP_LINES);
+  assert.equal(recordPreview(c).status, 0, "a record with a tree");
+  writeFileSync(join(c.repo, "a.txt"), "alpha changed\n");
+  const plain = checkPreview(c, []);
+  assert.equal(plain.status, 0, "the commands-only check does not look at the code");
+  assert.match(plain.out, /^match [0-9a-f]{12}\n/);
+  assert.equal(checkPreview(c).status, 3, "the same record with --root sees the change");
+  for (const args of [[c.plan, "--record", "planned", "--data", c.data, "--root", c.repo], [c.plan, "--check", "planned", "--data", c.data, "--root", c.repo],
+    [c.plan, "--check", "previewed", "--data", c.data, "--roadmap", c.roadmap], [c.plan, "--root", c.repo], [c.plan, "--check", "previewed", "--data", c.data, "--root"]]) {
+    const r = run(...args);
+    assert.equal(r.status, 1, args.join(" "));
+    assert.doesNotMatch(r.out, /^match /m);
+  }
+});
+
+// ---------- phase 7r, fix round 1: the paths that may change are fixed at the preview; message files and the record's own text ----------
+test("fix round 1 (7r), M1: --record previewed --root stores and prints the paths that may change; a roadmap not named PHASES.md, a plan not shaped like a plan file, a path outside the project folder and a link to one are refused, and nothing is recorded", () => {
+  const c = shipCase(SHIP_LINES);
+  const r = recordPreview(c);
+  assert.equal(r.status, 0, r.out + r.err);
+  const previews = join(c.data, "previews");
+  const saved = JSON.parse(readFileSync(join(previews, `${planKey(c.plan)}.previewed.json`), "utf8"));
+  assert.deepEqual(saved.allowed, { plan: ".plans/phases/phase-1-zork.md", roadmap: ".plans/PHASES.md" });
+  assert.match(r.out, /^recorded previewed [0-9a-f]{12}\n## Commands\n/);
+  assert.match(r.out, /\ncode bound to the tree [0-9a-f]{12}; only these may change: \.plans\/phases\/phase-1-zork\.md, \.plans\/PHASES\.md\n$/);
+  const refused = (plan, extra, why) => {
+    rmSync(previews, { recursive: true, force: true });
+    const x = recordPreview({ ...c, plan }, { extra });
+    assert.equal(x.status, 1, `${why}: ${x.out}${x.err}`);
+    assert.match(x.err, why);
+    assert.match(x.err, /nothing was recorded/);
+    assert.doesNotMatch(x.out, /^recorded /m);
+    assert.throws(() => readdirSync(previews), "nothing was written");
+  };
+  refused(c.plan, ["--root", c.repo, "--roadmap", join(c.repo, "a.txt")], /the roadmap's file name is not PHASES\.md/);
+  const odd = join(c.repo, ".plans", "zork.md");
+  writeFileSync(odd, planText(SHIP_LINES.slice(1)));
+  refused(odd, ["--root", c.repo, "--roadmap", c.roadmap], /the plan is not a phase-\*\.md file in a folder named phases/);
+  writeFileSync(c.at("PHASES.md"), "# Roadmap\n");
+  refused(c.plan, ["--root", c.repo, "--roadmap", c.at("PHASES.md")], /the roadmap is not inside the project folder/);
+  // A folder link on the way that leads outside the project folder.
+  mkdirSync(c.at(join("outside", "phases")), { recursive: true });
+  writeFileSync(c.at(join("outside", "phases", "phase-1-zork.md")), planText(SHIP_LINES.slice(1)));
+  linkFolder(c.at("outside"), join(c.repo, ".plans", "linked"));
+  refused(join(c.repo, ".plans", "linked", "phases", "phase-1-zork.md"), ["--root", c.repo, "--roadmap", c.roadmap], /the plan is not inside the project folder/);
+  unlinkLink(join(c.repo, ".plans", "linked"));
+  // A plan or roadmap that is itself a link, where this machine can make one (file links need a privilege on Windows).
+  const roadmapLink = join(c.repo, ".plans", "other", "PHASES.md");
+  mkdirSync(dirname(roadmapLink), { recursive: true });
+  let linked = true;
+  try { symlinkSync(c.roadmap, roadmapLink); } catch { linked = false; }
+  if (linked) refused(c.plan, ["--root", c.repo, "--roadmap", roadmapLink], /the roadmap is a link/);
+});
+
+test("fix round 1 (7r), M1: --check previewed --root takes the paths that may change from the record: a --roadmap or plan given now that is not the previewed one exits 3, and so does a record without them", () => {
+  const c = shipCase(SHIP_LINES);
+  assert.equal(recordPreview(c).status, 0);
+  writeFileSync(join(c.repo, "a.txt"), "alpha changed\n");
+  for (const roadmap of [join(c.repo, "a.txt"), join(c.repo, "docs", "PHASES.md")]) {
+    mkdirSync(join(c.repo, "docs"), { recursive: true });
+    writeFileSync(join(c.repo, "docs", "PHASES.md"), "# Roadmap\n");
+    const r = checkPreview(c, ["--root", c.repo, "--roadmap", roadmap]);
+    assert.equal(r.status, 3, r.out + r.err);
+    assert.match(r.out, /the roadmap given now is not the previewed one \(\.plans\/PHASES\.md\): preview again/);
+    assert.doesNotMatch(r.out, /^match /m);
+  }
+  rmSync(join(c.repo, "docs"), { recursive: true });
+  writeFileSync(join(c.repo, "a.txt"), "alpha\n");
+  assert.equal(checkPreview(c).status, 0, "the previewed roadmap still passes");
+  // A record from before this check (no allowed paths): preview again.
+  const key = join(c.data, "previews", `${planKey(c.plan)}.previewed.json`);
+  const saved = JSON.parse(readFileSync(key, "utf8"));
+  delete saved.allowed;
+  writeFileSync(key, JSON.stringify(saved));
+  const old = checkPreview(c);
+  assert.equal(old.status, 3);
+  assert.equal(old.out, "the previewed record holds no list of the paths that may change (it was made before that check): preview again\n");
+});
+
+test("fix round 1 (7r), L4: a commit message file is resolved again before it is hashed: a folder on its way re-pointed to another folder exits 3, even with the same bytes there", () => {
+  const c = shipCase(SHIP_LINES);
+  const commits = join(c.repo, ".plans", "commits");
+  rmSync(commits, { recursive: true, force: true });
+  for (const name of ["msg-a", "msg-b"]) {
+    mkdirSync(c.at(name));
+    writeFileSync(join(c.at(name), "zork-commit.txt"), "Ship zork\n");
+  }
+  writeFileSync(join(c.at("msg-b"), "zork-commit.txt"), "An unseen message\n");
+  linkFolder(c.at("msg-a"), commits);
+  assert.equal(recordPreview(c).status, 0);
+  assert.equal(checkPreview(c).status, 0);
+  unlinkLink(commits);
+  linkFolder(c.at("msg-b"), commits);
+  const moved = checkPreview(c);
+  assert.equal(moved.status, 3, moved.out);
+  assert.equal(moved.out, "the commit message file is not at its previewed real path (a folder on its way changed): .plans/commits/zork-commit.txt\n");
+  writeFileSync(join(c.at("msg-b"), "zork-commit.txt"), "Ship zork\n");
+  assert.equal(checkPreview(c).status, 3, "the path decides before the hash");
+  unlinkLink(commits);
+});
+
+test("fix round 1 (7r), L5: a record whose text was edited without its hash is refused (exit 4), with or without --root", () => {
+  const c = shipCase(SHIP_LINES);
+  assert.equal(recordPreview(c).status, 0);
+  const key = join(c.data, "previews", `${planKey(c.plan)}.previewed.json`);
+  const saved = JSON.parse(readFileSync(key, "utf8"));
+  writeFileSync(key, JSON.stringify({ ...saved, text: saved.text.replace("check: true", "check: true\nstep: echo zork-added") }));
+  for (const extra of [[], ["--root", c.repo, "--roadmap", c.roadmap]]) {
+    const r = checkPreview(c, extra);
+    assert.equal(r.status, 4, r.out);
+    assert.equal(r.out, "the previewed record's text does not match its hash (the record was edited): record it again\n");
+  }
 });

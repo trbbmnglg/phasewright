@@ -43,7 +43,9 @@ The marker line directly above the roadmap table makes it a standard table ([the
 
 ## Phase plan
 
-```markdown
+The outer fence has four backticks because the plan holds a fenced `ship` block.
+
+````markdown
 # Phase N: <one-line outcome>
 
 **Models:** plan <alias (effort)> · build <alias (effort)>, runs as <main | builder> · checks and ship <alias (effort)> · review <standard | security>
@@ -74,9 +76,32 @@ N. Docs, typecheck, full test run (<h>)
 - Prod check: `<cmd or flows>`
 - Rollback (required before deploy): `<cmd that restores the previous version>`
 
+```ship
+branch: <branch>
+step: git add -A -- <paths>
+step: git diff --quiet
+step: test -z "$(git status --porcelain --untracked-files=all | grep '^??')"
+step: git commit -F '<commit message file>'
+step: git push origin <branch>
+step: <deploy command>
+check: <prod check command, exit 0 when it passes>
+check: for i in 1 2 3 4 5 6; do ids=$(gh run list --commit "$(git rev-parse HEAD)" --json databaseId --jq '.[].databaseId'); test -n "$ids" && break; sleep 10; done; test -n "$ids" && for id in $ids; do gh run watch "$id" --exit-status || exit 1; done
+check: test -z "$(git status --short)"
+rollback: <cmd that restores the previous version>
+timeout: 900
+```
+
 ## Risks
 - <honest, short>
-```
+````
+
+The `ship` block is the deploy, prod-check and rollback commands again, one `key: value` entry per line, for `run` to run on approve with `ship.mjs` in one go (one permission prompt):
+- `branch:` once; `step:`, `check:` and `rollback:` at least once each, in order; `timeout:` optional, in seconds (default 900, at most 1800). Any other key, an empty block or a second block is refused at approve.
+- Every expectation is a command whose exit code decides: write "the tree is clean" as the `test -z` check in the block above, not as prose. Before the commit, the tree is not clean yet (the `git add` step staged the phase's files, and `git status --short` lists staged files too), so the two steps after `git add` check only what would be left out: `git diff --quiet` fails on a tracked file changed but not staged, and the `grep` step fails on an untracked file. A stray change stops the ship before anything is committed.
+- A `git commit -F '<file>'` step names its message file in single quotes; the preview binds that file's SHA-256 as well. A step with the word commit must be exactly `git commit` with `-q`, `-s`, `--no-edit` and one `-F` naming the message file (stage with a `git add` step before it; no `-a`, pathspec, `-m` or `&&`), and a check or a rollback never commits (undo with `git revert`), or the block is refused at approve. The same for a push: a step with `git push` is exactly `git push origin` and the block's branch (`-q` allowed), on its own, with no refspec, tag or other option; a check never pushes; a rollback line pushes only that way after `&&`, as in `git revert --no-edit HEAD && git push origin main`. `ship.mjs` then checks that origin's branch is HEAD.
+- The second check line is a CI watch: it fails when GitHub lists no run for the commit yet (right after a push the list can be empty), retrying six times, 10 seconds apart, and then watches every run. Keep that shape for any CI watch, and drop the line when a push starts no CI.
+- Every command must be one the shipper may run (the guard's shipper rules): `ship.mjs` checks them all before it runs any.
+- The block is inside `## Commands`, so the commands hash binds it like every other line. Leave it out and `run` briefs the shipper, which stays the fallback.
 
 ## Phase report
 

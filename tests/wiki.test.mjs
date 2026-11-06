@@ -82,7 +82,7 @@ test("the pages make no claim that drifts or that the plugins cannot keep", () =
 test("the page versions follow plugin.json, and no page says the guard has not been seen firing", () => {
   const version = JSON.parse(readFileSync(join(ROOT, "plugins", "phased-shipping", ".claude-plugin", "plugin.json"), "utf8")).version;
   assert.ok(read(WIKI, "Phased-shipping.md").includes(`The current plugin version is ${version}`));
-  assert.ok(read(WIKI, "Release-1.1.0-Baggao.md").includes(`plugin version ${version}`));
+  assert.ok(read(WIKI, "Release-1.2.0-Buguey.md").includes(`plugin version ${version}`));
   for (const f of readdirSync(WIKI)) assert.doesNotMatch(read(WIKI, f), /(has not|not yet) been seen firing/i, f);
 });
 
@@ -210,6 +210,8 @@ test("the roadmap standard page is in the feature list, has the five feature hea
   assert.ok(read(WIKI, "_Sidebar.md").includes("[Roadmap standard](Roadmap-standard)"));
   const version = JSON.parse(readFileSync(join(ROOT, "plugins", "phased-shipping", ".claude-plugin", "plugin.json"), "utf8")).version;
   assert.ok(page.includes(`Plugin version ${version}`), "the page names the plugin version that shipped it");
-  assert.ok(read(WIKI, "The-guard.md").includes(`Versions 0.6.0 to ${version} changed no guard rule`));
-  assert.ok(read(WIKI, "Phased-shipping.md").includes(`| ${version} | [v1.1.0]`), "the version table has a row for the current version");
+  // The guard page names the current version: either in the no-rule-changed line, or as the guard version of a release that changed a rule (0.12.0).
+  const guardPage = read(WIKI, "The-guard.md");
+  assert.ok(guardPage.includes(`Versions 0.6.0 to ${version} changed no guard rule`) || guardPage.includes(`The guard version is ${version}.`));
+  assert.ok(read(WIKI, "Phased-shipping.md").includes(`| ${version} | [v1.2.0]`), "the version table has a row for the current version");
 });

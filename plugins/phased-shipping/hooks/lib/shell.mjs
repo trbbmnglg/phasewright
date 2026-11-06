@@ -19,11 +19,14 @@
 // drops them), and in PowerShell or cmd text a .NET call, an alias, a call through a variable or a
 // %variable%. The caller decides what to do with it.
 //
-// Each entry also has two more things. `expanded` (not enumerable) is an array parallel to `args`:
+// Each entry also has four more things. `expanded` (not enumerable) is an array parallel to `args`:
 // true for an argument that holds an expansion (a variable, a command substitution, backticks), whose
 // value nothing here can know; it goes by the word's text, so a plain word with the same text is
-// marked too. `stdinShell` is true on a shell that reads its commands from stdin (no -c text and no
-// script file, or -s, or "-"), including `sudo -s`; the commands it will run can't be checked.
+// marked too. `programExpanded` (not enumerable) is true when the program word itself holds an
+// expansion (`$(echo git) push`, `$x push`, `gi$(echo t) push`, `nohup$(echo ' git') push`): what
+// runs is not the program shown. `programWord` (not enumerable) is the program word as written, folders included
+// (`/usr/bin/g?t`), for a caller that must see a glob in it. `stdinShell` is true on a shell that reads its commands from stdin
+// (no -c text and no script file, or -s, or "-"), including `sudo -s`; the commands it will run can't be checked.
 //
 // splitCommands(text, mode): mode is "sh" (default), "ps" (PowerShell text) or "cmd" (cmd.exe text).
 // It reads the command text as data and never runs it. Every loop is linear in the text. It throws
@@ -685,6 +688,11 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
   // The closing brace of a PowerShell script block belongs to the block, not to the command before it.
   if (mode === "ps") while (args.length && args[args.length - 1] === "}") args.pop();
   const next = (rest, m = mode, ex = exotic, e = env, h = []) => command(rest, h, depth + 1, out, m, ex, e);
+  // A program word that holds an expansion: every entry made for it here is marked (see programExpanded). A wrapper or a
+  // launcher that makes no entry of its own gets one, so the mark is never lost on the way to the command it wraps.
+  const hidden = out.marks.exp.has(words[lead.i]);
+  const mark = (e) => { if (hidden) out.marks.hidden.add(e); out.marks.word.set(e, words[lead.i]); return e; };
+  if (hidden && ((WRAPPERS[prog] && !KEEP.has(prog) && !(prog === "env" && envSplit(args))) || NPX_LIKE.has(prog))) out.push(mark(entry(prog, args, [], env, exotic)));
 
   if (prog === "function") exotic = exotic || "function definition";
   // In PowerShell a program is called through a variable only with & or . (the & case is flagged by the
@@ -694,19 +702,19 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
   if (prog === "env") {
     const s = envSplit(args);
     if (s) {
-      out.push(entry("env", args, [], env, exotic));
+      out.push(mark(entry("env", args, [], env, exotic)));
       runMode([s.value, ...s.rest].join(" "), depth + 1, out, "sh");
       return;
     }
   }
   if (prog === "script" || prog === "su") {
-    out.push(entry(prog, args, [], env, exotic));
+    out.push(mark(entry(prog, args, [], env, exotic)));
     const payload = dashC(args);
     if (payload !== undefined) runMode(payload, depth + 1, out, "sh");
     return;
   }
   if (WRAPPERS[prog]) {
-    if (KEEP.has(prog)) out.push(entry(prog, args, [], env, exotic));
+    if (KEEP.has(prog)) out.push(mark(entry(prog, args, [], env, exotic)));
     if (prog === "flock") {
       const payload = dashC(args);
       if (payload !== undefined) runMode(payload, depth + 1, out, "sh");
@@ -715,7 +723,7 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
     const inner = stripWrapper(WRAPPERS[prog], args, wenv);
     // sudo -s / sudo -i with no command start a shell that reads stdin.
     if (prog === "sudo" && inner.length === 0 && args.some((a) => /^-[A-Za-z]*[si][A-Za-z]*$/.test(a))) {
-      const sh = entry("sudo", args, [], env, exotic);
+      const sh = mark(entry("sudo", args, [], env, exotic));
       sh.stdinShell = true;
       out.push(sh);
     }
@@ -723,7 +731,7 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
     return next(inner, mode, exotic, wenv, heredocs);
   }
   if (prog === "parallel") {
-    out.push(entry(prog, args, [], env, exotic));
+    out.push(mark(entry(prog, args, [], env, exotic)));
     let end = args.findIndex((a) => a === ":::" || a === "::::");
     if (end < 0) end = args.length;
     const rest = stripWrapper({ valued: ["-j", "--jobs", "-n", "-N", "-a", "--arg-file", "-S", "--sshlogin", "--colsep", "-d", "--delimiter", "-L", "-I", "-X"] }, args.slice(0, end), null);
@@ -741,7 +749,7 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
     return;
   }
 
-  const self = prog === "git" ? gitEntry(args, env, exotic) : entry(prog, args, [], env, exotic);
+  const self = mark(prog === "git" ? gitEntry(args, env, exotic) : entry(prog, args, [], env, exotic));
   out.push(self);
 
   // PowerShell script blocks: `Start-Job { git push }`, `% { git push }`, `try { a } finally { git push }`. Every
@@ -852,12 +860,17 @@ function command(words, heredocs, depth, out, mode, exotic0, envIn) {
 export function splitCommands(input, mode = "sh") {
   if (typeof input !== "string") throw new TypeError("command must be a string");
   const out = [];
-  out.marks = { exp: new Set() };
+  out.marks = { exp: new Set(), hidden: new Set(), word: new Map() };
   runMode(input, 0, out, mode);
   // For each argument: does it hold an expansion (a variable, a command substitution, backticks)? A
   // guard can't know what such a word turns into. The marks go by the word's text, so a plain word with
-  // the same text is marked too (more denials, never fewer). Not enumerable, so the entries compare equal.
-  for (const e of out) Object.defineProperty(e, "expanded", { value: e.args.map((a) => out.marks.exp.has(a)) });
+  // the same text is marked too (more denials, never fewer). The same for the program word (programExpanded).
+  // Not enumerable, so the entries compare equal.
+  for (const e of out) {
+    Object.defineProperty(e, "expanded", { value: e.args.map((a) => out.marks.exp.has(a)) });
+    Object.defineProperty(e, "programExpanded", { value: out.marks.hidden.has(e) });
+    Object.defineProperty(e, "programWord", { value: out.marks.word.get(e) ?? e.program });
+  }
   delete out.marks;
   return out;
 }

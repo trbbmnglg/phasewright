@@ -24,6 +24,22 @@ node tree-state.mjs check --root <repo> --plan <plan file> --data <absolute data
 
 `stats` in the [phase history](Phase-history-and-estimates) shows the median seconds per kind, the median full runs per phase and how many baselines were reused.
 
+## Shipping
+
+Measured over 72 shipper runs, a ship took a median of 533 seconds with about 10 tool calls, and about 30% of that was `git push`. The real work (commit, deploy, CI) takes a few minutes. The likely cause of the wait is a permission prompt for a background agent's command, waiting until the owner notices, plus about 10 model turns. That cause is likely, not proven.
+
+From version 0.12.0 a plan can carry a **ship block**: a fenced block with the info string `ship` in its Commands section, with `branch:`, `step:`, `check:`, `rollback:` and an optional `timeout:` lines. On `approve`, `run` runs the block with one script, [ship.mjs](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/scripts/ship.mjs), once in the main session ([One-approval ship](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#one-approval-ship)):
+
+- **One permission prompt.** You get one prompt for the script, on purpose: it is the human gate outside the model. The plugin adds no allow rule. If you add one, allow `ship.mjs` only, never `git push`, and know that only the preview binding and the code-tree check then stand between a previewed phase and a ship (the guard hook may be inactive on a managed machine). Those protect against drift, not against a process that can run the command itself: the prompt is the authorization. Git's own hooks and `.git/config` settings (`core.fsmonitor`, `gpg.program`, filters) also run inside the allowed git commands and can act; write access to `.git` is outside what the binding protects against.
+- **Bound to what you saw.** The preview records the Commands section, the tree id of the code, the commit HEAD points at, the commit message file and the two paths that may still change (the plan file and the roadmap, fixed at the preview). The script refuses (nothing runs) when any of the rest changed. Right before a commit and on the new commit it checks again that only previewed content is committed, so a file changed after the start is never committed.
+- **The shipper's rules, in the script.** Every command must pass the guard's shipper rules before anything runs, even where hooks are off.
+- **A fixed order.** Steps in order, stopping at the first failure; then the checks; at the first failing check each rollback line once. Only a strict `git commit -F '<file>'` step commits, and a secret scan of the staged diff runs before it and of the new commit after it; a commit made by any other step stops the run. A git push the script can read must be a strict `git push origin <branch>` step, and after it origin's branch must be HEAD. A push it can't read (a script, a release tool) shows only in origin's branches and tags, which are read before the run, after every command and once more a few seconds after the last one: a ref that changed without a strict push stops the run (exit 3), whoever changed it (CI and other people too); a check that passed is never rolled back for it, and a failing check rolls back as always. The snapshot sees origin at those moments only: the background jobs the script can read are refused, but a program that detaches itself (a daemon, a service manager, a scheduler) can push after the last ref check, and a push that leaves no ref changed at those moments is out of scope, even though it can start CI. The run prints `shipped <commit>` only when origin has that commit. Each command has a timeout that kills its process tree.
+- **It says what is done.** When it stops after a step ran, it says how many steps ran and whether a local commit exists; "nothing was shipped" only when it says "nothing ran" or "no step ran".
+- **A CI watch must see the run.** Right after a push `gh run list` can be empty, so a check that watches CI requires a non-empty list, with a bounded retry ([templates.md](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/plan/references/templates.md)).
+- **The time is recorded.** The script prints `total seconds N`, which the history keeps as `ship_s`.
+
+A plan without a block keeps the shipper, which stays the fallback.
+
 ## In this repository
 
 The repository's own checks run on Node 20 or newer with no dependencies.
@@ -46,6 +62,7 @@ The repository's own checks run on Node 20 or newer with no dependencies.
 
 - Plugin version 0.11.0 added the two verify sets, parallel groups, the tree-state script, baseline reuse, the review brief, the timings table and the new history fields ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)). No guard rule changed. The shipper's turn limit went from 20 to 40.
 - This is part of [v1.1.0](Release-1.1.0-Baggao), which shipped on 2026-10-30.
+- Plugin version 0.12.0 added the ship block, `ship.mjs` and the code binding of the preview. Two guard rules were added: the builder and the checker may not run `ship.mjs` (best effort), and no role may run a program whose name is built from a variable or `$(...)`; the checker is now held to the builder's plan-file rules. Tests: [ship.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/ship.test.mjs) and [ship-process.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/ship-process.test.mjs). It is part of [v1.2.0](Release-1.2.0-Buguey), which is in progress.
 - Tests: [tree-state.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/tree-state.test.mjs), [tree-state-process.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/tree-state-process.test.mjs) and [history.test.mjs](https://github.com/trbbmnglg/phasewright/blob/main/tests/history.test.mjs).
 
 ## Limits
@@ -60,11 +77,13 @@ The repository's own checks run on Node 20 or newer with no dependencies.
 - Two runs that record at the same moment can lose one record, which only means one less reuse. A record file that exists but cannot be read is never overwritten.
 - The records are tree ids and hashes only, in `verify-records.json` in the plugin's data folder. They hold no command text and no file content.
 - The skill evals for these rules have not been run against a model yet.
+- The ship speed-up is not measured yet: `ship_s` shows it once phases ship with `ship.mjs`. A failed step is not rolled back, the secret scan knows known shapes only, the code is checked at the start and around each commit (not what a deploy step reads), the commands keep your session's `PATH`, and a process that leaves its process tree can outlive a timeout kill ([Limits](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md#limits)).
 
 ## Source
 
 - [plugins/phased-shipping/skills/run/SKILL.md](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/SKILL.md)
 - [plugins/phased-shipping/skills/run/scripts/tree-state.mjs](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/scripts/tree-state.mjs)
+- [plugins/phased-shipping/skills/run/scripts/ship.mjs](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/scripts/ship.mjs)
 - [plugins/phased-shipping/skills/run/references/review-brief.md](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/skills/run/references/review-brief.md)
 - [plugins/phased-shipping/README.md](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)
 - [plugins/phased-shipping/CHANGELOG.md](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)

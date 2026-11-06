@@ -1,0 +1,16 @@
+# v1.2.0 Buguey
+
+## Status
+
+In progress. It is not released yet, and this page lists what is built so far ([releases.json](https://github.com/trbbmnglg/phasewright/blob/main/releases.json)). The version is the git tag.
+
+## What shipped
+
+Built so far (the release is in progress):
+
+- **phased-shipping, plugin version 0.12.0** ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)): one approval ships. The plan's ship block runs in one script in the main session, bound to the previewed commands and code, with one permission prompt. See [Speed](Speed#shipping) and the [CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md).
+
+## Notes
+
+- This page changes as the release is built. Release bookkeeping happens when it ships.
+- Previous release: [v1.1.2 Calayan](Release-1.1.2-Calayan).

@@ -3,13 +3,13 @@
 Skills, agents and plugins that keep AI-assisted coding work small, checked and reversible.
 
 <!-- whats-new:start -->
-> **Under active development.** Interfaces and file formats may still change; see [Releases](#releases).
+> **Work in progress.** Phasewright is built in the open. Release v1.2.0 (Buguey) is being built, so interfaces and file formats may still change; see [Releases](#releases).
 
 ## What's new
 
+- **phased-shipping 0.12.0** (2026-10-30): One approval ships: the plan's ship block runs in one script in the main session, bound to the previewed commands and code.
 - **phased-shipping 0.11.1** (2026-10-29): Every script command line in every skill now writes its paths in single quotes, and a call whose path holds an unsafe character is not run.
 - **phased-shipping 0.11.0** (2026-10-28): Faster runs without a lower bar: fast and full verify sets, reusable green baselines, review briefs and visible timings.
-- **phased-shipping 0.10.0** (2026-10-27): The dashboard page: projects, sessions and current phase with its loops, one local file rebuilt at every step, no network.
 
 Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
 <!-- whats-new:end -->
@@ -154,7 +154,7 @@ Releases are numbered by version and named. The version is the git tag.
 | v1.1.0 | Baggao | shipped | Trust and guardrails, the free-resources plugin, a local dashboard, the README, the footprint budget, supply-chain signals, rewritten refactoring and business-analyst skills, and OpenAI Codex and Google Antigravity install support. |
 | v1.1.1 | Ballesteros | shipped | Adds the use-case-discovery skill, a Design Thinking discovery from evidence to use cases, user stories and metrics, and removes the project-board tooling. |
 | v1.1.2 | Calayan | shipped | The free-resources plugin can stop the left-over dev tools you pick, after checking each again, and its report adds an analysis, Linux and protected lists for organizations. |
-| v1.2.0 | Buguey | planned | Evals, reviewer agents, security checks by default, trustworthy history, operate and rollout, plan import, a test-first gate, more harnesses and new skills. |
+| v1.2.0 | Buguey | in progress | Evals, reviewer agents, security checks by default, trustworthy history, operate and rollout, plan import, a test-first gate, more harnesses and new skills. |
 | v1.3.0 | Camalaniugan | planned | Privacy and governance packs. |
 | v1.4.0 | $\color{#D4AF37}{\textbf{Gattaran}}$ | planned | The sensitive-information guard and the loop-guard plugin. |
 | v1.5.0 | Gonzaga | planned | The dependency upkeep plugin. |

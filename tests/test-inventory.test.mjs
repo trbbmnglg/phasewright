@@ -361,7 +361,9 @@ const LIVE_LINUX = [
   "free-resources linux: a live measure run records the peak of a real command on Linux and macOS",
   "free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe",
 ];
-const LINUX_ONLY = [JQ_TEST, ZIP_TEST, ...LIVE_LINUX];
+// ship.mjs ends a command's process group after it exits; Windows has no process groups, so that test runs on Linux only.
+const POSIX_GROUP = "fix round 4 (7r), M2: a job left running by a command dies with its process group (POSIX, the real bash)";
+const LINUX_ONLY = [JQ_TEST, ZIP_TEST, ...LIVE_LINUX, POSIX_GROUP];
 const PER_PLATFORM = { ...Object.fromEntries(LINUX_SKIPS.map((n) => [n, "linux:skip,win32:run"])), ...Object.fromEntries(LINUX_ONLY.map((n) => [n, "linux:run,win32:skip"])) };
 
 test("inventory: the real tests/inventory.txt is well formed, and its header count is its number of lines", () => {

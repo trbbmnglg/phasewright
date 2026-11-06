@@ -26,7 +26,7 @@ const TEST_FILE = /^tests\/[A-Za-z0-9._-]+\.test\.mjs$/;
 // first keeps them from being the tail of the run. This only orders the run: every test file still runs, and a file missing from this list
 // (or a name here with no file) changes nothing but the order.
 export const SLOW_FIRST = [
-  "plugin-split-guard", "dashboard-page-sweeps-6b", "dashboard-page-sweeps", "free-resources-measure", "wiki-publish", "tree-state-process", "dashboard-page-rounds",
+  "plugin-split-guard", "ship-process", "dashboard-page-sweeps-6b", "dashboard-page-sweeps", "free-resources-measure", "wiki-publish", "tree-state-process", "ship", "commands-hash", "dashboard-page-rounds",
   "dashboard", "scripts", "plugin-split", "dashboard-page", "dashboard-page-sweeps-6", "tree-state", "guard",
 ].map((n) => `tests/${n}.test.mjs`);
 

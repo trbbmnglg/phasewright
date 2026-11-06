@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 40], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.1");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.0");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -487,8 +487,8 @@ test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_
 
 test("phase 7d1 to 7d1c: the guard rules file changed only its version", () => {
   const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
-  assert.match(rules, /^export const GUARD_VERSION = "0\.11\.1";$/m);
-  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.1";', "line 16");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.12\.0";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.0";', "line 16");
 });
 
 test("phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes", () => {
@@ -790,10 +790,10 @@ test("phase 7d2: the CHANGELOG keeps 0.9.0 above 0.8.0 with Date, Summary, Added
 test("phase 7p: the What's new block lists 0.11.0, 0.10.0 and 0.9.0, newest first", () => {
   const readme = repoText("README.md");
   const block = readme.slice(readme.indexOf("<!-- whats-new:start -->"), readme.indexOf("<!-- whats-new:end -->"));
-  const at = ["0.11.1", "0.11.0", "0.10.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
+  const at = ["0.12.0", "0.11.1", "0.11.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
   assert.ok(at.every((i) => i >= 0), "all three are listed");
   assert.ok(at[0] < at[1] && at[1] < at[2], "newest first");
-  assert.ok(!block.includes("**phased-shipping 0.9.0**"), "only the newest three");
+  assert.ok(!block.includes("**phased-shipping 0.10.0**"), "only the newest three");
 });
 
 test("phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes", () => {
@@ -859,7 +859,7 @@ test("phase 7d2: the README and the wiki describe the dashboard data, what it wr
   for (const phrase of ["**The dashboard data**", "**The dashboard files**", "`dashboard.json`", "`projects.json`", "`sessions/<id>-<tag>+<phase>.json`", "**absolute path**", "the only file with an absolute path", "never print it except `list --paths`", "makes no network calls", "a link, a junction or a hard link makes the script stop and write nothing", "at most 16 KB", "`collect --out` writes the one file you name", "is refused inside the data folder"]) assert.ok(touches.includes(phrase), phrase);
   assert.ok(touches.includes("The status script (`status.mjs`)"), "the commands it runs list the status script");
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.1"));
+  assert.ok(wiki.includes("The current plugin version is 0.12.0"));
   assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
   assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(wiki), "the version row");
   const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
@@ -1021,7 +1021,7 @@ test("phase 7p: the README has the Speed section with the honest limits, and the
 
 test("phase 7p: the wiki pages say 0.11.0 where they name the current version", () => {
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.11.1"));
+  assert.ok(wiki.includes("The current plugin version is 0.12.0"));
   assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|.*fast and a full verify set/m.test(wiki), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.0: faster runs without a lower bar"));
   assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
@@ -1221,13 +1221,16 @@ test("phase 7q: the roadmap, onboard and free-resources skills stop and say why;
 });
 
 test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added", () => {
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.11.1");
+  // the plugin is at 0.11.1 or later (the exact current version is pinned by the newest phase's test), and the guard version follows it
+  const version = JSON.parse(text(".claude-plugin", "plugin.json")).version;
+  const [major, minor, patch] = version.split(".").map(Number);
+  assert.ok(major > 0 || minor > 11 || (minor === 11 && patch >= 1), version);
   // free-resources is at 0.1.1 or later (the exact current version is pinned by tests/free-resources-bin.test.mjs)
   const frVersion = JSON.parse(readFileSync(join(HERE, "..", "plugins", "free-resources", ".claude-plugin", "plugin.json"), "utf8")).version;
   const [frMajor, frMinor, frPatch] = frVersion.split(".").map(Number);
   assert.ok(frMajor > 0 || frMinor > 1 || (frMinor === 1 && frPatch >= 1), frVersion);
-  assert.ok(repoText("library.json").includes('"version": "0.11.1"') && repoText("library.json").includes(`"version": "${frVersion}"`), "library.json carries both plugin versions");
-  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.11.1";');
+  assert.ok(repoText("library.json").includes(`"version": "${version}"`) && repoText("library.json").includes(`"version": "${frVersion}"`), "library.json carries both plugin versions");
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], `export const GUARD_VERSION = "${version}";`);
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.11.1").length, 2, "one 0.11.1 block");
   assert.ok(log.indexOf("## 0.11.1") < log.indexOf("## 0.11.0"), "newest first");
@@ -1241,4 +1244,196 @@ test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, 
   assert.ok(repoText("docs", "wiki", "Free-resources.md").includes("Plugin version 0.1.1") && repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("free-resources, plugin version 0.1.1"));
   assert.ok(/^\| 0\.11\.1 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.1: every script command line"));
+});
+
+// ---------- phase 7r: one approval ships (plugin version 0.12.0) ----------
+test("phase 7r: the plugin is at 0.12.0, the guard version follows, and the CHANGELOG has 0.12.0 above 0.11.1 with Date, Summary, Added and Changed", () => {
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.0");
+  assert.ok(repoText("library.json").includes('"version": "0.12.0"') && repoText("library.json").includes("plugins/phased-shipping/skills/run/scripts/ship.mjs"));
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.0";');
+  const log = text("CHANGELOG.md");
+  assert.equal(log.split("## 0.12.0").length, 2, "one 0.12.0 block");
+  assert.ok(log.indexOf("## 0.12.0") < log.indexOf("## 0.11.1"), "newest first");
+  const lines = log.split(/\r?\n/);
+  const at = lines.indexOf("## 0.12.0");
+  assert.equal(lines[at + 2], "Date: 2026-10-30");
+  assert.match(lines[at + 3], /^Summary: [\p{L}\p{Nd} .,;:'"()/+&!?`-]{20,160}$/u);
+  const entry = log.slice(log.indexOf("## 0.12.0"), log.indexOf("## 0.11.1"));
+  for (const heading of ["### Added", "### Changed"]) assert.ok(entry.includes(heading), heading);
+  for (const word of ["ship.mjs", "ship-script", "treeId", "--root", "--roadmap", "shipBlock", "secretShapeIn", "taskkill", "never `cmd.exe`", "total seconds N", "tests/ship-process.test.mjs", "never for `git push`", "The plugin adds no allow rule"]) assert.ok(entry.includes(word), word);
+  assert.ok(/^\| 0\.12\.0 \| \[v1\.2\.0\]\(Release-1\.2\.0-Buguey\) \|/m.test(repoText("docs", "wiki", "Phased-shipping.md")), "the version row");
+  assert.ok(repoText("docs", "wiki", "Release-1.2.0-Buguey.md").includes("one approval ships"));
+});
+
+test("phase 7r: the run skill binds the preview to the code, runs ship.mjs on approve with a ship block, says one prompt, and falls back to the shipper", () => {
+  const run = text("skills", "run", "SKILL.md");
+  const preview = run.slice(run.indexOf("## Preview, then stop"), run.indexOf("## On `approve`"));
+  assert.ok(preview.includes("commands-hash.mjs\" '<plan>' --record previewed --data \"${CLAUDE_PLUGIN_DATA}\" --root '<project folder>' --roadmap '<PHASES.md>'"));
+  assert.ok(preview.includes("the code is **not bound**") && preview.includes("never `ship.mjs`"));
+  const approve = run.slice(run.indexOf("## On `approve`"), run.indexOf("## Close the phase"));
+  assert.ok(approve.includes("commands-hash.mjs\" '<plan>' --check previewed --data \"${CLAUDE_PLUGIN_DATA}\" --root '<project folder>' --roadmap '<PHASES.md>'"));
+  const shipLine = "node \"${CLAUDE_SKILL_DIR}/scripts/ship.mjs\" run --plan '<plan>' --root '<project folder>' --roadmap '<PHASES.md>' --data \"${CLAUDE_PLUGIN_DATA}\"";
+  assert.ok(approve.includes(shipLine), "the ship.mjs command line");
+  assert.equal(run.split("scripts/ship.mjs\" run").length, 2, "ship.mjs is run from one place");
+  for (const phrase of ["info string `ship`", "the shipper is the fallback", "You get one permission prompt for it; that prompt is the approval gate.", "Never add an allow rule for it yourself", "Run it once, in this session's Bash tool",
+    "run it in the background and wait for its completion notice", "**Exit 2, 5 or 6, or exit 1, 3 or 7 whose output says \"nothing ran\" or \"no step ran\": nothing was shipped.**", "**Exit 3 or 7 after a step ran: a failed ship.**", "**Exit 1, 4 or 8: a failed ship.**", "Roll back by hand.", "`ship_s` is the number in its `total seconds N` line.",
+    "The code changed after the preview. Run `/phased-shipping:run N` again."]) assert.ok(approve.includes(phrase), phrase);
+  assert.ok(approve.indexOf(shipLine) < approve.indexOf("**Brief `phased-shipping:shipper`** (when `ship.mjs` does not run)"), "ship.mjs first, the shipper as the fallback");
+  assert.ok(run.slice(run.indexOf("## Close the phase")).includes("or the number in the `total seconds N` line of `ship.mjs`"));
+  assert.ok(existsSync(join(PS, "skills", "run", "scripts", "ship.mjs")));
+});
+
+test("phase 7r: the plan template's ship block parses, keeps the plan's verify text readable, and the plan skill writes it with commands as checks", async () => {
+  const { commandsSection, shipBlock } = await import("../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs");
+  const { verifyText } = await import("../plugins/phased-shipping/skills/run/scripts/tree-state.mjs");
+  const tpl = text("skills", "plan", "references", "templates.md");
+  const plan = tpl.slice(tpl.indexOf("````markdown\n") + "````markdown\n".length, tpl.indexOf("\n````\n", tpl.indexOf("````markdown")));
+  assert.ok(plan.startsWith("# Phase N:") && plan.includes("## Risks"), "the four-backtick fence holds the whole plan");
+  const section = commandsSection(plan.replace(/<branch>/g, "main"));
+  const block = shipBlock(section);
+  assert.equal(block.branch, "main");
+  assert.ok(block.steps.length >= 3 && block.checks.length >= 1 && block.rollbacks.length === 1 && block.timeout === 900);
+  assert.ok(block.checks.includes('test -z "$(git status --short)"'), "an expectation written as a command");
+  assert.deepEqual(block.messages, ["<commit message file>"], "the commit message file is named with -F in single quotes");
+  assert.notEqual(verifyText(plan), null, "a ship block does not stop a baseline from being reused");
+  for (const phrase of ["is refused at approve", "the preview binds that file's SHA-256", "the commands hash binds it", "the shipper, which stays the fallback", "(one permission prompt)"]) assert.ok(tpl.includes(phrase), phrase);
+  const skill = text("skills", "plan", "SKILL.md");
+  for (const phrase of ["**The ship block.**", "info string `ship`", "a command whose exit code decides", "bound by the commands hash", "one permission prompt", "the shipper, which stays the fallback", "the guard's shipper rules"]) assert.ok(skill.includes(phrase), phrase);
+});
+
+test("phase 7r: the README and the wiki document ship.mjs, the one prompt and the allow-rule trade-off (never for git push)", () => {
+  const readme = text("README.md");
+  assert.match(readme, /^## One-approval ship$/m);
+  const section = readme.slice(readme.indexOf("## One-approval ship"), readme.indexOf("## Speed"));
+  for (const phrase of ["`skills/run/scripts/ship.mjs`", "**One permission prompt stays, on purpose.**", "the plugin adds no allow rule", "allow `ship.mjs` only, never `git push`", "The guard hook may be inactive on a managed machine",
+    "only the preview binding and the code-tree check stand between a previewed phase and a ship", "**The shipper is the fallback.**", "never `cmd.exe`", "`ship-script`"]) assert.ok(section.includes(phrase), phrase);
+  const touches = readme.slice(readme.indexOf("## What it touches"), readme.indexOf("## Limits"));
+  for (const phrase of ["The ship script (`ship.mjs`)", "The ship logs", "its tree id and the path and SHA-256 of each bound commit message file"]) assert.ok(touches.includes(phrase), phrase);
+  assert.ok(readme.includes("`ship.mjs` has limits of its own:"));
+  const speed = repoText("docs", "wiki", "Speed.md");
+  assert.match(speed, /^## Shipping$/m);
+  const shipping = speed.slice(speed.indexOf("## Shipping"), speed.indexOf("## In this repository"));
+  for (const phrase of ["ship.mjs", "One permission prompt", "allow `ship.mjs` only, never `git push`", "only the preview binding and the code-tree check then stand between a previewed phase and a ship", "the shipper, which stays the fallback", "`ship_s`", "likely, not proven"]) assert.ok(shipping.includes(phrase), phrase);
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Version 0.12.0 added two rules, `ship-script` and `hidden-program`"));
+  assert.ok(repoText("docs", "wiki", "Approval-check.md").includes("Version 0.12.0 binds the preview to the code too"));
+});
+
+// ---------- phase 7r, fix round 1: the docs follow the fixes ----------
+test("fix round 1 (7r), L2, L3, L7, L9: the docs say nothing was shipped only when no step ran, call ship-script best effort, say the binding is against drift, and write a CI watch that needs a run", async () => {
+  const { shipBlock, commandsSection } = await import("../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs");
+  const { decide } = await import("../plugins/phased-shipping/hooks/guard-rules.mjs");
+  const readme = text("README.md");
+  const ship = readme.slice(readme.indexOf("## One-approval ship"), readme.indexOf("## Speed"));
+  // L2: "nothing was shipped" is tied to no step having run; after a step, 3 and 7 are a failed ship.
+  assert.ok(ship.includes("and on 1, 3 and 7 when the output says \"nothing ran\" or \"no step ran\""), "README exit codes");
+  assert.ok(ship.includes("After a step ran, every stop is a failed ship"));
+  assert.ok(!/Nothing was shipped on 2 \(no valid block\), 3/.test(ship), "the old claim is gone");
+  const run = text("skills", "run", "SKILL.md");
+  assert.ok(run.includes("**Exit 3 or 7 after a step ran: a failed ship.**") && run.includes("never push it as it is"));
+  assert.ok(text("skills", "run", "scripts", "ship.mjs").replace(/\r\n/g, "\n").includes("3 or 7 after a\n// step ran is a failed ship"), "the script header says so too");
+  // L3: the ship-script rule is best effort, in the README and on the guard page.
+  const limits = readme.slice(readme.indexOf("`ship.mjs` has limits of its own:"));
+  assert.ok(limits.includes("**The `ship-script` rule is best effort.**"));
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("it is best effort, so a package script or a script file the agent writes is not seen"));
+  // L7: the binding is against drift; the prompt is the authorization.
+  assert.ok(ship.includes("Those protect against drift (an edited plan, changed code, a changed message file), not against a process on your machine that can run the command or rewrite the record itself: the prompt is the authorization"));
+  assert.ok(repoText("docs", "wiki", "Speed.md").includes("Those protect against drift, not against a process that can run the command itself: the prompt is the authorization."));
+  // L9: every CI watch example needs a non-empty run list, with a bounded retry; it is a valid check the shipper's rules allow.
+  const tpl = text("skills", "plan", "references", "templates.md");
+  const examples = [...tpl.matchAll(/^check: (for i in .+)$/gm), ...ship.matchAll(/check line: `(for i in [^`]+)`/g)].map((m) => m[1]);
+  assert.equal(examples.length, 2, "the template and the README each show one");
+  for (const line of examples) {
+    assert.match(line, /test -n "\$ids" && break; sleep \d+; done; test -n "\$ids" && for id in \$ids; do gh run watch "\$id" --exit-status \|\| exit 1; done$/);
+    assert.match(line, /^for i in( \d)+; do /, "a bounded retry");
+    const block = shipBlock(commandsSection(`# x\n\n## Commands\n\n\`\`\`ship\nbranch: main\nstep: git push origin main\ncheck: ${line}\nrollback: git revert --no-edit HEAD\n\`\`\`\n`));
+    assert.equal(block.checks[0], line);
+    assert.equal(decide("shipper", "Bash", { command: line }, "."), null, "the shipper's rules allow it");
+  }
+  // No other watch loop in the docs: every gh run watch is inside one of those examples.
+  for (const [file, body] of [["README.md", readme], ["templates.md", tpl], ["Speed.md", repoText("docs", "wiki", "Speed.md")], ["run SKILL.md", run], ["plan SKILL.md", text("skills", "plan", "SKILL.md")]]) {
+    assert.doesNotMatch(examples.reduce((s, e) => s.split(e).join(""), body), /gh run watch/, file);
+  }
+});
+
+test("fix round 2 (7r), N2, N6, N7: the docs bind the push, say git's hooks and config run inside it, name the lockfile false stop, and no longer overstate what a hook can add", async () => {
+  const { shipBlock, commandsSection } = await import("../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs");
+  const readme = text("README.md");
+  const ship = readme.slice(readme.indexOf("## One-approval ship"), readme.indexOf("## Speed"));
+  for (const phrase of ["**A push is checked twice.**", "stops (exit 3) when a ref changed that no strict push explains", "`git revert --no-edit HEAD && git push origin main` stays a valid rollback", "`git ls-remote origin refs/heads/<branch>` must be HEAD", "`shipped <commit>` only when origin's branch is that commit",
+    "HEAD: it must be the commit the preview was made on", "Git itself is also outside the binding"]) assert.ok(ship.includes(phrase), phrase);
+  assert.ok(!readme.includes("what a hook added is caught before a later step pushes it"), "the overstated sentence is gone");
+  const limits = readme.slice(readme.indexOf("`ship.mjs` has limits of its own:"));
+  for (const phrase of ["lockfiles and checksum lists", "**A ref someone else changes stops the run.**", "**A background job on Windows.**", "**Git's own hooks and config run.**", "`GH_REPO` and `GH_HOST` stay"]) assert.ok(limits.includes(phrase), phrase);
+  assert.ok(repoText("docs", "wiki", "Speed.md").includes("Git's own hooks and `.git/config` settings"));
+  assert.ok(repoText("docs", "wiki", "Approval-check.md").includes("not against git's own hooks and `.git/config` settings"));
+  // The plan template's ship block pushes with the strict form, and the run skill reads both stop words.
+  const tpl = text("skills", "plan", "references", "templates.md");
+  const plan = tpl.slice(tpl.indexOf("````markdown\n") + "````markdown\n".length, tpl.indexOf("\n````\n", tpl.indexOf("````markdown")));
+  assert.ok(shipBlock(commandsSection(plan.replace(/<branch>/g, "main"))).pushes.includes(true), "the template's push step is strict");
+  assert.ok(text("skills", "plan", "SKILL.md").includes("A push is its own step too"));
+  assert.ok(text("skills", "run", "SKILL.md").includes("whose output says \"nothing ran\" or \"no step ran\": nothing was shipped."));
+});
+
+test("fix round 3 (7r), M3: every ship block and ship line in the README, the run and plan skills, the templates and the wiki parses and passes the shipper's rules", async () => {
+  const { shipBlock, commandsSection } = await import("../plugins/phased-shipping/skills/run/scripts/commands-hash.mjs");
+  const { decide } = await import("../plugins/phased-shipping/hooks/guard-rules.mjs");
+  const fill = (l) => l.replace(/<branch>/g, "main").replace(/<commit message file>/g, ".plans/commits/zork-commit.txt").replace(/<paths>/g, "zork.txt").replace(/<[a-z][a-z ,]*>/g, "true");
+  const files = [["README.md", text("README.md")], ["run SKILL.md", text("skills", "run", "SKILL.md")], ["plan SKILL.md", text("skills", "plan", "SKILL.md")], ["templates.md", text("skills", "plan", "references", "templates.md")],
+    ...readdirSync(join(REPO, "docs", "wiki")).filter((f) => f.endsWith(".md")).map((f) => [`wiki ${f}`, repoText("docs", "wiki", f)])];
+  let blocks = 0;
+  let lines = 0;
+  for (const [name, body] of files) {
+    const t = body.replace(/\r\n/g, "\n");
+    for (let at = t.indexOf("```ship\n"); at >= 0; at = t.indexOf("```ship\n", at + 1)) {
+      const start = at + "```ship\n".length;
+      const blockLines = t.slice(start, t.indexOf("\n```", start)).split("\n").map(fill);
+      const block = shipBlock(commandsSection(`# x\n\n## Commands\n\n\`\`\`ship\n${blockLines.join("\n")}\n\`\`\`\n`));
+      for (const c of [...block.steps, ...block.checks, ...block.rollbacks]) assert.equal(decide("shipper", "Bash", { command: c }, "."), null, `${name}: ${c}`);
+      blocks++;
+    }
+    for (const m of t.matchAll(/`(step|check|rollback): ([^`]+)`|check line: `([^`]+)`/g)) {
+      const [key, value] = m[3] ? ["check", m[3]] : [m[1], fill(m[2])];
+      if (/^<[^>]+>$/.test(m[2] ?? "")) continue; // a bare placeholder in the prose
+      const block = shipBlock(commandsSection(`# x\n\n## Commands\n\n\`\`\`ship\nbranch: main\nstep: true\ncheck: true\nrollback: true\n${key}: ${value}\n\`\`\`\n`));
+      assert.ok(block, `${name}: ${value}`);
+      assert.equal(decide("shipper", "Bash", { command: value }, "."), null, `${name}: ${value}`);
+      lines++;
+    }
+  }
+  assert.ok(blocks >= 1 && lines >= 1, `${blocks} blocks, ${lines} lines`);
+  // M1: the run skill never says nothing was put on origin; it says origin's refs are as they were.
+  const run = text("skills", "run", "SKILL.md");
+  assert.ok(!run.includes("nothing was put on origin"));
+  assert.ok(run.includes("HEAD is not on origin, and origin's branches and tags were as before at each of its ref checks (it can't see a push that left no ref changed at those moments, which can still have started CI)"));
+});
+
+test("fix round 5 (7r): the docs say a passing check is never rolled back, that a program which detaches itself can push after the last ref check, what the lockfile exemption skips, and that v1.2.0 is built so far", () => {
+  const readme = text("README.md");
+  const ship = readme.slice(readme.indexOf("## One-approval ship"), readme.indexOf("## Speed"));
+  assert.ok(ship.includes("**Only a failing check rolls back.**"));
+  assert.ok(!ship.includes("**A failing check, or one whose ref check trips, rolls back.**"), "the old rule is gone");
+  const limits = readme.slice(readme.indexOf("`ship.mjs` has limits of its own:"));
+  for (const phrase of ["**A program that detaches itself can push later.**", "`tmux`", "`pm2`", "`systemd-run`", "started its own session", "The diff scan applies the token shapes only"]) assert.ok(limits.includes(phrase), phrase);
+  assert.ok(!readme.includes("on POSIX each command's process group is ended when the command exits."), "the claim is narrowed to what the kill reaches");
+  const run = text("skills", "run", "SKILL.md");
+  assert.ok(run.includes("a check that passed is never rolled back"));
+  assert.ok(!run.includes("when that happens after a check, it runs the rollback lines first"));
+  const speed = repoText("docs", "wiki", "Speed.md");
+  assert.ok(speed.includes("a program that detaches itself") && !speed.includes("after a check the rollback lines run first"));
+  const release = repoText("docs", "wiki", "Release-1.2.0-Buguey.md");
+  assert.ok(release.includes("## What shipped\n\nBuilt so far (the release is in progress):"), "the heading stays, the lead says it is in progress");
+});
+
+test("fix round 6 (7r): the docs say exactly which exits report the steps and HEAD, how a shell's -c is read, and the run skill relays a ref change reported with exit 4", () => {
+  const readme = text("README.md");
+  const ship = readme.slice(readme.indexOf("## One-approval ship"), readme.indexOf("## Speed"));
+  assert.ok(!ship.includes("After a step ran, every stop is a failed ship, and the output says how many steps ran (what they did stays done) and whether HEAD moved:"), "exits 4 and 8 don't print that");
+  assert.ok(ship.includes("A stop with 1, 3 or 7 after a step ran says how many steps ran (what they did stays done) and whether HEAD moved"));
+  assert.ok(ship.includes("a quote or a backslash in a shell's options, or a backslash-escaped character in its command text, makes the block invalid"));
+  assert.ok(!/in the text a shell runs after any of its options/.test(ship), "the old claim is gone");
+  const log = text("CHANGELOG.md");
+  assert.ok(!log.includes("or a shell's options before `-c`)") && log.includes("a quote or a backslash in a shell's options"));
+  const run = text("skills", "run", "SKILL.md");
+  assert.ok(!run.includes("; A check that passed is never rolled back"), "no stray capital after a semicolon");
+  assert.ok(run.includes("When exit 4 comes with a ref change of origin reported, relay the refs it names"));
 });

@@ -8,6 +8,7 @@
 - [v1.1.0 Baggao](Release-1.1.0-Baggao)
 - [v1.1.1 Ballesteros](Release-1.1.1-Ballesteros)
 - [v1.1.2 Calayan](Release-1.1.2-Calayan)
+- [v1.2.0 Buguey](Release-1.2.0-Buguey)
 
 **Features**
 

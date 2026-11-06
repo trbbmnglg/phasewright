@@ -2,7 +2,8 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 1071
+# tests: 1189
+linux:run,win32:skip	fix round 4 (7r), M2: a job left running by a command dies with its process group (POSIX, the real bash)
 linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
 linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
 linux:run,win32:skip	the Release name step titles a listed tag and fails an unlisted one
@@ -61,6 +62,7 @@ run	a description with no sentence end: short stays whole, long is cut
 run	a double-quoted placeholder fails, named by file and line, in a span and in a fenced block
 run	a double-quoted string is allowed only around a Claude Code variable or fixed lowercase text
 run	a drifted generated page fails
+run	a failed command's log tail withholds secret-shaped lines and keeps the others (the real bash)
 run	a fallback publish that fails with something left at the final name keeps its marker: the next write refuses, and nothing is written
 run	a fenced command that continues on the next line is checked as one line
 run	a file turned into a hard link after the list is caught at the read, and the read-time check is what catches it
@@ -85,6 +87,7 @@ run	a plan file name with an invisible character is skipped as an unusual name, 
 run	a plan title with escape, link and bell characters reaches neither the output nor the written roadmap
 run	a planted fake secret in an allowlisted file skips the whole file, is counted, and is never printed or saved
 run	a quoted description with escaped quotes passes and round-trips
+run	a real timeout: the real bash running sleep is killed after the block's timeout
 run	a record with a guard value is saved as given, for each of the three values
 run	a record with timings and baseline_reused is saved as given
 run	a record with tokens is saved as given
@@ -103,6 +106,7 @@ run	a stray file name fails
 run	a symbolic link or junction that points outside the project is not followed
 run	a term from the local denylist fails, including mixed case
 run	a tilde fence whose info string holds a backtick still opens a fence and wraps a decoy bullet
+run	a timeout kills the child's process tree and reports exit 124; a timed-out check rolls back
 run	a valid CHANGELOG gives the newest three entries, newest first, with date and summary
 run	a valid caught_by is saved as given: [] with no rounds, one entry per round, plus one for a rollback
 run	a value beyond the safe integer range is refused for timings and tokens, and stats ignores one in an old file
@@ -162,7 +166,7 @@ run	both case: a standard table lists only the plan files whose ids are not in i
 run	both case: several roadmap files are listed, --into picks one, nothing is merged across files
 run	both marketplace files list phased-shipping, and the Cursor entry says what is Claude Code only
 run	bracketed options, positional-only spans and spans with a quote or a $ are script lines too
-run	builder and checker share their rules, the builder has two more (the plan files, the plugin files), and shipper has its own
+run	builder and checker share their rules, the plan-file and plugin-file rules included, and shipper has its own
 run	caps: 200 files in the list, 64 KB of text per file, 400 KB for the survey
 run	cell escapes the backslash first and then the pipe, so the text reads back unchanged and a pipe never splits a cell
 run	cells: clean(cellOf(v).trim()) gives v back for every string of a, space, | and backslash up to 6 characters
@@ -277,6 +281,19 @@ run	every shipped or in-progress release has a page whose Status says so, with t
 run	every summary in the real library.json is within 240 characters
 run	every tokenizer loop is linear: 80000-word inputs are split in well under a second
 run	exempt: "${CLAUDE_SKILL_DIR}" and "${CLAUDE_PLUGIN_DATA}" in double quotes, with or without a path after them
+run	exit 0: every step and check passes; the report lines, the commit, the Commands hash and the total seconds
+run	exit 1 before any step: HEAD is on another branch
+run	exit 1: a failing step stops the run, and no later step, check or rollback ran
+run	exit 2: usage errors run nothing
+run	exit 3 during the run: a commit message file that changed after the binding is never committed
+run	exit 3: a command changed after the preview, and nothing ran
+run	exit 3: a record without a tree (an old preview) is refused, and nothing ran
+run	exit 3: the code changed after the preview (the path is named), and nothing ran; the plan and the roadmap may change
+run	exit 4: a failing check runs every rollback line once, in order, and no later check
+run	exit 5: a guard-denied command refuses the whole run before anything runs, and so does a missing guard
+run	exit 6: no bash, and nothing ran
+run	exit 7: a fake secret in the staged diff stops before the commit; only the file name and the category are printed
+run	exit 8: a failing rollback line stops the rollback and says to roll back by hand
 run	exotic syntax is flagged on the command that uses it
 run	fail closed: .phased-shipping is a file, a link, or has a .gitignore that is not '*': nothing is written
 run	fewer than three entries are all shown; no version heading is an error
@@ -284,15 +301,56 @@ run	final fixes, L1: an older-form file hides a tagged file only when it is the 
 run	final fixes, L2: collect reads roadmap entries that are the same path once (letter case through io.caseInsensitive)
 run	final fixes, L2: status compares roadmap entries with the same letter-case fold as the tags, under both io.caseInsensitive settings
 run	final fixes, L2: the page draws roadmap entries that are the same path once (letter case through its caseInsensitive option)
+run	findBash: Git Bash from git --exec-path on Windows (never the PATH), the first bash on the PATH elsewhere, null when none
+run	fix round 1 (7r), L1: the log tail withholds a token behind an ANSI colour code, the rest of a line cut by the 64 KB read, and every line of a PEM block
+run	fix round 1 (7r), L2, L3, L7, L9: the docs say nothing was shipped only when no step ran, call ship-script best effort, say the binding is against drift, and write a CI watch that needs a run
+run	fix round 1 (7r), L3: reading, testing and ordinary node runs stay allowed for the builder and the checker (false-deny guard)
+run	fix round 1 (7r), L3: the checker can't write the plan files or the approval records with the file tools or the shell, nor run commands-hash.mjs --record
+run	fix round 1 (7r), L3: the ship-script bypasses are denied for the builder and the checker (best effort)
+run	fix round 1 (7r), L4: a commit message file is resolved again before it is hashed: a folder on its way re-pointed to another folder exits 3, even with the same bytes there
+run	fix round 1 (7r), L4: a commit message folder re-pointed to another folder during the run is never committed from (exit 3)
+run	fix round 1 (7r), L5: a record whose text was edited without its hash is refused (exit 3), and nothing ran
+run	fix round 1 (7r), L5: a record whose text was edited without its hash is refused (exit 4), with or without --root
+run	fix round 1 (7r), L6: a format character (bidi, zero-width, BOM) anywhere in a ship block line makes the block invalid
+run	fix round 1 (7r), L8: the log folder is made in the temp folder the caller gives
+run	fix round 1 (7r), M1: --check previewed --root takes the paths that may change from the record: a --roadmap or plan given now that is not the previewed one exits 3, and so does a record without them
+run	fix round 1 (7r), M1: --record previewed --root stores and prints the paths that may change; a roadmap not named PHASES.md, a plan not shaped like a plan file, a path outside the project folder and a link to one are refused, and nothing is recorded
+run	fix round 1 (7r), M1: a --roadmap that names a changed tracked file is not the previewed roadmap: exit 3, and nothing ran
+run	fix round 1 (7r), M2: a commit step that makes more than one commit, and a check that moves HEAD, stop the run (exit 3) with no later command
+run	fix round 1 (7r), M2: a step that is not a commit step but moves HEAD stops the run (exit 3), names the commit and runs no later step
+run	fix round 1 (7r), M2: a step with the word commit must be exactly git commit with -q, -s, --no-edit and one -F: every other form is an invalid block (exit 2), and nothing ran
+run	fix round 1 (7r), M2: an alias for commit (git ci) is refused by the guard before anything runs (exit 5)
+run	fix round 1 (7r), M2: the staged-diff scan reads a file whose .gitattributes says -diff as text: exit 7, and the commit never ran
+run	fix round 1 (7r), M2: what a commit step committed is scanned too: a file staged after the scan (as a pre-commit hook could) gives exit 7, names the local commit and never pushes it
+run	fix round 1 (7r), M3: a tracked file edited after the binding check and staged by a step is never committed (exit 3), and the push never ran
+run	fix round 1 (7r), M3: every command runs in the bound real project folder, not the --root spelling
+run	fix round 1 (7r), M3: the new commit is checked against the preview too: a tracked file a hook changed and staged gives exit 3, names the local commit and never pushes it
+run	fix round 1 (7r), M4: a program word, an empty program or command text built from an expansion is denied for every role (hidden-program)
+run	fix round 1 (7r), M4: the real prod-check and watch lines, git commit -F <file>, git push origin main and revert-and-push stay allowed for the shipper (false-deny guard)
+run	fix round 1 (7r), M5: commandEnv drops every GIT_* variable, every name on the guard's list and the fixed extra names, keeps the home and PATH names, and lists what it dropped
+run	fix round 1 (7r), M5: the parent's GIT_CONFIG_* never reach a command, so a refusing pre-commit hook still refuses (exit 1); the left-out names are printed, never the values (the real bash)
+run	fix round 1 (7r), mutant: a guard-denied command in a step or in a check refuses the whole run too, and nothing ran
 run	fix round 1, H1: --record and --check print the normalized section after the status line
 run	fix round 1, L1: two Commands headings, or one that isn't exactly '## Commands', exit 2
 run	fix round 1, L2: --record, --check or --data with no value exits 1 and never prints the hash
 run	fix round 1, L5: a redirect glued to a word is a plan file write; similar names stay allowed
-run	fix round 1, L6: git checkout and git restore onto a plan file are denied for the builder only
+run	fix round 1, L6: git checkout and git restore onto a plan file are denied for the builder and the checker
 run	fix round 1, L7: an NTFS stream suffix on a plan file name is the same file
-run	fix round 1, L8: reading those files and folders merely named previews stay allowed; other roles are not restricted
+run	fix round 1, L8: reading those files and folders merely named previews stay allowed; the shipper is not restricted
 run	fix round 1, L8: the builder can't write the approval records or the plugin's data, skills and agents
 run	fix round 1, L9: a relative and an absolute path to the same file share a key; the same name in two folders differs
+run	fix round 2 (7r), N1: a process substitution, an fd path or an expansion as the script of a shell, source or . is denied for every role (hidden-program)
+run	fix round 2 (7r), N1: a step or a check that runs a process substitution or an fd path as a shell script is refused by the guard (exit 5), and nothing ran
+run	fix round 2 (7r), N2, N6, N7: the docs bind the push, say git's hooks and config run inside it, name the lockfile false stop, and no longer overstate what a hook can add
+run	fix round 2 (7r), N2: a commit made after the preview refuses the ship (exit 3) even when the tree is the previewed one, and so does a record with no HEAD; nothing ran
+run	fix round 2 (7r), N2: a push step must be exactly git push [-q] origin <the block's branch>, on its own; a check never pushes; a rollback pushes only that way, after &&
+run	fix round 2 (7r), N2: after a push step origin's branch must be HEAD (exit 3 otherwise), and a run that did not put HEAD on origin never prints shipped
+run	fix round 2 (7r), N3: the word commit hidden by a backslash, quotes, $'..', a line continuation or an empty expansion still counts: a step must then be strict, and a check or a rollback may not hold it
+run	fix round 2 (7r), N4: a token split by a lone CR in a log line is withheld, and the line is never shown in two parts
+run	fix round 2 (7r), N5: a commit message file with secret-shaped text stops before the commit (exit 7); only its name and the category are printed
+run	fix round 2 (7r): every stop before the first step says nothing ran or no step ran, and a stop after a step says neither (the run skill reads those words)
+run	fix round 2 (7r): node --eval= with a substitution, and node reading its script from stdin, are denied for the builder and the checker; version, help, test and check runs stay allowed
+run	fix round 2 (7r): the overcommit and pre-commit skips are dangerous environment for every role
 run	fix round 2, L1: dot segments, doubled slashes and a trailing /. don't hide a plan or protected file
 run	fix round 2, L2: cp, mv, install -t and a phases folder as the destination; rsync, git apply and git mv
 run	fix round 2, L6: an option whose value starts with -- exits 1 with a message and creates no folder
@@ -315,11 +373,50 @@ run	fix round 2: coproc is a program of its own, and node follows a tool path un
 run	fix round 2: each change below, made in a copy of the scripts, makes its scenario fail
 run	fix round 2: git restore --staged alone only unstages and is allowed; with --worktree it is denied
 run	fix round 2: the legitimate commands still pass (false-deny guard)
+run	fix round 3 (7r), M1, M2: origin's refs are read before the run and after every step and check: a ref a step or a check changed stops the run (exit 3) and is named; only a strict push may move the block's branch to HEAD
+run	fix round 3 (7r), M1: a shell reading its stdin from a process substitution, a file or an fd is refused (the reviewer's force push, the real bash): exit 5, and origin is untouched
+run	fix round 3 (7r), M1: a shell, source or . with no -c text whose stdin is redirected (a file, a process substitution or an fd) is denied for every role (hidden-program)
+run	fix round 3 (7r), M2: a nested substitution is read through in a step, a check and a rollback, and one that is never closed makes the block invalid
+run	fix round 3 (7r), M2: a push hidden by a nested substitution is read as a push (the reviewer's evil ref, the real bash): an invalid block, exit 2, and no ref appears on origin
+run	fix round 3 (7r), M2: a push step runs only while HEAD is the block's branch (git symbolic-ref): exit 3 otherwise, and the push never ran
+run	fix round 3 (7r), M2: a run that can't read origin's refs proves nothing: exit 3 before any step, or right after the step that ran
+run	fix round 3 (7r), M3: every ship block and ship line in the README, the run and plan skills, the templates and the wiki parses and passes the shipper's rules
+run	fix round 3 (7r), M3: the plan template's ship block, filled in, ships through the real scripts; a stray unstaged or untracked change stops it before the commit
 run	fix round 3, item 1: git's global and system config files are protected for every role (shell and file tools)
 run	fix round 3, item 2: read, printf -v, mapfile, readarray and getopts that fill HOME, USERPROFILE, GIT_* and the like are denied; harmless names pass
 run	fix round 3, item 3: curl short options with an attached value are writes (builder, checker, shipper); GET forms pass
 run	fix round 3, item 5: git fetch with --force or a + refspec is denied; plain fetches pass
 run	fix round 3, item 6: git config --get-regexp, --name-only and --show-scope are reads; writes stay denied
+run	fix round 4 (7r), M1: a glob in the program word (the reviewer's force push, the real bash) is an invalid block: exit 2, and origin is untouched
+run	fix round 4 (7r), M1: a glob in the program word is denied for every role (hidden-program); arguments may glob
+run	fix round 4 (7r), M1: a glob, a brace expansion or ${ in any command's program word makes the block invalid in a step, a check and a rollback; arguments may glob
+run	fix round 4 (7r), M2: & as an operator and the background programs are refused in every line; && and the redirections with & stay valid
+run	fix round 4 (7r), M2: a background job is refused (the reviewer's delayed push, the real bash): an invalid block, exit 2, and origin is never rewritten later
+run	fix round 4 (7r), M2: each command's process group (or tree) is ended after the command exits, not only on a timeout
+run	fix round 4 (7r), M2: one more ref check after the last command, after a short wait, catches a push that lands late (exit 3)
+run	fix round 4 (7r), M3: a ref of origin changed by something else while a check fails stops the ship, and the rollback lines still run (the real scripts)
+run	fix round 4 (7r), M3: refs that hosting services own (refs/pull, refs/merge-requests, refs/changes, refs/notes, refs/remotes, refs/keep-around) changing during the run don't stop it
+run	fix round 4 (7r), N6: a 64-hex checksum in a lockfile does not stop the ship, but any other shape in it does, and a 64-hex string elsewhere still does
+run	fix round 4 (7r): a case in a substitution, a ${ holding a quote and a brace expansion are refused as unreadable (bash reads them as push)
+run	fix round 4 (7r): a failed step still gets its ref check: a ref it pushed before failing is named, and the exit stays 1
+run	fix round 4 (7r): a rollback line is followed by its own ref check (what it changed is reported, and the later rollback lines still run), and ls-remote runs with its own 60-second timeout
+run	fix round 4 (7r): the log tail withholds a token glued to text by a colour code, split by a backspace or by an OSC sequence, and leaves ordinary progress output alone
+run	fix round 5 (7r), A: a check that passed while a ref of origin changed stops the run (exit 3) and rolls nothing back; a failing check with a ref change rolls back (exit 4)
+run	fix round 5 (7r), A: a passing check while someone tags origin stops the run (exit 3) with no rollback, and origin's main is still HEAD (the real scripts)
+run	fix round 5 (7r), A: a ref of origin that changes after a rollback line is reported, and the later rollback lines still run
+run	fix round 5 (7r), A: origin's refs that can't be read after a passing check stop the run (exit 3) and roll nothing back
+run	fix round 5 (7r), B: a background job behind shell options (bash --norc -c '... &') is refused before anything runs: exit 2, and origin is unchanged later (the real scripts)
+run	fix round 5 (7r), B: the background refusal reads through folders, .exe, wrapper option values and shell options, and nohup, setsid, disown and coproc count as any plain word
+run	fix round 5 (7r): the docs say a passing check is never rolled back, that a program which detaches itself can push after the last ref check, what the lockfile exemption skips, and that v1.2.0 is built so far
+run	fix round 5 (7r): the log tail withholds a token cut by a string sequence (DCS, APC, PM, SOS, OSC), hidden by a carriage-return overwrite, split by a tab or percent-encoded, and leaves progress output alone
+run	fix round 6 (7r), B1: a background job behind a quoted -c or an escaped & is refused before anything runs (exit 2), and no tag appears later (the real scripts)
+run	fix round 6 (7r), B1: a shell's -c or its command text written with a quote or a backslash is read as bash reads it, and refused when it can't be (fail closed)
+run	fix round 6 (7r), L1: a passing check whose ref check trips, in a block that never pushed, says origin's branch is unchanged and this run did not push HEAD
+run	fix round 6 (7r), L2: at and batch can't sit behind a keyword's or a wrapper's options, and a wrapper option the reader does not know is refused
+run	fix round 6 (7r), L3: the log tail withholds a token cut by an nF escape, by a string sequence never ended, or by an 8-bit string sequence, and leaves ordinary output alone
+run	fix round 6 (7r), L4: ;& and ;;& are case separators, and the operators with & stay valid; a lone & is still refused
+run	fix round 6 (7r): after a failing check whose refs can't be read, the rollback lines still run (exit 4) and the read failure is reported
+run	fix round 6 (7r): the docs say exactly which exits report the steps and HEAD, how a shell's -c is read, and the run skill relays a ref change reported with exit 4
 run	folder links inside docs and plan folders are counted and reported, never followed
 run	folder warning: each CLI warns on stderr when run from inside the skill folder, and not from elsewhere
 run	fonts: both woff2 files are renamed (no Plex outside the copyright and licence records) and the licence file is unchanged
@@ -627,7 +724,7 @@ run	phase 7, builder: Write, Edit and NotebookEdit to PHASES.md or phases/phase-
 run	phase 7, builder: other files that look similar are allowed
 run	phase 7, builder: reading the plan files and writing similar names is allowed
 run	phase 7, builder: shell writes to the plan files are denied (best effort)
-run	phase 7, others: the shipper, the checker, the main session and model-scout may write PHASES.md
+run	phase 7, others: the shipper, the main session and model-scout may write PHASES.md
 run	phase 7: plan records `planned` and adds the Commands hash line; the shipper reports the hash
 run	phase 7: run records the preview, checks it on approve and push, and a mismatch is a hard stop
 run	phase 7: the changelog has a 0.5.0 entry above 0.4.0, and the README is honest about what the binding stops
@@ -691,6 +788,15 @@ run	phase 7q: the plan skill stops at the record step and the roadmap check, and
 run	phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added
 run	phase 7q: the roadmap, onboard and free-resources skills stop and say why; format.md names the single-quoted form
 run	phase 7q: the run skill stops when a commands-hash path is unsafe, skips roadmap set, and picks another temp path for the history file
+run	phase 7r: --check previewed --root passes a plan-only or roadmap-only change and refuses any other changed path, by name
+run	phase 7r: --record previewed --root stores the project folder, the tree id and the commit message file's SHA-256
+run	phase 7r: a changed -F message file is refused, and so is an old record with --root, another project folder, or a lost tree
+run	phase 7r: builder, checker and model-scout are denied running ship.mjs; the shipper and the main session are not, and reading or testing it stays allowed
+run	phase 7r: the README and the wiki document ship.mjs, the one prompt and the allow-rule trade-off (never for git push)
+run	phase 7r: the plan template's ship block parses, keeps the plan's verify text readable, and the plan skill writes it with commands as checks
+run	phase 7r: the plugin is at 0.12.0, the guard version follows, and the CHANGELOG has 0.12.0 above 0.11.1 with Date, Summary, Added and Changed
+run	phase 7r: the run skill binds the preview to the code, runs ship.mjs on approve with a ship block, says one prompt, and falls back to the shipper
+run	phase 7r: without --root the check is unchanged (old and new records, code changes unseen); --root and --roadmap need their stage
 run	plugin agent names must match the file and have no colon
 run	plugin agents: bad effort and maxTurns fail
 run	plugin agents: fields that plugins ignore fail
@@ -802,12 +908,18 @@ run	set: keeps CRLF line endings and the last-newline state, and refuses an exis
 run	set: touches only the cells it was given, writes the status in lowercase and the actual as <n> h
 run	set: validates the status and the actual, and refuses unknown, legacy and ambiguous ids
 run	shell.mjs has no imports beyond node: built-ins
+run	ship block: a valid block parses with its defaults, in order, and a section without one gives null
+run	ship block: each invalid shape exits 2 from ship.mjs, and nothing ran
+run	ship block: every invalid shape throws a ship error
+run	ship block: messageFiles reads -F, a flag cluster, --file and --file=, quoted or bare, and refuses any other commit form
+run	ship block: the block is read from the recorded text, not from the plan file
 run	shipper: force, skip-checks and history rewrites are denied
 run	show keeps a command, an action, a stack entry and a manifest or deploy file only in the forms the script writes, and strips invisible characters
 run	show keeps only known fields from a survey.json on disk, cleans and caps them, and says it was read from disk
 run	show refuses a survey that is not schema v 1
 run	single-quoted placeholders need the unsafe-character rule in the same file, each piece of it
 run	source: adopt builds no regular expression from text and reads no folder it should not
+run	stagedSecrets reads only added lines and names the file
 run	stale banner: 90 minutes, from one value in the page, the placeholder and the script
 run	standardize --write: LF and CRLF files keep their line endings and the last-newline state
 run	standardize --write: a file outside --root is refused (exit 2) and nothing is written
@@ -936,6 +1048,7 @@ run	the four SVGs exist, are at most 12 KB and have a viewBox
 run	the fourth and older entries need no lines, and a heading with extra text is not an entry
 run	the generated What's new block is at most 110 words and sits between the tagline and The problem
 run	the generated pages match what the renderers produce
+run	the guard rules and the secret matcher load from the plugin layout, and from a personal-copy layout only with the marker
 run	the guard version matches the plugin version
 run	the headings are exactly the agreed list, in order, with their levels
 run	the hook scripts import only node: built-ins and their own files, and never write or reach the network
@@ -970,10 +1083,12 @@ run	the real repo lints with no errors, including the plugin files
 run	the real repo passes lint and its manifest is current
 run	the real script, run as a process: deny output, allow output, exit codes and --agent
 run	the real script: id prints one line equal to HEAD^{tree}, and check with no record exits 1
+run	the real scripts: preview, then ship (commit and push to a bare remote, checks pass), then a code change after a fresh preview exits 3 and runs nothing
 run	the real tree: every script command line in every skill and agent file follows the quoting rule
 run	the recovery message names the cut-short copy: .original is compared and may be deleted too; any other marker names its own copy, not .original
 run	the release note claims provenance only when the workflow makes it
 run	the release table lists only releases that are shipped or in progress
+run	the report counts seconds from the injected clock
 run	the repository's own latest commit passes, and its author name has no space
 run	the roadmap standard page is in the feature list, has the five feature headings, and is linked from Home and the sidebar
 run	the roadmap's temp file lives in the backup folder; nothing named .tmp is ever next to the roadmap, at any moment of set, standardize --write or restore --write
@@ -983,14 +1098,17 @@ run	the root: .git is found from a subfolder, a folder outside any repository is
 run	the rule has the empty-value and root piece, and each skill states it
 run	the same section gives the same hash, whatever the line endings or trailing spaces
 run	the script imports only node: built-ins
+run	the script imports only node: built-ins and its two siblings, writes no file outside its log folder, and never uses a shell option
 run	the script imports only node: built-ins and never calls require or a dynamic import
 run	the script imports only node: built-ins and writes only under --data
 run	the script imports only node: built-ins, reads no environment variable and uses no network or process API
 run	the script never writes anywhere but the roadmap file's own folder or its backup folder: every write call names a known path variable
+run	the script never writes the plan, the roadmap or the data folder
 run	the script's writes are all inside the state folder: every write helper is called only on paths built from it
 run	the section ends at the next heading, and a heading inside a code fence doesn't count
 run	the social preview is a 1280 by 640 PNG of at most 1 MB
 run	the source runs git with an argument array and never a shell
+run	the spawn arguments: bash with an argument array, never cmd.exe and never shell: true, stdin closed, in the project folder
 run	the state folder's .gitignore is a single line, *, and a real git repository shows nothing from it
 run	the survey runs nothing: commands found in the files are only recorded
 run	the temp folders made by this file are removed by the after hook
