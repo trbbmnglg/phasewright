@@ -133,7 +133,7 @@
       ],
       "featured": false,
       "order": 3,
-      "version": "1.1.0",
+      "version": "1.1.1",
       "license": "MIT",
       "path": "agents/claude/docs-writer.md",
       "files": [
@@ -194,7 +194,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.3.0",
+      "version": "0.3.1",
       "license": "MIT",
       "path": "plugins/free-resources",
       "files": [
@@ -301,7 +301,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "0.12.0",
+      "version": "0.12.1",
       "license": "MIT",
       "path": "plugins/phased-shipping",
       "files": [
@@ -955,7 +955,7 @@
       ],
       "featured": false,
       "order": 9,
-      "version": "1.0.0",
+      "version": "1.0.1",
       "license": "MIT",
       "path": "skills/use-case-discovery",
       "files": [

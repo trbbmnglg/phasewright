@@ -226,7 +226,7 @@ All notable changes to this project are documented here, newest first.
 - BUG-042: {what was wrong and what it does correctly now}
 ````
 
-Use `git log --oneline {prev-tag}..HEAD` to enumerate what's changed. Read the actual commits and source changes — never invent changelog entries.
+Find the previous tag with `git describe --tags --abbrev=0`, or take it from the user. A tag name comes from the repository, so check it before it goes into a command: use it only if it matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$` and does not contain `..`. If it does not match, do not run the command; tell the user which value was refused. To confirm the tag exists, run `git rev-parse --verify --quiet 'refs/tags/<prev tag>'`, with the validated tag inside the single quotes. A tag that passes the check has no character the shell treats specially, so write it bare in the log command: `git log --oneline <prev tag>..HEAD`. Use that to enumerate what's changed. Read the actual commits and source changes — never invent changelog entries.
 
 ---
 
@@ -236,7 +236,7 @@ Use `git log --oneline {prev-tag}..HEAD` to enumerate what's changed. Read the a
 2. **Check the current `docs/` folder** — stale documentation is worse than no documentation. Update rather than create a parallel version.
 3. **Mermaid diagrams reflect the code, not an ideal.** If the diagram would be wishful thinking, note it as \"planned\" and mark the doc as Draft.
 4. **No placeholders shipped.** Replace every `{...}` template token before saving.
-5. **Changelog uses actual git commits.** Run `git log` — never invent entries.
+5. **Changelog uses actual git commits.** Run `git log` with a validated tag, as the changelog section says — never invent entries.
 
 ---
 

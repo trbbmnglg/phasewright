@@ -40,6 +40,7 @@ Adopt a project's existing plan files (`phase-*.md`) into a roadmap. It shows th
 
 ## What shipped when
 
+- Plugin version 0.12.1 changed nothing in the roadmap format. It is part of [v1.2.0](Release-1.2.0-Buguey), which is in progress.
 - Plugin version 0.12.0 added an optional fenced `ship` block to a phase plan's Commands section and changed nothing in the roadmap format. It is part of [v1.2.0](Release-1.2.0-Buguey), which is in progress.
 - Plugin version 0.11.1 changed nothing in the format, and neither did 0.11.0, 0.10.0 or 0.9.0. The dashboard data script reads a roadmap through the same reader, only for the roadmap files you list for a project (see [Phased shipping](Phased-shipping)).
 - Plugin version 0.8.0 added `adopt` (proposes roadmap rows from a project's existing plan files), the real-world status forms (`shipped 2026-10-24`, `shipped 2026-10-25 (2nd attempt)` and a bold word followed by `(plan: <path>)`) and the [Onboarding](Onboarding) skill that points to it ([CHANGELOG](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/CHANGELOG.md)).

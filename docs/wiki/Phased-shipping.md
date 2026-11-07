@@ -2,7 +2,7 @@
 
 ## What it is
 
-A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.12.0 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
+A Claude Code plugin for shipping work in small phases, with one deploy per phase. Each step runs on the cheapest model and effort that can do it well ([README](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/README.md)). The current plugin version is 0.12.1 ([plugin.json](https://github.com/trbbmnglg/phasewright/blob/main/plugins/phased-shipping/.claude-plugin/plugin.json)).
 
 | Component | What it does |
 |---|---|
@@ -60,6 +60,7 @@ The plugin's version history is its [CHANGELOG](https://github.com/trbbmnglg/pha
 | 0.11.0 | [v1.1.0](Release-1.1.0-Baggao) | Faster runs without a lower bar: a fast and a full verify set, a baseline reused only from a green full verify on the same tree, review briefs and a timings table. See [Speed](Speed). |
 | 0.11.1 | [v1.1.0](Release-1.1.0-Baggao) | Every script command line in every skill writes its paths in single quotes, and a call whose path holds an unsafe character is not run. |
 | 0.12.0 | [v1.2.0](Release-1.2.0-Buguey) | One approval ships: the plan's ship block runs in one script, `ship.mjs`, in the main session, bound to the previewed commands and code. See [Speed](Speed#shipping). |
+| 0.12.1 | [v1.2.0](Release-1.2.0-Buguey) | The rule for an empty or root value now names `C:`, `C:/` and a `\\server\share` share and says to check it on the value as given and again after a trailing separator is dropped, in every skill that states it. The test checker for the skills' command lines catches more unsafe shapes. No guard rule changed. |
 
 ## Limits
 

@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 1191
+# tests: 1203
 linux:run,win32:skip	fix round 4 (7r), M2: a job left running by a command dies with its process group (POSIX, the real bash)
 linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
 linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
@@ -50,12 +50,14 @@ run	a .original that appears between the check and the link is kept as it is (tr
 run	a BOM in front of the marker on the first line is allowed: the table is standard, set works and keeps the BOM; a BOM anywhere else does not count
 run	a Summary must be 20 to 160 characters
 run	a Summary with a character outside the allowlist is an error that names the version and the code point, never the character
+run	a backslash escape outside single quotes fails; a Markdown table escape and a backslash inside single quotes pass
 run	a bare placeholder fails unless it is on the validated list and the file states its pattern
 run	a broken relative link fails, but a link inside a code block does not
 run	a broken repo link fails, and so does a link to a heading that does not exist
 run	a broken wiki link fails
 run	a clean fixture passes
 run	a clean plugin agent and skill pass, with no metadata block needed
+run	a code span or <code> that wraps onto the next row is one script line, reported at its first row; a blank line or a block ends it
 run	a damaged or foreign record file means no record, and record replaces it with a valid one
 run	a date must be written YYYY-MM-DD and be a real calendar date
 run	a description with no sentence end: short stays whole, long is cut
@@ -102,6 +104,7 @@ run	a sentence ending within 200 characters is used as is
 run	a shipped release without a page fails, and so does a release page without an entry
 run	a short .original that is already there is trusted as a name, never written to, and never made by this tool
 run	a stale .prev temp name from an earlier run with the same process id does not block a set
+run	a stray backtick does not hide the command lines after it: the carry only adds, and a heading, a rule, a table row or a list item ends it
 run	a stray file name fails
 run	a symbolic link or junction that points outside the project is not followed
 run	a term from the local denylist fails, including mixed case
@@ -297,6 +300,7 @@ run	exit 7: a fake secret in the staged diff stops before the commit; only the f
 run	exit 8: a failing rollback line stops the rollback and says to roll back by hand
 run	exotic syntax is flagged on the command that uses it
 run	fail closed: .phased-shipping is a file, a link, or has a .gitignore that is not '*': nothing is written
+run	fences and <pre> only where Markdown makes them: a one-line fence, <pre> in prose, a span or a cell, capitals, a blockquote
 run	fewer than three entries are all shown; no version heading is an error
 run	final fixes, L1: an older-form file hides a tagged file only when it is the one tagged file of its phase; with two roadmaps both stay and the older-form file goes
 run	final fixes, L2: collect reads roadmap entries that are the same path once (letter case through io.caseInsensitive)
@@ -430,7 +434,7 @@ run	free-resources bin: no script starts a program by a bare name, through a she
 run	free-resources bin: the peaks store is never written inside the project folder
 run	free-resources bin: the peaks store refuses a link and leaves its target alone
 run	free-resources bin: the peaks store refuses a second name for another file and leaves that file alone
-run	free-resources bin: the plugin is at 0.3.0, and the README and wiki say what changed in 0.1.2 and since
+run	free-resources bin: the plugin is at 0.3.1, and the README and wiki say what changed in 0.1.2 and since
 run	free-resources canonical: paths are turned into their long form on Windows only, and only on a local drive
 run	free-resources config: 'stop': false in any list switches stopping off and says which
 run	free-resources config: a file that cannot be used is 'bad' with a reason, and never throws
@@ -576,6 +580,7 @@ run	id refuses a temp folder that is the repository or inside it, and makes noth
 run	id refuses a tree that holds a submodule or a nested repository (mode 160000)
 run	in a git repo only the published tree is scanned; outside git the full walk still applies
 run	insideSkillDir: the skill folder and its subfolders count; a sibling with the same prefix and the parent do not
+run	intended trade-off: unquoted redirection, an a < b && c > d test and a %d%m%Y_%H%M%S% format on a script line fail like a bare placeholder
 run	invalid timings are rejected with a message naming the key, and nothing is written
 run	invalid tokens are rejected with a message naming the field, and nothing is written
 run	inventory: --check prints exactly what changed: missing, newly skipped and unlisted
@@ -661,6 +666,7 @@ run	modes: the roadmap keeps its mode, copies are owner-only and the folder 0700
 run	more wrappers: busybox, script, su, winpty, flock, strace, ltrace, parallel, start
 run	mutation proof on a temp copy: removing a marker or a CHANGELOG line makes --check fail with a clear message
 run	mutation proof on synthetic text: the good form passes, and each bad form of it fails with the file and line
+run	mutation proof on the real docs: the new rules catch their forms in real lines
 run	mutation proof on the real skills: the lines the first review found fail when written the old way
 run	mutation proof on the real skills: turning one single-quoted path into a double-quoted one fails in that file
 run	mutation sweeps: the mutant count of each sweep in dashboard-page-sweeps-6.test.mjs is unchanged
@@ -784,6 +790,8 @@ run	phase 7p: the run skill reuses a baseline only from a green full verify, nev
 run	phase 7p: the shipper has 40 turns and the README says so
 run	phase 7p: the three new evals have a prompt with max_turns and allowed_tools, an llm grader and typed tool graders
 run	phase 7p: the wiki pages say 0.11.0 where they name the current version
+run	phase 7q2: the empty and root rule says the same in every copy (the six skills, the use-case-discovery skill) and in the short form
+run	phase 7q2: the plugin is at 0.12.1, the guard version follows, and the CHANGELOG has 0.12.1 above 0.12.0 with Date, Summary, Changed and Added
 run	phase 7q: each skill with script lines states the same unsafe-path rule, and keeps ${CLAUDE_SKILL_DIR} in double quotes
 run	phase 7q: the plan skill stops at the record step and the roadmap check, and skips the survey, when a path is unsafe
 run	phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, and the CHANGELOG has 0.11.1 above 0.11.0 with Date, Summary, Changed and Added
@@ -798,6 +806,7 @@ run	phase 7r: the plan template's ship block parses, keeps the plan's verify tex
 run	phase 7r: the plugin is at 0.12.0, the guard version follows, and the CHANGELOG has 0.12.0 above 0.11.1 with Date, Summary, Added and Changed
 run	phase 7r: the run skill binds the preview to the code, runs ship.mjs on approve with a ship block, says one prompt, and falls back to the shipper
 run	phase 7r: without --root the check is unchanged (old and new records, code changes unseen); --root and --roadmap need their stage
+run	placeholder forms beyond <name> fail when bare: %name%, a digit, _, - or a space first, <...>, and text glued after an allowed one
 run	plugin agent names must match the file and have no colon
 run	plugin agents: bad effort and maxTurns fail
 run	plugin agents: fields that plugins ignore fail
@@ -844,6 +853,7 @@ run	regression, wrappers: bash -c --, env -S, busybox, script, su, winpty, flock
 run	release.yml reads releases.json for the title and keeps its pinned actions and permissions
 run	releases.json and the README Releases section carry no rename wording
 run	releases.json: versions, names, statuses and dates are well formed
+run	removing a rule from a copy of the agent text makes the check fail (mutation proof, in memory)
 run	rename retry, through the commands: a rename refused once per target still gives a finished set; a refused-for-good rename fails closed; a change during a wait is caught
 run	rename retry: on Windows a refused rename is retried up to 10 times after the same check, waiting 10..100 ms; elsewhere it is not retried
 run	renderTable escapes cells and still renders the gold name as the exact expected string
@@ -1023,6 +1033,7 @@ run	the README lists what it touches and the four limits, and is at the new vers
 run	the README table equals the table rendered from releases.json, with the gold name only on v1.4.0
 run	the Releases markers are intact, the table equals the one rendered from releases.json, and the drift check passes
 run	the Summary line must read 'Summary: text'
+run	the agent text states the tag pattern, the no-`..` rule, the refusal, a bare git log command and version 1.1.1
 run	the allowlist is enforced: only allowlisted files are opened, and no planted marker reaches any output or the saved survey
 run	the allowlist reasons name what IS allowed
 run	the banner follows the first in-progress release, and falls back when none is in progress
@@ -1073,6 +1084,7 @@ run	the old required-field check still works
 run	the old unsafe command lines are all caught
 run	the page versions follow plugin.json, and no page says the guard has not been seen firing
 run	the pages make no claim that drifts or that the plugins cannot keep
+run	the pattern, with the no-`..` rule, accepts ordinary tags and refuses every shell-special or option-like value (made-up tags)
 run	the placeholder end check is what catches true-Xy7pq9Lm2: with it loosened to a word boundary the value passes
 run	the plan skill's env regex catches the override variables and no key variables
 run	the plugin hooks.json wires the guard to the right tools, with no onFailure

@@ -13,7 +13,8 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PS = "plugins/phased-shipping/skills";
 const SKILLS = [`${PS}/run/SKILL.md`, `${PS}/plan/SKILL.md`, `${PS}/roadmap/SKILL.md`, `${PS}/onboard/SKILL.md`, `${PS}/dashboard/SKILL.md`, "plugins/free-resources/skills/free-resources/SKILL.md"];
 // every piece of the rule, as the skills say it
-const RULE = "A path is single-quoted. A call is not run when the path holds a single quote, a double quote, a control or format character or any of U+2018 to U+201B, or ends in a slash: drop a trailing separator. A value that is empty, or is a drive or file-system root, is not run. Run the calls with the Bash tool.";
+const ROOT_RULE = "A value that is empty, or is a drive or file-system root (`/`, `C:\\`, `C:/`, `C:` or a `\\\\server\\share` share), is not run; check this on the value as given and again after a trailing separator is dropped.";
+const RULE = `A path is single-quoted. A call is not run when the path holds a single quote, a double quote, a control or format character or any of U+2018 to U+201B, or ends in a slash: drop a trailing separator. ${ROOT_RULE} Run the calls with the Bash tool.`;
 const doc = (...lines) => lines.join("\n");
 const read = (f) => readFileSync(join(REPO, f), "utf8");
 const fails = (file, text, expect) => {
@@ -166,9 +167,10 @@ test("single-quoted placeholders need the unsafe-character rule in the same file
   passes(doc(line, RULE));
   const none = fails("skills/zork/SKILL.md", doc("Intro", line, "Nothing about quotes."), /^skills\/zork\/SKILL\.md:2: single-quoted placeholders, but the file does not state the unsafe-character rule/);
   assert.equal(none.length, RULE_PIECES.length, "each missing piece is named");
-  assert.deepEqual(RULE_PIECES, ["single quote", "double quote", "control or format character", "U+2018 to U+201B", "trailing separator", "file-system root", "Bash tool"]);
+  assert.deepEqual(RULE_PIECES, ["single quote", "double quote", "control or format character", "U+2018 to U+201B", "trailing separator", "file-system root", "is empty", "Bash tool"]);
   for (const piece of RULE_PIECES) {
-    const ps = fails("a.md", doc(line, RULE.replace(piece, "something")), new RegExp(`missing "${esc(piece)}"`));
+    // every copy of the piece goes ("trailing separator" is said twice)
+    const ps = fails("a.md", doc(line, RULE.replaceAll(piece, "something")), new RegExp(`missing "${esc(piece)}"`));
     assert.equal(ps.length, 1, ps.join(" | "));
   }
   // a file with no single-quoted placeholder owes no rule
@@ -205,6 +207,12 @@ test("mutation proof on synthetic text: the good form passes, and each bad form 
     ["the folder in double quotes", (s) => s.replace("'<folder of PHASES.md>'", "\"<folder of PHASES.md>\""), /good\.md:4: a double-quoted placeholder/],
     ["the phase id after the wrong option", (s) => s.replace("<phase id> --root", "--note <phase id> --root"), /good\.md:4: a bare <phase id> that does not follow/],
     ["a shell variable", (s) => s.replace("'<PHASES.md>'", "$PHASES"), /good\.md:4: a \$ or a backtick outside single quotes/],
+    ["a backslash-escaped quote", (s) => s.replace("'<PHASES.md>'", "\\'<PHASES.md>\\'"), /good\.md:4: a backslash escape outside single quotes/],
+    ["a %name% placeholder", (s) => s.replace("'<PHASES.md>'", "%phases%"), /good\.md:4: a %name% placeholder/],
+    ["a placeholder that starts with a digit", (s) => s.replace("'<PHASES.md>'", "<2PHASES.md>"), /good\.md:4: a bare <2PHASES\.md> that is not on the validated list/],
+    ["text glued after the phase id", (s) => s.replace("<phase id> --root", "<phase id>x --root"), /good\.md:4: a bare <phase id> with text glued after it/],
+    ["the span wrapped onto the next row with a double-quoted path", (s) => s.replace(" set '<PHASES.md>'", "\nset \"<PHASES.md>\""), /good\.md:4: a double-quoted placeholder/],
+    ["the empty-value piece removed", (s) => s.replace("empty, or is a", ""), /good\.md:4: .*missing "is empty"/],
   ];
   for (const [what, mutate, expect] of mutations) {
     const mutated = mutate(good);
@@ -362,6 +370,15 @@ test("every scan is linear: 32,000 repeats of the shapes that made a regex resca
     "placeholders after options": `\`node zork.mjs ${"--commit <commit> ".repeat(n)}\``,
     "a long fenced continuation": ["```", ...Array.from({ length: n }, () => "node zork.mjs go \\"), "x", "```"].join("\n"),
     "many rows": Array.from({ length: n }, () => "`node zork.mjs go '<a>'`").join("\n"),
+    "a span left open over many rows": ["`` node zork.mjs go", ...Array.from({ length: n }, () => "node zork.mjs go '<a>' `")].join("\n"),
+    "a <code> left open over many rows": Array.from({ length: n }, () => "<code>node zork.mjs go '<a>'").join("\n"),
+    "<CODE> in capitals": "<CODE>".repeat(n),
+    "<pre> elements in a row": `| ${"<pre>node zork.mjs x</pre> ".repeat(n)} |`,
+    "open <pre> tags in a row": `| ${"<PRE>x ".repeat(n)} |`,
+    "blockquote markers": `${"> ".repeat(n)}\`\`\``,
+    "backslash escapes": `\`node zork.mjs ${"\\' \\| ".repeat(n)}\``,
+    "%name% placeholders": `\`node zork.mjs ${"%ab %a ".repeat(n)}\``,
+    "placeholders with a space or an arrow": `\`node zork.mjs ${"< a <- b -".repeat(n)}\``,
   };
   for (const [what, text] of Object.entries(shapes)) {
     const start = performance.now();
@@ -373,7 +390,175 @@ test("every scan is linear: 32,000 repeats of the shapes that made a regex resca
 
 test("the rule has the empty-value and root piece, and each skill states it", () => {
   assert.ok(RULE_PIECES.includes("file-system root"));
+  assert.ok(RULE_PIECES.includes("is empty"));
   const line = "`node \"${CLAUDE_SKILL_DIR}/scripts/zork.mjs\" check '<file>'`";
-  fails("a.md", doc(line, RULE.replace("A value that is empty, or is a drive or file-system root, is not run.", "")), /missing "file-system root"/);
+  assert.ok(RULE.includes(ROOT_RULE));
+  fails("a.md", doc(line, RULE.replace(ROOT_RULE, "")), /missing "file-system root"/);
+  // the empty value alone removed: only that piece is named
+  const noEmpty = RULE.replace("empty, or is a", "");
+  assert.notEqual(noEmpty, RULE);
+  const ps = fails("a.md", doc(line, noEmpty), /missing "is empty"/);
+  assert.equal(ps.length, 1, ps.join(" | "));
+  // the whole sentence replaced by another one fails too
+  fails("a.md", doc(line, RULE.replace(ROOT_RULE, "A file-system root is fine.")), /missing "is empty"/);
   for (const f of [...SKILLS, `${PS}/roadmap/references/format.md`]) assert.ok(read(f).includes("file-system root"), f);
+  // each skill states the sentence word for word
+  for (const f of SKILLS) assert.ok(read(f).includes(ROOT_RULE), `${f} states: ${ROOT_RULE}`);
+});
+
+test("a backslash escape outside single quotes fails; a Markdown table escape and a backslash inside single quotes pass", () => {
+  const cases = [
+    ["an escaped single quote", "`node zork.mjs go --root \\'<dir>\\'`"],
+    ["an escaped double quote", "`node zork.mjs go \\\"<plan>\\\"`"],
+    ["an escaped $", "`node zork.mjs go --root \\$HOME`"],
+    ["an escaped backtick", "`` node zork.mjs go \\`date\\` ``"],
+    ["in a fenced block", doc("```", "node zork.mjs go --root \\'<dir>\\'", "```")],
+  ];
+  for (const [what, text] of cases) {
+    const ps = fails("a.md", doc(text, RULE), /a\.md:[12]: a backslash escape outside single quotes: write the value in single quotes/);
+    // the escaped quote opens no quoted span, so nothing is called unbalanced
+    assert.ok(!ps.some((p) => /unbalanced/.test(p)), `${what}: ${ps.join(" | ")}`);
+  }
+  // the escaped single quotes no longer hide the bare placeholder between them
+  fails("a.md", doc("`node zork.mjs go --root \\'<dir>\\'`", RULE), /a bare <dir> that is not on the validated list/);
+  // the table escape of a pipe, and backslashes inside single quotes, are fine
+  passes(doc("| `restore '<file>' --from original\\|prev\\|'<name>'` | x |", "`node zork.mjs go 'a\\b' 'C:\\x' 'C:\\'`", RULE));
+  // an escaped backslash escapes nothing after it: the quote that follows opens a quoted value
+  passes(doc("`node zork.mjs go \\\\'<a>'`", RULE));
+});
+
+test("a code span or <code> that wraps onto the next row is one script line, reported at its first row; a blank line or a block ends it", () => {
+  const lines = (text) => scriptLines(text).map(({ line, text: t }) => [line, t]);
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "\"<plan>\"` now.")), [[1, "node zork.mjs go \"<plan>\""]]);
+  fails("a.md", doc("Intro.", "Run `node zork.mjs go", "\"<plan>\"` now.", RULE), /a\.md:2: a double-quoted placeholder/);
+  assert.deepEqual(lines(doc("Run <code>node zork.mjs go", "\"<plan>\"</code> now.")), [[1, "node zork.mjs go \"<plan>\""]]);
+  fails("a.md", doc("Run <CODE>node zork.mjs go", "\"<plan>\"</CODE> now."), /a\.md:1: a double-quoted placeholder/);
+  // over three rows, and the spans after the close on the last row are still found there
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "--root", "'<a>'` then `node zork.mjs go \"<b>\"`.")), [[1, "node zork.mjs go --root '<a>'"], [3, "node zork.mjs go \"<b>\""]]);
+  // a closed span before the open one on the first row is found once
+  assert.deepEqual(lines(doc("`node zork.mjs a` and `node zork.mjs go", "'<b>'` x")), [[1, "node zork.mjs a"], [1, "node zork.mjs go '<b>'"]]);
+  // a blank line ends the carry: the backtick was literal, and the next row is not part of a span
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "", "\"<plan>\"` now.")), []);
+  passes(doc("Run `node zork.mjs go", "", "\"<plan>\"` now."));
+  // so does a block start: a fence, a <pre> or indented code
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "```", "\"<plan>\"` x", "```")), []);
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "<pre>", "x", "</pre>", "\"<plan>\"` x")), []);
+  assert.deepEqual(lines(doc("Run <code>node zork.mjs go", "    x", "\"<plan>\"</code> x")), []);
+  // a backtick left open at the end of the document is literal text
+  assert.deepEqual(lines("Run `node zork.mjs go \"<plan>\""), []);
+  // a fence between the rows ends the carry even when the fence closes before the next text row
+  assert.deepEqual(lines(doc("Run `node zork.mjs go", "```", "x", "```", "\"<plan>\"` x")), []);
+});
+
+test("a stray backtick does not hide the command lines after it: the carry only adds, and a heading, a rule, a table row or a list item ends it", () => {
+  const lines = (text) => scriptLines(text).map(({ line, text: t }) => [line, t]);
+  const bad = "run `node zork.mjs go --root \"<p>\"` then.";
+  const cell = "| b | `node zork.mjs go \"<p>\"` |";
+  // each one is what the checker before the carry reported
+  for (const [text, at, t] of [
+    [doc("A value with a ` is refused, and", bad), 2, "node zork.mjs go --root \"<p>\""],
+    [doc("A value with a ` is refused,", "and so on, and", bad), 3, "node zork.mjs go --root \"<p>\""],
+    [doc("| a | the ` character |", cell), 2, "node zork.mjs go \"<p>\""],
+    [doc("- a ` b", "- `node zork.mjs go \"<p>\"`"), 2, "node zork.mjs go \"<p>\""],
+    [doc("A stray ` here.", "## Run", bad), 3, "node zork.mjs go --root \"<p>\""],
+    [doc("A stray ` here.", "---", bad), 3, "node zork.mjs go --root \"<p>\""],
+  ]) {
+    assert.deepEqual(lines(text), [[at, t]], text);
+    const ps = fails("a.md", text, new RegExp(`^a\\.md:${at}: a double-quoted placeholder`));
+    assert.equal(ps.length, 1, ps.join(" | "));
+  }
+  // a heading, a thematic break, a table row or a list item is not joined to the span before it
+  for (const next of ["# Head \"<plan>\"` x", "***", "| \"<plan>\"` x |", "- \"<plan>\"` x", "1. \"<plan>\"` x"]) {
+    const rows = next === "***" ? ["Run `node zork.mjs go", next, "\"<plan>\"` x"] : ["Run `node zork.mjs go", next];
+    assert.deepEqual(lines(doc(...rows)), [], next);
+  }
+  // a span the row reads on its own, and the joined text reads again, is reported once
+  assert.deepEqual(lines(doc("Run ``node zork.mjs go", "`node zork.mjs b` x")), [[2, "node zork.mjs b"]]);
+});
+
+test("intended trade-off: unquoted redirection, an a < b && c > d test and a %d%m%Y_%H%M%S% format on a script line fail like a bare placeholder", () => {
+  fails("a.md", "`node zork.mjs go < in.txt > out.txt`", /a\.md:1: a bare < in\.txt > that is not on the validated list/);
+  fails("a.md", "`node zork.mjs go; test a < b && c > d`", /a\.md:1: a bare < b && c > that is not on the validated list/);
+  fails("a.md", "`node zork.mjs go --at %d%m%Y_%H%M%S%`", /a\.md:1: a %name% placeholder/);
+});
+
+test("placeholder forms beyond <name> fail when bare: %name%, a digit, _, - or a space first, <...>, and text glued after an allowed one", () => {
+  for (const name of ["2plan", "_plan", "-plan", " plan ", "...", "…"]) {
+    fails("a.md", doc(`\`node zork.mjs go --root <${name}>\``, RULE), new RegExp(`a\\.md:1: a bare <${esc(name)}> that is not on the validated list`));
+  }
+  fails("a.md", doc("`node zork.mjs go --root %plan%`", RULE), /a\.md:1: a %name% placeholder, write it in single quotes/);
+  fails("a.md", doc("`node zork.mjs go --label <label>x`", PATTERNS), /a\.md:1: a bare <label> with text glued after it, write it in single quotes/);
+  fails("a.md", doc("`node zork.mjs go --commit <commit>'x'`", PATTERNS, RULE), /a\.md:1: a bare <commit> with text glued after it/);
+  // the single-quoted forms pass, and so do an allowed placeholder before a space, a bracket or the end
+  passes(doc("`node zork.mjs go --root '<2plan>' '<_plan>' '<-plan>' '< plan >' '<...>' '<…>' '%plan%' --label '<label>x'`", "`[--table <index>]...` and `node zork.mjs --label <label> --commit <commit>`", PATTERNS, RULE));
+  // not placeholders: a heredoc, a redirect from a numbered descriptor, arrows, a date format, and bare words
+  passes(doc("```", "node zork.mjs go <<end > out.txt", "node zork.mjs go 2<in.txt >out.txt", "```", "`node zork.mjs go --day %Y%m%d`", "`--plans a <- b -> c`", "Prose: plan <- run -> ship."));
+  passes("`node zork.mjs go --x ... Plan plan_file ~ * @ #`");
+  // glued on either side, or ending in - or =: still a placeholder
+  fails("a.md", doc("`node zork.mjs go --label v1<label>`", PATTERNS), /a\.md:1: a bare <label> that does not follow --label/);
+  for (const [line, name] of [["`node zork.mjs go --out run-2<suffix>`", "suffix"], ["`node zork.mjs go --x <plan->`", "plan-"], ["`node zork.mjs go --x <plan=>`", "plan="]]) {
+    fails("a.md", line, new RegExp(`a\\.md:1: a bare <${esc(name)}> that is not on the validated list`));
+  }
+  // <= and <- open no placeholder even with a > later on the line, and an HTML comment is not one
+  passes(doc("`node zork.mjs go --x <= 3 > --y <- a >`", "`node zork.mjs go <!-- note -->`"));
+});
+
+test("fences and <pre> only where Markdown makes them: a one-line fence, <pre> in prose, a span or a cell, capitals, a blockquote", () => {
+  const lines = (text) => scriptLines(text).map(({ line, text: t }) => [line, t]);
+  const bad = "node zork.mjs go \"<b>\"";
+  const badSpan = `Run \`${bad}\`.`;
+  // a ``` with a backtick in its info string is an inline span, not a fence that never closes
+  assert.deepEqual(lines(doc("```node zork.mjs go \"<plan>\"```", badSpan)), [[1, "node zork.mjs go \"<plan>\""], [2, bad]]);
+  fails("a.md", doc("```node zork.mjs go \"<plan>\"```", RULE), /a\.md:1: a double-quoted placeholder/);
+  // a bare <pre> in prose is not a block
+  assert.deepEqual(lines(doc("Use a <pre> element in HTML.", badSpan)), [[2, bad]]);
+  // nor is a <pre> inside a code span
+  assert.deepEqual(lines(doc("Write a `<pre>` block.", badSpan)), [[2, bad]]);
+  // a <pre> in a table cell is checked, and so are the other cells
+  assert.deepEqual(lines(`| <pre>node zork.mjs go '<a>'</pre> | \`${bad}\` |`), [[1, "node zork.mjs go '<a>'"], [1, bad]]);
+  fails("a.md", doc(`| <pre>node zork.mjs go '<a>'</pre> | \`${bad}\` |`, RULE), /a\.md:1: a double-quoted placeholder/);
+  fails("a.md", doc("| <pre class=\"x\">node zork.mjs go '<a>'</pre> |", RULE), /a\.md:1: a <pre> element with attributes/);
+  // capitals: </PRE> closes the block, <CODE> is checked
+  assert.deepEqual(lines(doc("<PRE>", "node zork.mjs go '<a>'", "</PRE>", badSpan)), [[2, "node zork.mjs go '<a>'"], [4, bad]]);
+  assert.deepEqual(lines("<CODE>node zork.mjs go \"<a>\"</CODE>"), [[1, "node zork.mjs go \"<a>\""]]);
+  fails("a.md", "<CODE>node zork.mjs go \"<a>\"</CODE>", /a\.md:1: a double-quoted placeholder/);
+  // a fence and indented code inside a blockquote
+  assert.deepEqual(lines(doc("> ```", "> node zork.mjs go \"<a>\"", "> ```", "Run `node zork.mjs go '<b>'`.")), [[2, "node zork.mjs go \"<a>\""], [4, "node zork.mjs go '<b>'"]]);
+  fails("a.md", doc("> Note:", ">", ">     node zork.mjs go \"<a>\""), /a\.md:3: a double-quoted placeholder/);
+  // a fence opened in a blockquote ends with the blockquote: the rows after it are read as before
+  assert.deepEqual(lines(doc("> ```", "> x", "", "Use `read \"<p>\" now`.", "<code>check \"<q>\"</code>")), [[4, "read \"<p>\" now"], [5, "check \"<q>\""]]);
+  // a <pre> with no </pre> in a cell: the rest of the row is a block line; in prose it runs no script and is ignored
+  assert.deepEqual(lines("| <pre>node zork.mjs go \"<p>\" | x |"), [[1, "node zork.mjs go \"<p>\" | x |"]]);
+  fails("a.md", "| <pre>node zork.mjs go \"<p>\" | x |", /a\.md:1: a double-quoted placeholder/);
+  assert.deepEqual(lines(doc("Prose with a <pre> tag in it.", "node zork.mjs go \"<p>\"")), []);
+  // a <PRE> element in capitals inside a cell is read too
+  assert.deepEqual(lines("| <PRE>node zork.mjs go '<a>'</PRE> | x |"), [[1, "node zork.mjs go '<a>'"]]);
+  // <codex> is another tag, not <code>
+  assert.deepEqual(lines("<codex>node zork.mjs go \"<a>\"</code>"), []);
+  // still fences: an info string with no backtick, a ~~~ fence with one; a > line in a plain fence is kept as it is
+  assert.deepEqual(lines(doc("```sh", bad, "```", "~~~ `x`", "node a.mjs go", "~~~", "```", "> node zork.mjs x", "```")), [[2, bad], [5, "node a.mjs go"], [8, "> node zork.mjs x"]]);
+});
+
+test("mutation proof on the real docs: the new rules catch their forms in real lines", () => {
+  const mutate = (f, from, to) => {
+    const text = read(f);
+    assert.ok(text.includes(from), `${f} has ${from}`);
+    const out = text.replace(from, to);
+    assert.notEqual(out, text);
+    return out;
+  };
+  const at = (f, from) => read(f).split("\n").findIndex((l) => l.includes(from)) + 1;
+  const format = `${PS}/roadmap/references/format.md`;
+  const restore = "--from original\\|prev\\|'<name>'";
+  fails(format, mutate(format, restore, "--from original\\|prev\\|\\'<name>\\'"), new RegExp(`^${esc(format)}:${at(format, restore)}: a backslash escape outside single quotes`));
+  fails(format, mutate(format, "--commit <commit>", "--commit <commit>x"), new RegExp(`^${esc(format)}:${at(format, "--commit <commit>")}: a bare <commit> with text glued after it`));
+  fails(format, mutate(format, "--note '<note>'", "--note %note%"), /a %name% placeholder/);
+  // a real span wrapped onto the next row with its path double-quoted is reported at the row it opens on
+  for (const f of SKILLS) {
+    const lines = read(f).split("\n");
+    const i = lines.findIndex((l) => /`[^`\n]*(?:\.mjs|--)[^`\n]* '<[^'>]*>'/.test(l));
+    assert.ok(i >= 0, `${f} has a span with a single-quoted placeholder`);
+    lines[i] = lines[i].replace(/ '(<[^'>]*>)'/, '\n"$1"');
+    fails(f, lines.join("\n"), new RegExp(`^${esc(f)}:${i + 1}: a double-quoted placeholder`));
+  }
 });

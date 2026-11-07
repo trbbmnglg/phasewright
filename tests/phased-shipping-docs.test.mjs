@@ -68,7 +68,7 @@ test("the README lists what it touches and the four limits, and is at the new ve
   for (const [agent, turns] of [["builder", 200], ["checker", 25], ["shipper", 40], ["model-scout", 15]]) {
     assert.match(readme, new RegExp(`\\| \`${agent}\` \\|[^\\n]*\\| ${turns} \\|`), `${agent} ${turns}`);
   }
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.0");
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.1");
 });
 
 test("what the README says each agent can use matches the agent files", () => {
@@ -487,8 +487,8 @@ test("phase 7d1: the two roadmap evals have a prompt with max_turns and allowed_
 
 test("phase 7d1 to 7d1c: the guard rules file changed only its version", () => {
   const rules = readFileSync(join(PS, "hooks", "guard-rules.mjs"), "utf8");
-  assert.match(rules, /^export const GUARD_VERSION = "0\.12\.0";$/m);
-  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.0";', "line 16");
+  assert.match(rules, /^export const GUARD_VERSION = "0\.12\.1";$/m);
+  assert.equal(rules.split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.1";', "line 16");
 });
 
 test("phase 7d1b: the CHANGELOG has 0.7.1 above 0.7.0, says no guard rule changed, and lists the backup changes", () => {
@@ -790,10 +790,10 @@ test("phase 7d2: the CHANGELOG keeps 0.9.0 above 0.8.0 with Date, Summary, Added
 test("phase 7p: the What's new block lists 0.11.0, 0.10.0 and 0.9.0, newest first", () => {
   const readme = repoText("README.md");
   const block = readme.slice(readme.indexOf("<!-- whats-new:start -->"), readme.indexOf("<!-- whats-new:end -->"));
-  const at = ["0.12.0", "0.11.1", "0.11.0"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
+  const at = ["0.12.1", "0.12.0", "0.11.1"].map((v) => block.indexOf(`**phased-shipping ${v}**`));
   assert.ok(at.every((i) => i >= 0), "all three are listed");
   assert.ok(at[0] < at[1] && at[1] < at[2], "newest first");
-  assert.ok(!block.includes("**phased-shipping 0.10.0**"), "only the newest three");
+  assert.ok(!block.includes("**phased-shipping 0.11.0**") && !block.includes("**phased-shipping 0.10.0**"), "only the newest three");
 });
 
 test("phase 7d2: the dashboard skill is owner-invoked only, low effort, and lists its modes", () => {
@@ -859,7 +859,7 @@ test("phase 7d2: the README and the wiki describe the dashboard data, what it wr
   for (const phrase of ["**The dashboard data**", "**The dashboard files**", "`dashboard.json`", "`projects.json`", "`sessions/<id>-<tag>+<phase>.json`", "**absolute path**", "the only file with an absolute path", "never print it except `list --paths`", "makes no network calls", "a link, a junction or a hard link makes the script stop and write nothing", "at most 16 KB", "`collect --out` writes the one file you name", "is refused inside the data folder"]) assert.ok(touches.includes(phrase), phrase);
   assert.ok(touches.includes("The status script (`status.mjs`)"), "the commands it runs list the status script");
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.12.0"));
+  assert.ok(wiki.includes("The current plugin version is 0.12.1"));
   assert.ok(wiki.includes("| `/phased-shipping:dashboard` ([skill]("));
   assert.ok(/^\| 0\.9\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|/m.test(wiki), "the version row");
   const release = repoText("docs", "wiki", "Release-1.1.0-Baggao.md");
@@ -1021,7 +1021,7 @@ test("phase 7p: the README has the Speed section with the honest limits, and the
 
 test("phase 7p: the wiki pages say 0.11.0 where they name the current version", () => {
   const wiki = repoText("docs", "wiki", "Phased-shipping.md");
-  assert.ok(wiki.includes("The current plugin version is 0.12.0"));
+  assert.ok(wiki.includes("The current plugin version is 0.12.1"));
   assert.ok(/^\| 0\.11\.0 \| \[v1\.1\.0\]\(Release-1\.1\.0-Baggao\) \|.*fast and a full verify set/m.test(wiki), "the version row");
   assert.ok(repoText("docs", "wiki", "Release-1.1.0-Baggao.md").includes("  - 0.11.0: faster runs without a lower bar"));
   assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Versions 0.6.0 to 0.11.1 changed no guard rule"));
@@ -1158,7 +1158,7 @@ test("phase 7p fix 5: the README and the Speed page name the two limits of the t
 });
 
 // ---------- phase 7q: every script command line quotes its paths the same safe way (plugin version 0.11.1) ----------
-const UNSAFE_RULE = ["a single quote", "a double quote", "a control or format character", "Unicode categories Cc, Cf, Zl and Zp", "U+2018 to U+201B", "never ends in `" + String.fromCharCode(92) + "` or `/`", "drop a trailing separator", "is a drive or file-system root (`C:" + String.fromCharCode(92) + "` or `/`), is not run", "with the Bash tool when there is one", "PowerShell 5.1"];
+const UNSAFE_RULE = ["a single quote", "a double quote", "a control or format character", "Unicode categories Cc, Cf, Zl and Zp", "U+2018 to U+201B", "never ends in `" + String.fromCharCode(92) + "` or `/`", "drop a trailing separator", "is a drive or file-system root (`/`, `C:" + String.fromCharCode(92) + "`, `C:/`, `C:` or a `" + String.fromCharCode(92) + String.fromCharCode(92) + "server" + String.fromCharCode(92) + "share` share), is not run; check this on the value as given and again after a trailing separator is dropped", "with the Bash tool when there is one", "PowerShell 5.1"];
 const FR = join(HERE, "..", "plugins", "free-resources", "skills", "free-resources", "SKILL.md");
 
 test("phase 7q: each skill with script lines states the same unsafe-path rule, and keeps ${CLAUDE_SKILL_DIR} in double quotes", () => {
@@ -1248,9 +1248,12 @@ test("phase 7q: the plugins are at 0.11.1 and 0.1.1, the guard version follows, 
 
 // ---------- phase 7r: one approval ships (plugin version 0.12.0) ----------
 test("phase 7r: the plugin is at 0.12.0, the guard version follows, and the CHANGELOG has 0.12.0 above 0.11.1 with Date, Summary, Added and Changed", () => {
-  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.0");
-  assert.ok(repoText("library.json").includes('"version": "0.12.0"') && repoText("library.json").includes("plugins/phased-shipping/skills/run/scripts/ship.mjs"));
-  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.0";');
+  // the plugin is at 0.12.0 or later (the exact current version is pinned by the newest phase's test), and the guard version follows it
+  const version = JSON.parse(text(".claude-plugin", "plugin.json")).version;
+  const [major, minor] = version.split(".").map(Number);
+  assert.ok(major > 0 || minor >= 12, version);
+  assert.ok(repoText("library.json").includes(`"version": "${version}"`) && repoText("library.json").includes("plugins/phased-shipping/skills/run/scripts/ship.mjs"));
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], `export const GUARD_VERSION = "${version}";`);
   const log = text("CHANGELOG.md");
   assert.equal(log.split("## 0.12.0").length, 2, "one 0.12.0 block");
   assert.ok(log.indexOf("## 0.12.0") < log.indexOf("## 0.11.1"), "newest first");
@@ -1436,4 +1439,70 @@ test("fix round 6 (7r): the docs say exactly which exits report the steps and HE
   const run = text("skills", "run", "SKILL.md");
   assert.ok(!run.includes("; A check that passed is never rolled back"), "no stray capital after a semicolon");
   assert.ok(run.includes("When exit 4 comes with a ref change of origin reported, relay the refs it names"));
+});
+
+// ---------- phase 7q2: the empty and root rule is complete in every copy, and the docs checker is stricter (plugin version 0.12.1) ----------
+test("phase 7q2: the plugin is at 0.12.1, the guard version follows, and the CHANGELOG has 0.12.1 above 0.12.0 with Date, Summary, Changed and Added", () => {
+  const BS = String.fromCharCode(92);
+  assert.equal(JSON.parse(text(".claude-plugin", "plugin.json")).version, "0.12.1");
+  assert.equal(JSON.parse(readFileSync(join(HERE, "..", "plugins", "free-resources", ".claude-plugin", "plugin.json"), "utf8")).version, "0.3.1");
+  const items = JSON.parse(repoText("library.json")).items;
+  assert.equal(items.find((i) => i.path === "plugins/phased-shipping")?.version, "0.12.1", "library.json: phased-shipping");
+  assert.equal(items.find((i) => i.path === "plugins/free-resources")?.version, "0.3.1", "library.json: free-resources");
+  assert.equal(text("hooks", "guard-rules.mjs").split(/\r?\n/)[15], 'export const GUARD_VERSION = "0.12.1";');
+  const log = text("CHANGELOG.md");
+  assert.equal(log.split("## 0.12.1").length, 2, "one 0.12.1 block");
+  assert.ok(log.indexOf("## 0.12.1") < log.indexOf("## 0.12.0"), "newest first");
+  const lines = log.split(/\r?\n/);
+  const at = lines.indexOf("## 0.12.1");
+  assert.equal(lines[at + 2], "Date: 2026-11-07");
+  assert.match(lines[at + 3], /^Summary: [\p{L}\p{Nd} .,;:'"()/+&!?`-]{20,160}$/u);
+  const entry = log.slice(log.indexOf("## 0.12.1"), log.indexOf("## 0.12.0"));
+  for (const heading of ["### Changed", "### Added"]) assert.ok(entry.includes(heading), heading);
+  assert.ok(entry.indexOf("### Changed") < entry.indexOf("### Added"), "Changed first, as in 0.11.1");
+  for (const word of ["`C:/`", "`C:`", "`" + BS + BS + "server" + BS + "share` share", "checked on the value as given and again after a trailing separator is dropped", "tests/helpers/command-lines.mjs", "tests/command-lines.test.mjs", "No guard rule changed", "The guard version is 0.12.1", "free-resources plugin is at 0.3.1", "use-case-discovery skill is at 1.0.1",
+    "refuses an empty `--project`, but no script checks a value for a drive or file-system root", "which ends where the quote ends", "in capitals", "fails like a bare placeholder"]) assert.ok(entry.includes(word), word);
+  for (const stale of ["No script enforces", "the way Markdown does", "that is not at the start of a row"]) assert.ok(!entry.includes(stale), `the entry no longer says: ${stale}`);
+  // the README's What's new, the wiki pages and the release page
+  const block = repoText("README.md").slice(repoText("README.md").indexOf("<!-- whats-new:start -->"), repoText("README.md").indexOf("<!-- whats-new:end -->"));
+  assert.ok(block.indexOf("**phased-shipping 0.12.1**") >= 0 && block.indexOf("**phased-shipping 0.12.1**") < block.indexOf("**phased-shipping 0.12.0**"), "What's new lists 0.12.1 first");
+  const wiki = repoText("docs", "wiki", "Phased-shipping.md");
+  assert.ok(/^\| 0\.12\.1 \| \[v1\.2\.0\]\(Release-1\.2\.0-Buguey\) \|/m.test(wiki), "the version row");
+  assert.ok(wiki.indexOf("| 0.12.0 |") < wiki.indexOf("| 0.12.1 |"), "the 0.12.1 row follows the 0.12.0 row");
+  assert.ok(repoText("docs", "wiki", "The-guard.md").includes("Version 0.12.1 changed no guard rule. The guard version is 0.12.1."));
+  assert.ok(repoText("docs", "wiki", "Roadmap-standard.md").includes("Plugin version 0.12.1 changed nothing in the roadmap format"));
+  const release = repoText("docs", "wiki", "Release-1.2.0-Buguey.md");
+  assert.ok(release.includes("plugin version 0.12.1") && release.includes("free-resources, plugin version 0.3.1"));
+  const fr = repoText("docs", "wiki", "Free-resources.md");
+  assert.ok(fr.includes("The current plugin version is 0.3.1") && fr.includes("Plugin version 0.3.1 is part of [v1.2.0](Release-1.2.0-Buguey)"));
+  assert.ok(fr.includes("Plugin version 0.3.0 is part of [v1.1.2](Release-1.1.2-Calayan)"), "0.3.0 stays as history");
+  assert.ok(repoText("docs", "wiki", "Release-1.1.2-Calayan.md").includes("free-resources 0.3.0"), "the v1.1.2 page keeps 0.3.0");
+});
+
+test("phase 7q2: the empty and root rule says the same in every copy (the six skills, the use-case-discovery skill) and in the short form", () => {
+  const BS = String.fromCharCode(92);
+  const OLD = "is a drive or file-system root (`C:" + BS + "` or `/`), is not run";
+  const NEW = "A value that is empty, or is a drive or file-system root (`/`, `C:" + BS + "`, `C:/`, `C:` or a `" + BS + BS + "server" + BS + "share` share), is not run; check this on the value as given and again after a trailing separator is dropped.";
+  const flat = (s) => s.replace(/\s+/g, " ");
+  const copies = {
+    run: text("skills", "run", "SKILL.md"), plan: text("skills", "plan", "SKILL.md"), roadmap: text("skills", "roadmap", "SKILL.md"),
+    onboard: text("skills", "onboard", "SKILL.md"), dashboard: text("skills", "dashboard", "SKILL.md"),
+    "free-resources": readFileSync(FR, "utf8"), "use-case-discovery": repoText("skills", "use-case-discovery", "SKILL.md"),
+  };
+  for (const [name, doc] of Object.entries(copies)) {
+    assert.equal(flat(doc).split(NEW).length, 2, `${name}: the sentence is there once, word for word`);
+    assert.ok(!doc.includes(OLD), `${name}: the old sentence is gone`);
+    assert.equal(flat(doc).split("A value that is empty").length, 2, `${name}: the sentence is not repeated`);
+    assert.ok(!flat(doc).includes("before a trailing separator is dropped"), `${name}: the first order of checks is gone`);
+  }
+  // the use-case-discovery skill's text changed, so its version moved (library.json is written from the file)
+  assert.match(copies["use-case-discovery"], /^  version: "1\.0\.1"$/m);
+  assert.equal(JSON.parse(repoText("library.json")).items.find((i) => i.slug === "use-case-discovery")?.version, "1.0.1");
+  // the short form on the roadmap format page names C: and a share, and the order of the checks
+  const format = flat(text("skills", "roadmap", "references", "format.md"));
+  for (const phrase of ["a value that is empty or a drive or file-system root", "`C:`", "`" + BS + BS + "server" + BS + "share` share", "checked on the value as given and again after a trailing separator is dropped", "the roadmap skill has the full rule"]) assert.ok(format.includes(phrase), phrase);
+  // history: the 0.11.1 entry keeps the sentence it shipped with, and the dashboard's own `.` stays allowed
+  assert.ok(text("CHANGELOG.md").includes("A value that is empty, or is a drive or file-system root, is not run either."), "the 0.11.1 entry is unchanged");
+  assert.ok(copies.dashboard.includes("A project folder is written `.` when it is the working directory"));
+  assert.ok(copies.dashboard.includes("A `.` counts as the root it stands for: if the working directory is a drive or file-system root, the value is not run."));
 });

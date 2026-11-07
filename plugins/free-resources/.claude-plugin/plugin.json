@@ -1,7 +1,7 @@
 {
   "name": "free-resources",
   "description": "Checks how pressured your machine is (Windows, macOS, Linux), which processes use the most and why, and what a task really needs, and stops the left-over dev tools of yours that you pick. Never system, security, managed or other users' processes.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "author": {
     "name": "trbbmnglg"
   },

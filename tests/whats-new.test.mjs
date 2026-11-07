@@ -383,14 +383,14 @@ test("mutation proof on a temp copy: removing a marker or a CHANGELOG line makes
   // a CHANGELOG line removed
   r = run(["--check"], copy(undefined, (s) => s.replace(/^Summary: [^\n]*\n/m, "")));
   assert.equal(r.code, 1);
-  assert.ok(r.err.includes("0.12.0") && r.err.includes('"Summary:"'), r.err);
+  assert.ok(r.err.includes("0.12.1") && r.err.includes('"Summary:"'), r.err);
   r = run(["--check"], copy(undefined, (s) => s.replace(/^Date: [^\n]*\n/m, "")));
   assert.equal(r.code, 1);
-  assert.ok(r.err.includes("0.12.0") && r.err.includes('"Date:"'), r.err);
+  assert.ok(r.err.includes("0.12.1") && r.err.includes('"Date:"'), r.err);
   // a new version with no lines
-  r = run(["--check"], copy(undefined, (s) => s.replace("\n## 0.12.0\n", "\n## 0.12.1\n\n### Added\n- x\n\n## 0.12.0\n")));
+  r = run(["--check"], copy(undefined, (s) => s.replace("\n## 0.12.1\n", "\n## 0.12.2\n\n### Added\n- x\n\n## 0.12.1\n")));
   assert.equal(r.code, 1);
-  assert.ok(r.err.includes("0.12.1") && r.err.includes("needs a"), r.err);
+  assert.ok(r.err.includes("0.12.2") && r.err.includes("needs a"), r.err);
   // a README block edited by hand
   r = run(["--check"], copy((s) => s.replace(/Work in progress|Under active development/, "Finished")));
   assert.equal(r.code, 1);

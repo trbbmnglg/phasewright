@@ -7,9 +7,9 @@ Skills, agents and plugins that keep AI-assisted coding work small, checked and 
 
 ## What's new
 
+- **phased-shipping 0.12.1** (2026-11-07): The skills now refuse C:, C:/ and a share as a root, and the docs checker is stricter.
 - **phased-shipping 0.12.0** (2026-10-30): One approval ships: the plan's ship block runs in one script in the main session, bound to the previewed commands and code.
 - **phased-shipping 0.11.1** (2026-10-29): Every script command line in every skill now writes its paths in single quotes, and a call whose path holds an unsafe character is not run.
-- **phased-shipping 0.11.0** (2026-10-28): Faster runs without a lower bar: fast and full verify sets, reusable green baselines, review briefs and visible timings.
 
 Full history: [phased-shipping changelog](plugins/phased-shipping/CHANGELOG.md).
 <!-- whats-new:end -->

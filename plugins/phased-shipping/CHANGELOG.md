@@ -2,6 +2,20 @@
 
 Newest first. Each version starts with a `Date:` and a `Summary:` line; the README's What's new list is written from the newest three. Older entries have none.
 
+## 0.12.1
+
+Date: 2026-11-07
+Summary: The skills now refuse C:, C:/ and a share as a root, and the docs checker is stricter.
+
+### Changed
+- The rule for an empty or root value now settles the cases it left open and the order of the checks. In the run, plan, roadmap, onboard and dashboard skills, in the free-resources skill and in the use-case-discovery skill (which is outside this plugin), and in the short form on the roadmap format page, it now reads: a value that is empty, or is a drive or file-system root (`/`, `C:\`, `C:/`, `C:` or a `\\server\share` share), is not run, and this is checked on the value as given and again after a trailing separator is dropped. Before, it named only `C:\` and `/`, so `C:` (what `C:\` becomes once its separator is dropped), `C:/` and a share, with or without a trailing separator, were not settled. `.` is still allowed (the dashboard writes it for the working directory), but the dashboard skill now says it counts as the root it stands for when the working directory is a drive or file-system root, and `..` is left alone. `free.mjs` refuses an empty `--project`, but no script checks a value for a drive or file-system root, so the sentence is an instruction the model follows: this changes what the model is told, not what a program does.
+- The free-resources plugin is at 0.3.1 and the use-case-discovery skill is at 1.0.1 for the same change to their text. The plugin has no changelog of its own.
+
+### Added
+- The docs checker, `tests/helpers/command-lines.mjs` (tested by `tests/command-lines.test.mjs`), is stricter. It now flags a backslash before a quote, a `$` or a backtick outside single quotes; a `%name%` placeholder of two characters or more, which includes a long date format such as `%d%m%Y_%H%M%S%` (a short one such as `%Y%m%d` is not one); more placeholder shapes (`<2plan>`, `<-plan>`, `< plan >`, `<...>`, and text glued after an allowed one, as in `<label>x`); and a `<` followed by a later `>` outside quotes on a script line, so an unquoted redirection such as `< in.txt > out.txt` or a test such as `a < b && c > d` fails like a bare placeholder, as intended. It now reads a code span or `<code>` that wraps onto the next rows (reported at the row it opens on, ended by a blank row or a block start, and read in addition to what each row shows by itself), a one-line fence, `<PRE>` and `<CODE>` in capitals, a `<pre>...</pre>` inside a row or a table cell (the rest of an unclosed one, and the rest of the row), and a fence inside a blockquote, which ends where the quote ends. A `<pre>` in the middle of a row of prose no longer opens a block. A file with single-quoted placeholders must also state the empty-value piece of the unsafe-character rule: that a value that is empty is not run.
+
+No guard rule changed. The guard version is 0.12.1, kept equal to the plugin version, and the guard still has four roles (`builder`, `checker`, `shipper` and `model-scout`).
+
 ## 0.12.0
 
 Date: 2026-10-30

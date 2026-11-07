@@ -9,7 +9,7 @@ metadata:
   tags: "design-thinking,discovery,use-cases,user-stories,metrics"
   featured: "false"
   order: "9"
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Use Case Discovery
@@ -196,7 +196,9 @@ rows first, because field names differ between projects.
 A path is single-quoted. A call is not run when the path holds a single quote,
 a double quote, a control or format character or any of U+2018 to U+201B, or
 ends in a slash: drop a trailing separator. A value that is empty, or is a
-drive or file-system root, is not run. Run the calls with the Bash tool.
+drive or file-system root (`/`, `C:\`, `C:/`, `C:` or a `\\server\share`
+share), is not run; check this on the value as given and again after a
+trailing separator is dropped. Run the calls with the Bash tool.
 
 End with the hand-off: the chosen use case, its stories and metrics, and the
 open questions with owners. Suggest business-analyst for the specification
