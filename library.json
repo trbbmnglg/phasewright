@@ -16,7 +16,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "agents/claude/prompt-engineer.md",
       "files": [
@@ -133,7 +133,7 @@
       ],
       "featured": false,
       "order": 3,
-      "version": "1.0.1",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "agents/claude/docs-writer.md",
       "files": [
@@ -164,15 +164,15 @@
           "install": []
         },
         "codex": {
-          "support": "partial",
-          "note": "The model and the tool list come from your Codex settings; the Claude version's limit to Read, Grep, Glob, Bash, Write is not kept",
+          "support": "full",
+          "note": "The model and the tool list come from your Codex settings",
           "install": [
             "Copy agents/codex/docs-writer.toml into .codex/agents/ (project) or ~/.codex/agents/ (personal)"
           ]
         },
         "antigravity": {
-          "support": "partial",
-          "note": "The model and the tool list come from your Antigravity settings; the Claude version's limit to Read, Grep, Glob, Bash, Write is not kept",
+          "support": "full",
+          "note": "The model and the tool list come from your Antigravity settings",
           "install": [
             "Copy agents/antigravity/docs-writer.md into .agents/agents/ (project) or ~/.gemini/config/agents/ (personal, App and CLI)"
           ]
@@ -463,7 +463,7 @@
       ],
       "featured": true,
       "order": 1,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/prompt-engineering",
       "files": [
@@ -516,7 +516,7 @@
       "type": "skill",
       "title": "Implementation Planner",
       "summary": "Multi-perspective implementation planner.",
-      "description": "Multi-perspective implementation planner. MANDATORY for every enhancement or new feature that touches a schema, API route, or UI page — regardless of size. Produces a full §1–16 plan covering overview, data model, backend, frontend, reuse checklist, out-of-scope, Tech Architecture (§8), QA (§9), Security (§10), execution plan (§11), E2E spec (§12), Definition of Done (§13), evidence report template (§14), and UX/UI/responsive/a11y checklist (§15). TRIGGER on: any new feature, enhancement, \"plan this\", \"go\", \"let's start\", \"build\", or any user story that will ship to production. Do NOT fire for typo fixes, copy tweaks, or single-file bug fixes touching < 3 files.",
+      "description": "Multi-perspective implementation planner. Produces a full §1–15 plan covering overview, data model, backend, frontend, reuse checklist, out-of-scope, Tech Architecture (§8), QA (§9), Security (§10), execution plan (§11), E2E spec (§12), Definition of Done (§13), evidence report template (§14), and UX/UI/responsive/a11y checklist (§15). Run /planner for a new feature or enhancement that touches a schema, API route or UI page. Not for typo and copy fixes, bug fixes touching fewer than 3 files, behavior-preserving refactors, or infrastructure-only work (CI, build scripts).",
       "tags": [
         "planning",
         "architecture",
@@ -525,7 +525,7 @@
       ],
       "featured": true,
       "order": 2,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/planner",
       "files": [
@@ -577,8 +577,8 @@
       "slug": "docs-generator",
       "type": "skill",
       "title": "Docs Generator",
-      "summary": "Create and update project documentation — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelogs, and release notes.",
-      "description": "Create and update project documentation — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelogs, and release notes. TRIGGER when the user asks to create, update, or generate any documentation.",
+      "summary": "Templates and folder rules for the project docs types — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelog, and release notes.",
+      "description": "Templates and folder rules for the project docs types — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelog, and release notes. Run it manually with /docs-generator; the docs-writer agent carries its own five templates. TDD and FRD are for as-built or approved work; requirements specs belong to the business-analyst skill.",
       "tags": [
         "docs",
         "diagrams",
@@ -586,7 +586,7 @@
       ],
       "featured": false,
       "order": 3,
-      "version": "1.0.1",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/docs-generator",
       "files": [
@@ -700,15 +700,15 @@
       "slug": "refactoring",
       "type": "skill",
       "title": "Refactoring Guide",
-      "summary": "Risk-based code refactoring guide for frontend components, hooks, modals, tabs, constants, API routes, and LLM request builders.",
-      "description": "Risk-based code refactoring guide for frontend components, hooks, modals, tabs, constants, API routes, and LLM request builders. Use when asked to refactor or extract these elements, or when a maintained source file approaches or exceeds 300 lines and needs a responsibility review. Classify changes, preserve behavior contracts, require verification evidence, and document size exceptions instead of splitting solely to satisfy line counts.",
+      "summary": "Risk-based code refactoring guide for frontend (React-style) components, hooks, modals, tabs, constants, API routes, and LLM request builders.",
+      "description": "Risk-based code refactoring guide for frontend (React-style) components, hooks, modals, tabs, constants, API routes, and LLM request builders. Use when asked to refactor or extract these elements, or when a maintained source file reaches 300 lines and needs a responsibility review. Classify changes, preserve behavior contracts, require verification evidence, and document size exceptions instead of splitting solely to satisfy line counts.",
       "tags": [
         "refactoring",
         "code-quality"
       ],
       "featured": false,
       "order": 5,
-      "version": "2.0.0",
+      "version": "2.0.1",
       "license": "MIT",
       "path": "skills/refactoring",
       "files": [
@@ -763,7 +763,7 @@
       "type": "skill",
       "title": "Error Handling",
       "summary": "API response shapes, Zod validation patterns, database error handling, frontend fetch wrappers, AbortController, loading/empty states, and silent failure rules.",
-      "description": "API response shapes, Zod validation patterns, database error handling, frontend fetch wrappers, AbortController, loading/empty states, and silent failure rules. TRIGGER when writing API routes, handling errors, or displaying loading/empty states.",
+      "description": "API response shapes, Zod validation patterns, database error handling, frontend fetch wrappers, AbortController, loading/empty states, and silent failure rules. Examples use Hono, Drizzle, Zod and React; the rules apply to other stacks. TRIGGER when writing API routes, handling errors, or displaying loading/empty states.",
       "tags": [
         "errors",
         "api",
@@ -771,7 +771,7 @@
       ],
       "featured": false,
       "order": 6,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/error-handling",
       "files": [
@@ -823,8 +823,8 @@
       "slug": "performance",
       "type": "skill",
       "title": "Performance Patterns",
-      "summary": "Frontend and API performance patterns — AbortController, useCallback, useMemo, Promise.all, pagination, batch inserts.",
-      "description": "Frontend and API performance patterns — AbortController, useCallback, useMemo, Promise.all, pagination, batch inserts. TRIGGER when optimizing renders, parallel fetches, waterfall queries, or slow pages.",
+      "summary": "Frontend and API performance patterns — measuring first, useCallback and useMemo only where they pay off, Promise.all, pagination, batch inserts.",
+      "description": "Frontend and API performance patterns — measuring first, useCallback and useMemo only where they pay off, Promise.all, pagination, batch inserts. The frontend sections are React; the API examples use Hono and Drizzle, and the rules apply to other stacks. TRIGGER when optimizing renders, parallel fetches, waterfall queries, or slow pages.",
       "tags": [
         "performance",
         "react",
@@ -832,7 +832,7 @@
       ],
       "featured": false,
       "order": 7,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/performance",
       "files": [
@@ -884,15 +884,15 @@
       "slug": "commits",
       "type": "skill",
       "title": "Conventional Commits",
-      "summary": "Conventional Commits format, types, scopes, and splitting rules.",
-      "description": "Conventional Commits format, types, scopes, and splitting rules. TRIGGER when writing a git commit message or deciding how to split commits.",
+      "summary": "Conventional Commits format, types, scopes and splitting rules.",
+      "description": "Conventional Commits format, types, scopes and splitting rules. Run /commits when writing a commit message or deciding how to split commits.",
       "tags": [
         "git",
         "commits"
       ],
       "featured": false,
       "order": 8,
-      "version": "1.0.0",
+      "version": "1.1.0",
       "license": "MIT",
       "path": "skills/commits",
       "files": [

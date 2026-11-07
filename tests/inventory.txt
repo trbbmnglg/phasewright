@@ -2,7 +2,7 @@
 # The status is run or skip on every platform, or one per platform for a test that runs on only some (linux:skip,win32:run).
 # Written by `node scripts/test-inventory.mjs --write` (it changes only this platform's status) and checked by `npm run verify`.
 # Edit by hand only to record another platform's status: a test that disappears, or is newly skipped, fails the full verify.
-# tests: 1189
+# tests: 1191
 linux:run,win32:skip	fix round 4 (7r), M2: a job left running by a command dies with its process group (POSIX, the real bash)
 linux:run,win32:skip	free-resources linux: a live measure run records the peak of a real command on Linux and macOS
 linux:run,win32:skip	free-resources linux: a live scan of this machine reads real processes, finds itself in use, and prints nothing unsafe
@@ -278,6 +278,7 @@ run	every relative link and image points at a file that exists, and every anchor
 run	every rule denies with the documented output (the decision the script prints)
 run	every scan is linear: 32,000 repeats of the shapes that made a regex rescan the text finish at once
 run	every shipped or in-progress release has a page whose Status says so, with the date of a shipped one
+run	every skill, skill reference and agent file has fences that close where they were meant to
 run	every summary in the real library.json is within 240 characters
 run	every tokenizer loop is linear: 80000-word inputs are split in well under a second
 run	exempt: "${CLAUDE_SKILL_DIR}" and "${CLAUDE_PLUGIN_DATA}" in double quotes, with or without a path after them
@@ -1033,6 +1034,7 @@ run	the cap is 50 records, the newest kept, and the file stays valid JSON
 run	the changelog has a 0.3.0 entry with Added, Changed and Fixed
 run	the changelog has a 0.4.0 entry above 0.3.0 that describes the guard honestly
 run	the checker has no file-editing tools, proposes commands and never runs them
+run	the checker passes sound fences and names each way a fence goes wrong (made-up text)
 run	the checker runs the probe first when the brief has it, and it is never a check failure
 run	the classes the first version of this test missed all fail now
 run	the command line: unknown commands and options are usage errors that read nothing

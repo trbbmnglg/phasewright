@@ -1,6 +1,6 @@
 ---
 name: docs-generator
-description: Create and update project documentation — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelogs, and release notes. TRIGGER when the user asks to create, update, or generate any documentation.
+description: Templates and folder rules for the project docs types — flowcharts (Mermaid), TDD, FRD, user guides, API docs, ERDs, architecture diagrams, changelog, and release notes. Run it manually with /docs-generator; the docs-writer agent carries its own five templates. TDD and FRD are for as-built or approved work; requirements specs belong to the business-analyst skill.
 argument-hint: "[doc type: flowchart|tdd|frd|user-guide|api|erd|architecture|changelog|release-notes]"
 disable-model-invocation: true
 license: MIT
@@ -9,12 +9,14 @@ metadata:
   tags: "docs,diagrams,changelog"
   featured: "false"
   order: "3"
-  version: "1.0.1"
+  version: "1.1.0"
 ---
 
 # Skill: Documentation Generator
 
-Create, update, and maintain all project documentation in Markdown under `docs/`.
+Create, update, and maintain the project documentation types below in Markdown under `docs/`. Manual-only: a person runs it with `/docs-generator <type>`. The `docs-writer` agent does not depend on it (Claude Code keeps manual-only skills from being preloaded into subagents) and carries its own templates for flowchart, TDD, API reference, ERD and changelog. The argument picks the template by its number below: flowchart 1, tdd 2, frd 3, user-guide 4, api 5, erd 6, architecture 7, changelog 8, release-notes 9.
+
+TDD and FRD are for as-built or approved work. A requirements spec written before implementation belongs to the `business-analyst` skill.
 
 ---
 
@@ -29,19 +31,19 @@ docs/
   api/                 # API endpoint documentation
   erd/                 # Entity Relationship Diagrams
   architecture/        # Architecture diagrams and overviews
-  changelog/           # CHANGELOG.md (single file, append-style)
+  changelog/           # CHANGELOG.md (single file, newest entries first)
   release-notes/       # Per-release notes (e.g., v1.2.0.md)
 ```
 
-Create subfolders on first use. Do NOT dump all docs in a flat `docs/` root.
+Create subfolders on first use. Do NOT dump all docs in a flat `docs/` root. Folders owned by other tools (`adr/`, `specs/`, `test-plans/`, `bugs/`, `reviews/`, `security/`) are left alone.
 
 ---
 
 ## Before Writing Any Doc
 
-Reflect the **actual codebase**, not assumptions. Before writing:
+Reflect the **actual codebase**, not assumptions. These steps assume a web app with a SQL schema; adapt them for other stacks. Before writing:
 
-1. **Read the schema** — the DB schema file is the source of truth for tables and columns.
+1. **Read the schema** — the DB schema file is the source of truth for tables and columns. Use its table and column names verbatim (same spelling and case) in every diagram and table.
 2. **Read relevant routes** — scan backend route files for endpoints, request/response shapes, middleware.
 3. **Read relevant pages/components** — scan frontend pages for UI flows.
 4. **Check existing docs** — read the target file first if it exists; update in place, don't overwrite.
@@ -54,7 +56,7 @@ Zero hallucinated details. Every table name, column, endpoint, and component mus
 
 ### 1. Flowchart (`docs/flowcharts/<feature-name>.md`)
 
-```markdown
+````markdown
 # <Feature Name> — Flow
 
 ## Overview
@@ -62,25 +64,27 @@ Brief one-liner on what this flow covers.
 
 ## Diagram
 
-` ``mermaid
+```mermaid
 flowchart TD
     A[Start] --> B{Decision}
     B -->|Yes| C[Action]
     B -->|No| D[Other Action]
     C --> E[End]
     D --> E
-` ``
+```
 
 ## Notes
 - Any edge cases, gotchas, or branching logic worth calling out.
-```
+````
 
 ---
 
 ### 2. TDD — Technical Design Document (`docs/tdd/<feature-name>.md`)
 
-```markdown
+````markdown
 # TDD: <Feature Name>
+
+**Status:** Draft | Under Review | Approved | Implemented
 
 ## 1. Context & Problem
 Why this feature exists. What problem it solves.
@@ -91,10 +95,10 @@ Why this feature exists. What problem it solves.
 | ...   | ...       |
 
 ## 3. Architecture Overview
-` ``mermaid
+```mermaid
 flowchart LR
     Client --> API --> DB[(Database)]
-` ``
+```
 
 ## 4. Data Model
 Tables involved, new columns/tables if any.
@@ -110,7 +114,7 @@ New or modified endpoints with request/response shapes.
 Pages, components, modals affected. Key state flows.
 
 ## 7. Sequence Diagram
-` ``mermaid
+```mermaid
 sequenceDiagram
     User->>+Web: Action
     Web->>+API: POST /endpoint
@@ -118,12 +122,12 @@ sequenceDiagram
     DB-->>-API: OK
     API-->>-Web: 200 response
     Web-->>-User: Success feedback
-` ``
+```
 
 ## 8. Edge Cases & Risks
 
 ## 9. Migration Plan (if schema changes needed)
-```
+````
 
 ---
 
@@ -131,6 +135,8 @@ sequenceDiagram
 
 ```markdown
 # FRD: <Feature Name>
+
+**Status:** Draft | Under Review | Approved | Implemented
 
 ## 1. Overview
 
@@ -190,9 +196,9 @@ Plain language, no code blocks unless showing UI text.
 
 ### 5. API Docs (`docs/api/<domain>.md`)
 
-Generate from actual route files. Group by domain.
+Generate from actual route files. Group by domain. The response envelope below (`success` / `data`) is an example: it must match the repo's real envelope.
 
-```markdown
+````markdown
 # API: <Domain>
 
 ## Endpoints
@@ -202,38 +208,38 @@ Generate from actual route files. Group by domain.
 **Description:** What it does.
 
 **Request Body:**
-` ``json
+```json
 { "field": "type" }
-` ``
+```
 
 **Response (200):**
-` ``json
+```json
 { "success": true, "data": {} }
-` ``
+```
 
 **Errors:**
 | Code | Message | When |
 |------|---------|------|
 | 400  | ...     | ...  |
 | 401  | ...     | ...  |
-```
+````
 
 ---
 
 ### 6. ERD (`docs/erd/<scope>.md`)
 
-Use Mermaid `erDiagram` syntax. Generate from actual schema files.
+Use Mermaid `erDiagram` syntax. Generate from actual schema files, with the schema's table names verbatim in the diagram and in the detail section.
 
-```markdown
+````markdown
 # ERD: <Scope>
 
 ## Diagram
 
-` ``mermaid
+```mermaid
 erDiagram
-    USERS ||--o{ ITEMS : has
-    ITEMS }o--|| CATEGORIES : "categorized by"
-` ``
+    users ||--o{ items : has
+    items }o--|| categories : "categorized by"
+```
 
 ## Table Details
 
@@ -241,18 +247,18 @@ erDiagram
 | Column | Type | Notes |
 |--------|------|-------|
 | id     | TEXT | PK    |
-```
+````
 
 ---
 
 ### 7. Architecture Diagram (`docs/architecture/<topic>.md`)
 
-```markdown
+````markdown
 # Architecture: <Topic>
 
 ## Diagram
 
-` ``mermaid
+```mermaid
 flowchart TB
     subgraph Client
         Web[Frontend SPA]
@@ -263,17 +269,17 @@ flowchart TB
     end
     Web -->|fetch| API
     API --> DB
-` ``
+```
 
 ## Components
 Brief description of each box and its responsibility.
-```
+````
 
 ---
 
 ### 8. Changelog (`docs/changelog/CHANGELOG.md`)
 
-Single file, newest entries at the top, each release grouped under Added, Changed and Fixed.
+Single file, newest entries at the top: `[Unreleased]` first, then one dated or versioned heading per release (`## [1.2.0] - YYYY-MM-DD`, or `## [YYYY-MM-DD]` when the project has no versions). Each section is grouped under Added, Changed and Fixed (leave out a group with no entries in a released section). A security fix goes under Fixed.
 
 ```markdown
 # Changelog
@@ -286,16 +292,19 @@ Single file, newest entries at the top, each release grouped under Added, Change
 
 ---
 
-## [YYYY-MM-DD]
+## [1.2.0] - YYYY-MM-DD
 
 ### Added
 - <Feature description>
+
+### Changed
+- <Change description>
 
 ### Fixed
 - <Bug fix description>
 ```
 
-When updating: read git log and recent completed tasks, then append to `[Unreleased]`.
+When updating: read `git log` since the last release heading, then add entries under `[Unreleased]`. At release, rename `[Unreleased]` to the dated or versioned heading and add a new empty `[Unreleased]` above it.
 
 ---
 
@@ -325,12 +334,13 @@ User-facing summary. Less technical than changelog.
 - **Changelogs / release notes** — update after every major feature ship or significant bug fix.
 - **API docs** — update whenever a route is added, changed, or removed.
 - **ERDs** — update whenever the schema changes.
-- **TDDs / FRDs** — mark as "Implemented" in the header once shipped.
+- **TDDs / FRDs** — set the `**Status:**` line to Implemented once shipped.
 - When updating an existing doc, **read it first** and surgically update — don't rewrite unless asked.
 
 ## Naming Conventions
 
-- kebab-case filenames: `budget-allocation.md`, not `BudgetAllocation.md`
+- kebab-case filenames: `budget-allocation.md`, not `BudgetAllocation.md`. The one exception is `CHANGELOG.md`.
+- Architecture docs follow the same rule: `docs/architecture/<topic>.md` (for example `overview.md`), not `ARCHITECTURE.md`.
 - Release notes: use date or version (`2026-04-16.md`, `v2.1.0.md`)
 
 ## Quality Checklist

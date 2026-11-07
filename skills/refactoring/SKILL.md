@@ -1,6 +1,6 @@
 ---
 name: refactoring
-description: "Risk-based code refactoring guide for frontend components, hooks, modals, tabs, constants, API routes, and LLM request builders. Use when asked to refactor or extract these elements, or when a maintained source file approaches or exceeds 300 lines and needs a responsibility review. Classify changes, preserve behavior contracts, require verification evidence, and document size exceptions instead of splitting solely to satisfy line counts."
+description: "Risk-based code refactoring guide for frontend (React-style) components, hooks, modals, tabs, constants, API routes, and LLM request builders. Use when asked to refactor or extract these elements, or when a maintained source file reaches 300 lines and needs a responsibility review. Classify changes, preserve behavior contracts, require verification evidence, and document size exceptions instead of splitting solely to satisfy line counts."
 argument-hint: "[optional: file path or area to refactor]"
 license: MIT
 metadata:
@@ -8,7 +8,7 @@ metadata:
   tags: "refactoring,code-quality"
   featured: "false"
   order: "5"
-  version: "2.0.0"
+  version: "2.0.1"
 ---
 
 # Refactoring Guide
@@ -26,6 +26,8 @@ metadata:
 - In a repository without PR review, use the substitutes in section 7. Do not invent approvals, and do not leave every change blocked on reviewers who do not exist.
 
 ## 1. Inspect and establish the baseline
+
+If an argument was given (a file path or area), treat it as the refactor scope and start there; with no argument, use the files or area the request names.
 
 1. Read repository instructions, architecture conventions, affected callers, exports, and existing tests.
 2. Identify the actual build, lint, type-check, and test commands from the repository. Do not invent commands.
@@ -81,7 +83,7 @@ Never treat a PR below 400 lines as approved, low-risk, or adequately tested by 
 
 ## 4. Choose what to extract
 
-Review responsibilities first. Use counts only to prompt inspection.
+Review responsibilities first. Use counts only to prompt inspection. The frontend rows and sections below (components, hooks, modals, tabs, JSX) are written for React-style code; apply the same ideas to other frameworks.
 
 | Signal | Extraction decision |
 |---|---|
